@@ -1,0 +1,22 @@
+{
+	"compilerOptions": {
+		"strict": true,
+		"jsx": "react-jsx",
+		"baseUrl": ".",
+		"paths": {
+			"@/*": ["./src/*"],
+			"~/*": ["src/*"],
+			"@dto/*": ["./src/dto/*"],
+			"@assets/*": ["./src/assets/*"],
+			"@components/*": ["./src/components/*"],
+			"@screens/*": ["./src/screens/*"],
+			"@storage/*": ["./src/storage/*"],
+			"@utils/*": ["./src/utils/*"],
+			"@services/*": ["./src/services/*"],
+			"@hooks/*": ["./src/hooks/*"],
+			"@contexts/*": ["./src/contexts/*"],
+			"@routes/*": ["./src/routes/*"]
+		}
+	},
+	"extends": "expo/tsconfig.base"
+}
