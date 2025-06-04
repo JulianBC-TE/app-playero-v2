@@ -10,6 +10,7 @@ import {
 	Tractor,
 	Cog,
 	LucideIcon,
+	Pencil,
 } from "lucide-react-native";
 
 export type menuItemType = {
@@ -68,6 +69,13 @@ export const baseMenuItems: menuItemType[] = [
 		icon: DraftingCompass,
 		route: "medicion",
 		enabled: false,
+		params: {},
+	},
+	{
+		name: "Firma",
+		icon: Pencil,
+		route: "telaDeAssinatura",
+		enabled: true,
 		params: {},
 	},
 ];

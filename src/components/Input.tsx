@@ -5,12 +5,14 @@ type Props = TextInputProps & {
 	isReadOnly?: boolean;
 	isInvalid?: boolean;
 	errorMessage?: string | null;
+	align?: "left" | "center" | "right";
 };
 
 export function Input({
 	isReadOnly = false,
 	errorMessage = null,
 	isInvalid = false,
+	align = "left",
 	onFocus,
 	onBlur,
 	...rest
@@ -47,7 +49,7 @@ export function Input({
           justify-center
           ${getBorderClass()}
           ${isReadOnly ? "opacity-50" : "opacity-100"}
-		  ${!isMultiline ? "h-10" : ""}
+		  ${!isMultiline ? "h-10" : "h-24"}
         `}
 			>
 				<TextInput
@@ -61,7 +63,7 @@ export function Input({
             rounded-md
           `}
 					style={{
-						textAlign: "left",
+						textAlign: align,
 						lineHeight: 20,
 						paddingTop: 0,
 						paddingBottom: 0,

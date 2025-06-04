@@ -3,6 +3,6 @@ export type MedicionDTO = {
 	id_tanque: string;
 	regla: number;
 	temperatura: number;
-	litros?: string;
+	litros?: number;
 	foto_tanque: string;
 };

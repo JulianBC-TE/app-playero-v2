@@ -73,8 +73,55 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 		]);
 	};
 
+	async function procesarTurno() {
+		try {
+			console.log(
+				"Iniciando procesamiento de turno para bodega...",
+				selectedBodega
+			);
+			// pega todos os picos de uma bodega
+			const picosResult = await api.get("/api/picos", {
+				params: {
+					id_bodega: selectedBodega,
+				},
+			});
+			console.log("Picos obtidos:", picosResult.data.picos);
+			const picos = picosResult.data.picos;
+			const med_picos = await Promise.all(
+				picos.map(async (pico: any) => {
+					console.log("Processando pico:", pico.id_pico);
+					const totalizadorResult = await api.get("/api/totalizador", {
+						params: {
+							pico: pico.id_pico,
+						},
+					});
+					console.log("Totalizado:", totalizadorResult);
+					return {
+						pico: pico.id_pico,
+						totalizador: totalizadorResult.data.totalizador,
+					};
+				})
+			);
+			console.log("Picos e totalizadores obtidos:", med_picos);
+		} catch (error) {
+			toastError("Erro ao processar turno", "Tente novamente mais tarde.");
+			console.error("Erro ao processar turno:", error);
+		} finally {
+			setIsLoading(false);
+		}
+	}
+
 	useEffect(() => {
 		if (route.params?.onSelect) {
+			// route.params.onSelect.map((medicion: MedicionDTO) => {
+			// 	console.log(
+			// 		medicion.tanque,
+			// 		medicion.id_tanque,
+			// 		medicion.litros,
+			// 		medicion.regla,
+			// 		medicion.temperatura
+			// 	);
+			// });
 			setMedicion(route.params.onSelect);
 		}
 	}, [route.params?.onSelect]);
@@ -82,10 +129,6 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 	useEffect(() => {
 		fetchTurno();
 	}, []);
-
-	useEffect(() => {
-		console.log("Bodegas:", selectedBodega);
-	}, [selectedBodega]);
 
 	async function fetchTurno() {
 		try {
@@ -151,7 +194,9 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 						className='ml-2'
 						value={observations}
 						onChangeText={setObservations}
-						placeholder='Informe, chapa o ID del vehículo'
+						placeholder={`Observaciones ${
+							inicioTurno ? "para el cierre" : "para la apertura"
+						} de turno`}
 					/>
 				</InputCard>
 				<InputCard
@@ -181,6 +226,8 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 					</View>
 				</InputCard>
 				<Button
+					onPress={procesarTurno}
+					disabled={isLoading || selectedBodega === ""}
 					title={`${inicioTurno === false ? "Iniciar Turno" : "Cerrar Turno"}`}
 				/>
 			</View>

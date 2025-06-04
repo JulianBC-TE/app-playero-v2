@@ -16,6 +16,7 @@ import { BuscarVehiculo } from "@/screens/vehiculo/BuscarVehiculo";
 import { CrearVehiculo } from "@/screens/vehiculo/CrearVehiculo";
 import { Medicion } from "@/screens/turno/Medicion";
 import { MedicionDTO } from "@/dto/MedicionDTO";
+import { TelaDeAssinatura } from "@/screens/TelaDeAssinatura";
 
 export type StackRoutesList = {
 	home: undefined;
@@ -30,6 +31,7 @@ export type StackRoutesList = {
 	buscarvehiculo: { enabledSelect?: boolean } | undefined;
 	crearvehiculo: undefined;
 	medicion: { idBodega: string } | undefined; // Assuming Medicion is a part of Turno for this example
+	telaDeAssinatura: { onSave: (base64: string) => void } | undefined;
 };
 
 export type StackRoutesProps<T extends keyof StackRoutesList> =
@@ -92,6 +94,10 @@ export function StackRoutes() {
 			<Stack.Screen
 				name='config'
 				component={Config} // Assuming Medicion is a part of Turno for this example
+			/>
+			<Stack.Screen
+				name='telaDeAssinatura'
+				component={TelaDeAssinatura} // Assuming Medicion is a part of Turno for this example
 			/>
 		</Stack.Navigator>
 	);

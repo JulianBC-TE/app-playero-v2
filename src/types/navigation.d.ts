@@ -13,6 +13,7 @@ export type RootStackParamList = {
 	BuscarVehiculo: { enabledSelect?: boolean } | undefined;
 	CrearVehiculo: undefined;
 	Medicion: { idBodega: string } | undefined;
+	TelaDeAssinatura: { onSave: (base64: string) => void } | undefined;
 };
 
 declare global {

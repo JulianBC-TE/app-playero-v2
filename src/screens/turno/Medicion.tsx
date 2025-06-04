@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 import { PhotoButton } from "@/components/PhotoButton";
 
 import { toastError, toastSuccess } from "@utils/toastMessage";
-import { useEffect, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { InputCard } from "@/components/InputCard";
 import { Input } from "@/components/Input";
 import { api } from "@/services/api";
@@ -76,72 +76,53 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 			);
 			return;
 		}
-
-		const tanqueEncontrado = tanques.find(
+		console.log("Tanque selecionado:", selectedTanques);
+		// Busca o nome do tanque selecionado
+		const tanqueSelecionado = tanques.find(
 			(t) => t.id_tanque === +selectedTanques
 		);
 
-		if (medicion && !medicion.some((m) => m.id_tanque === selectedTanques)) {
-			const newMedicion: MedicionDTO = {
-				tanque: tanqueEncontrado?.descripcion_tanque || "",
-				id_tanque: selectedTanques,
-				regla: parseFloat(altura_regla),
-				temperatura: parseFloat(temperatura),
-				litros: litros,
-				foto_tanque: base64Image,
-			};
-			setMedicion((prev) => [...(prev || []), newMedicion]);
-			reset(); // Limpa os campos do formulário
-			setBase64Image(""); // Limpa a imagem capturada
-			toastSuccess(
-				"Tanque registrado",
-				"El tanque ha sido registrado con éxito."
-			);
-		} else {
-			Alert.alert(
-				"Tanque ya registrado",
-				"Quiere replazar la medición de este tanque?",
-				[
-					{
-						text: "Cancelar",
-						style: "cancel",
-					},
-					{
-						text: "Reemplazar",
-						onPress: () => {
-							const updatedMedicion = medicion?.map((m) =>
-								m.id_tanque === selectedTanques
-									? {
-											...m,
-											regla: parseFloat(altura_regla),
-											temperatura: parseFloat(temperatura),
-											litros: litros,
-											foto_tanque: base64Image,
-									  }
-									: m
-							);
-							setMedicion(updatedMedicion || []);
-							reset(); // Limpa os campos do formulário
-							setBase64Image(""); // Limpa a imagem capturada
-							toastSuccess(
-								"Medición actualizada",
-								"La medición del tanque ha sido actualizada."
-							);
-						},
-					},
-				]
-			);
+		if (!tanqueSelecionado) {
+			toastError("Tanque inválido", "Seleccione un tanque válido.");
+			return;
 		}
-		// const dados: MedicionDTO = {
-		// 	id_tanque: selectedTanques,
 
-		// };
-		//navigation.popTo("turno", { onSelect: dados });
+		const newMedicion: MedicionDTO = {
+			tanque: tanqueSelecionado.descripcion_tanque || "",
+			id_tanque: selectedTanques,
+			regla: parseFloat(altura_regla),
+			temperatura: parseFloat(temperatura),
+			litros: parseFloat(litros),
+			foto_tanque: base64Image,
+		};
+		// Atualiza a lista de mediciones
+		const updatedMediciones = [...medicion, newMedicion];
+		setMedicion(updatedMediciones);
+
+		// Remove o tanque processado da lista
+		const tanquesAtualizados = tanques.filter(
+			(t) => t.id_tanque !== +selectedTanques
+		);
+		setTanques(tanquesAtualizados);
+		setSelectedTanques(""); // Limpa o tanque selecionado
+
+		reset(); // Limpa os campos do formulário
+		setBase64Image(""); // Limpa a imagem capturada
+		toastSuccess(
+			"Tanque registrado",
+			"El tanque ha sido registrado con éxito."
+		);
+
+		// Se era o último tanque, conclui
+		if (tanquesAtualizados.length === 0) {
+			toastSuccess(
+				"Tanques Medidos",
+				"Todos los tanques han sido medidos con éxito."
+			);
+			console.log("Qtd. Mediciones:", updatedMediciones.length);
+			navigation.popTo("turno", { onSelect: updatedMediciones });
+		}
 	};
-
-	function volver() {
-		navigation.popTo("turno", { onSelect: medicion });
-	}
 
 	function handleRemoveMedicion(idTanque: string) {
 		setMedicion((prev) => prev.filter((item) => item.id_tanque !== idTanque));
@@ -208,6 +189,10 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 		}
 	}, []);
 
+	useEffect(() => {
+		console.log(selectedTanques);
+	}, [tanques, selectedTanques]);
+
 	return (
 		<View className='flex-1'>
 			<ScreenHeader title='Medición' />
@@ -229,9 +214,9 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 					<Controller
 						control={control}
 						name='altura_regla'
-						rules={{ required: "cedula de identidad es requerido" }}
 						render={({ field: { onChange, value } }) => (
 							<Input
+								align='center'
 								textAlignVertical='top'
 								className='ml-2 text-center'
 								value={value}
@@ -246,9 +231,9 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 					<Controller
 						control={control}
 						name='litros'
-						rules={{ required: "informe el litro que hay en el tanque" }}
 						render={({ field: { onChange, value } }) => (
 							<Input
+								align='center'
 								textAlignVertical='top'
 								className='ml-2'
 								value={value}
@@ -263,15 +248,15 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 					<Controller
 						control={control}
 						name='temperatura'
-						rules={{ required: "cedula de identidad es requerido" }}
 						render={({ field: { onChange, value } }) => (
 							<Input
+								align='center'
 								textAlignVertical='top'
 								className='ml-2'
 								value={value}
 								onChangeText={onChange}
 								placeholder='Informe la temperatura del tanque'
-								errorMessage={errors.altura_regla?.message}
+								errorMessage={errors.temperatura?.message}
 							/>
 						)}
 					/>
@@ -296,7 +281,7 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 
 				<View className='w-full flex-col justify-center gap-4'>
 					<View>
-						<FlatList
+						{/* <FlatList
 							className='mt-2'
 							data={medicion}
 							keyExtractor={(item) => item.id_tanque}
@@ -309,7 +294,7 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 								/>
 							)}
 							showsVerticalScrollIndicator={false}
-						/>
+						/> */}
 					</View>
 					<View className='flex-row justify-center gap-4'>
 						<Button
@@ -320,7 +305,7 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 							iconSize='md'
 							iconColor='#000'
 						/>
-						{medicion.length > 0 && (
+						{/* {medicion.length > 0 && (
 							<Button
 								title='Concluir'
 								onPress={volver}
@@ -329,7 +314,7 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 								iconSize='md'
 								iconColor='#000'
 							/>
-						)}
+						)} */}
 					</View>
 				</View>
 			</View>

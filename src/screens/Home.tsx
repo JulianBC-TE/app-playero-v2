@@ -7,9 +7,7 @@ import { api } from "@/services/api";
 import { useAppContext } from "@/hooks/useAppContext";
 import { SucursalDTO } from "@/dto/userDTO copy";
 import { useEffect, useState } from "react";
-import { set } from "react-hook-form";
 import Toast from "react-native-toast-message";
-//import { toastError } from "@/utils/toastMessage";
 import { Loading } from "@/components/Loading";
 import { baseMenuItems, menuItemType } from "@/dto/MenuItens";
 
