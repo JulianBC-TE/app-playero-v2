@@ -11,7 +11,7 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import { toastError, toastSuccess } from "@utils/toastMessage";
 import * as yup from "yup";
 import { api } from "@services/api";
-import { StackRoutesProps } from "@/route/StackRoutes";
+import { StackRoutesProps } from "@/route/app.routes";
 import { Save } from "lucide-react-native";
 
 type FormData = {

@@ -16,7 +16,7 @@ import { VehiculoCard } from "@components/VehiculoCard";
 import { toastError, toastSuccess } from "@utils/toastMessage";
 import { XCircle, Search } from "lucide-react-native";
 import { EmptyList } from "@/components/EmptyList";
-import { StackRoutesProps } from "@/route/StackRoutes";
+import { StackRoutesProps } from "@/route/app.routes";
 
 const PAGE_SIZE = 15;
 

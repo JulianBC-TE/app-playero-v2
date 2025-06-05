@@ -1,8 +1,8 @@
 import { HomeHeader } from "@/components/HomeHeader";
-import { FlatList, Text, View } from "react-native";
+import { Alert, FlatList, Text, View } from "react-native";
 
 import { MenuCard } from "@/components/MenuCard";
-import { StackRoutesList, StackRoutesProps } from "@/route/StackRoutes";
+import { StackRoutesList, StackRoutesProps } from "@/route/app.routes";
 import { api } from "@/services/api";
 import { useAppContext } from "@/hooks/useAppContext";
 import { SucursalDTO } from "@/dto/userDTO copy";
@@ -11,79 +11,74 @@ import Toast from "react-native-toast-message";
 import { Loading } from "@/components/Loading";
 import { baseMenuItems, menuItemType } from "@/dto/MenuItens";
 
-import { Cog, AlertOctagon } from "lucide-react-native";
-import { Button } from "@/components/Button";
+import { Cog } from "lucide-react-native";
 
 export function Home({ navigation }: StackRoutesProps<"home">) {
 	const [isLoading, setIsLoading] = useState(true);
 	const [isReady, setIsready] = useState(false);
 	const [menuItems, setMenuItems] = useState<menuItemType[]>(baseMenuItems);
-	const { setSucursal, sucursal } = useAppContext();
+	const { setSucursal, sucursal, serverIP } = useAppContext();
 
 	function handleOpenMenu(route: keyof StackRoutesList, params: object) {
 		navigation.navigate(route, params as any);
 	}
 
 	async function fetchSucursal() {
-		setMenuItems(baseMenuItems);
 		try {
 			setIsLoading(true);
-			// Isso deve ficar no login
+
 			const response = await api.get("/api/sucursales");
-			const sucursal: SucursalDTO = response.data[0];
-			setSucursal(sucursal);
+			const sucursalData: SucursalDTO = response.data[0];
+			setSucursal(sucursalData);
 
 			const turno = await api.get("/api/registros/turno/status");
 			const { inicio_turno } = turno.data;
-			const updatedMenu = menuItems.map((item) => {
-				item.enabled = true; // Reset all items to disabled
-				// Testar Salida, Traspaso, Abastecimiento
-				if (
-					item.name === "Salida" ||
-					item.name === "Traspaso" ||
-					item.name === "Abastecimiento"
-				) {
+
+			const updatedMenu = baseMenuItems.map((item) => {
+				if (item.name === "Traspaso" || item.name === "Abastecimiento") {
 					return { ...item, enabled: inicio_turno };
 				}
-				return item;
+				return { ...item, enabled: true };
 			});
-			setIsready(true);
+
 			setMenuItems(updatedMenu);
+			setIsready(true);
 		} catch (error) {
-			// Cria um novo menu de configurações caso ocorra erro na conexão com o backend
-			// Se não tiver Config na lista adiciona
-			if (!menuItems.some((item) => item.name === "Config")) {
-				menuItems.push({
+			const fallbackMenu = [
+				...baseMenuItems,
+				{
 					name: "Config",
 					icon: Cog,
-					route: "config",
+					route: "config" as keyof StackRoutesList,
 					enabled: true,
 					params: {},
-				});
-			}
-			// usando a biblioteca react-native-toast-message crie um toast contendo um botão para recarregar a página
-			// e tentar novamente
-			Toast.show({
-				type: "CustomToast",
-				text1: "Erro ao carregar Sucursal. Recarregar?",
-				position: "top",
-				visibilityTime: 5000,
-
-				props: {
-					onConfirm: () => setIsready(false),
 				},
-			});
+			];
 
+			setMenuItems(fallbackMenu);
 			setSucursal(null);
-			setIsready(true);
-			console.log("Error fetching Sucursal:", error);
+
+			Alert.alert(
+				"Erro ao carregar Sucursal",
+				"Recarregar?",
+				[
+					{ text: "Cancelar", style: "cancel" },
+					{
+						text: "Recarregar",
+						onPress: () => fetchSucursal(),
+					},
+				],
+				{ cancelable: false }
+			);
+
+			console.log("Erro ao buscar sucursal:", error);
 		} finally {
 			setIsLoading(false);
 		}
 	}
 
 	useEffect(() => {
-		fetchSucursal();
+		if (!isReady) fetchSucursal();
 	}, [isReady]);
 
 	return (
@@ -117,9 +112,13 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 							)}
 						/>
 					</View>
-					<View className='mb-4'>
-						<Text className='text-center text-lg font-bold mt-4'>
+					<View className='mb-4 mt-4'>
+						<Text className='text-center text-lg font-bold'>
 							{sucursal?.descripcion_sucursal || "Nenhuma Sucursal Selecionada"}
+							({sucursal?.id_sucursal})
+						</Text>
+						<Text className='text-center text-sm'>
+							{serverIP || "Nenhum Servidor Configurado"}
 						</Text>
 					</View>
 				</View>

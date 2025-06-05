@@ -1,7 +1,7 @@
 import * as ImagePicker from "expo-image-picker";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { StackRoutesProps } from "@/route/StackRoutes";
+import { StackRoutesProps } from "@/route/app.routes";
 import { Alert, FlatList, Image, View } from "react-native";
 import { Button } from "@/components/Button";
 import { PhotoButton } from "@/components/PhotoButton";

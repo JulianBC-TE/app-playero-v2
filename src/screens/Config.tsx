@@ -1,4 +1,4 @@
-import { StackRoutesProps } from "@/route/StackRoutes";
+import { StackRoutesProps } from "@/route/app.routes";
 import { View } from "react-native";
 
 export function Config({ navigation }: StackRoutesProps<"config">) {

@@ -15,7 +15,7 @@
 			"@services/*": ["./src/services/*"],
 			"@hooks/*": ["./src/hooks/*"],
 			"@contexts/*": ["./src/contexts/*"],
-			"@routes/*": ["./src/routes/*"]
+			"@route/*": ["./src/route/*"]
 		}
 	},
 	"extends": "expo/tsconfig.base"

@@ -16,7 +16,7 @@ import debounce from "lodash.debounce";
 import { EmptyList } from "@/components/EmptyList";
 import { toastError, toastSuccess } from "@utils/toastMessage";
 
-import { StackRoutesProps } from "@/route/StackRoutes";
+import { StackRoutesProps } from "@/route/app.routes";
 
 interface Props {
 	enabledEdit?: boolean;

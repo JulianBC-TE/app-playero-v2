@@ -1,18 +1,25 @@
 import * as ImagePicker from "expo-image-picker";
 import { Alert, Image, Pressable, ScrollView, View } from "react-native";
+import { useEffect, useState } from "react";
+import { api } from "@/services/api";
+import { StackRoutesProps } from "@/route/app.routes";
+
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { StackRoutesProps } from "@/route/StackRoutes";
 import { InputCard } from "@/components/InputCard";
 import { Button } from "@/components/Button";
-import { useEffect, useState } from "react";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { PhotoButton } from "@/components/PhotoButton";
 import { Input } from "@/components/Input";
-import { RulerDimensionLine, CheckCheck } from "lucide-react-native";
-import { api } from "@/services/api";
-import { BodegaDTO } from "@/dto/BodegaDTO";
 import { Select } from "@/components/Select";
+
+import { BodegaDTO } from "@/dto/BodegaDTO";
 import { MedicionDTO } from "@/dto/MedicionDTO";
+import { TurnoDTO } from "@/dto/TurnoDTO";
+
+import { RulerDimensionLine, CheckCheck } from "lucide-react-native";
+import { useAppContext } from "@/hooks/useAppContext";
+import { AppError } from "@/utils/AppError";
+import { set } from "react-hook-form";
 
 export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 	const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +29,8 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 	const [selectedBodega, setSelectedBodega] = useState("");
 	const [bodegas, setBodegas] = useState<BodegaDTO[]>([]);
 	const [medicion, setMedicion] = useState<MedicionDTO[]>([]);
+	const [turno, setTurno] = useState<TurnoDTO[]>([]);
+	const { sucursal, user } = useAppContext();
 
 	async function handlePhotoCapture() {
 		try {
@@ -74,38 +83,97 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 	};
 
 	async function procesarTurno() {
+		setIsLoading(true);
 		try {
 			console.log(
 				"Iniciando procesamiento de turno para bodega...",
 				selectedBodega
 			);
-			// pega todos os picos de uma bodega
+
+			// 1. Buscar todos los picos de la bodega selecionada
 			const picosResult = await api.get("/api/picos", {
 				params: {
 					id_bodega: selectedBodega,
 				},
 			});
-			console.log("Picos obtidos:", picosResult.data.picos);
+			//console.log("Picos obtidos:", picosResult.data.picos);
 			const picos = picosResult.data.picos;
-			const med_picos = await Promise.all(
+
+			// 2. Buscar el taxilitro de cada pico
+			// Horustech tiene un id para cada pido y guarda el taxilitro
+			// de forma individual
+			const resultadosTotalizadores = await Promise.all(
 				picos.map(async (pico: any) => {
-					console.log("Processando pico:", pico.id_pico);
-					const totalizadorResult = await api.get("/api/totalizador", {
-						params: {
-							pico: pico.id_pico,
-						},
-					});
-					console.log("Totalizado:", totalizadorResult);
+					//console.log("Processando pico surtidor:", pico.id_pico_surtidor);
+					const totalizadorResult = await api.get(
+						`/api/totalizador/${pico.id_pico_surtidor}`
+					);
+					//console.log("Totalizado:", totalizadorResult.data.totalizador);
 					return {
 						pico: pico.id_pico,
 						totalizador: totalizadorResult.data.totalizador,
 					};
 				})
 			);
-			console.log("Picos e totalizadores obtidos:", med_picos);
+			// Soma os totalizadores para calcular el taxilitro general
+			const taxilitroGeneral = resultadosTotalizadores.reduce((acc, cur) => {
+				return acc + Number(cur.totalizador ?? 0);
+			}, 0);
+			console.log("Taxilitro General:", taxilitroGeneral);
+
+			const now = new Date();
+			const fecha = now.toISOString().slice(0, 10);
+			const hora = now.toTimeString().slice(0, 8);
+
+			const totalizadorLitros = medicion.reduce((acc, cur) => {
+				return acc + (cur.litros ?? 0);
+			}, 0);
+			console.log("Totalizador Litros:", totalizadorLitros);
+
+			// 3. Criar o registro de turno
+			const nuevoTurno: TurnoDTO = {
+				id_suc: Number(sucursal.id_sucursal), // ID da sucursal, deve ser dinâmico
+				id_bod: Number(selectedBodega),
+				fecha,
+				hora,
+				ci_playero: Number(user.cedula),
+				litros: totalizadorLitros,
+				observacion: observations,
+				// fotos_observacion: [],
+				fotos_observacion: base64Images,
+				med_tanques: medicion.map((med) => ({
+					id_tanque: Number(med.id_tanque),
+					regla: med.regla,
+					temperatura: med.temperatura,
+					litros: med.litros,
+					// foto_tanque: [],
+					foto_tanque: med.foto_tanque ? [med.foto_tanque] : [],
+				})),
+				med_picos: resultadosTotalizadores.map((result) => ({
+					id_pico: result.pico,
+					taxilitro: result.totalizador,
+				})),
+			};
+			console.log(
+				"Nuevo Turno:",
+				JSON.stringify({ json: nuevoTurno }, null, 2)
+			);
+			await api.post(
+				"/api/registros/turno/" + (inicioTurno ? "inicio" : "fin"),
+				{ json: nuevoTurno }
+			);
+			toastSuccess(
+				"Turno procesado",
+				`El turno ha sido ${inicioTurno ? "iniciado" : "cerrado"} con éxito.`
+			);
+			console.log("Turno procesado con éxito");
 		} catch (error) {
-			toastError("Erro ao processar turno", "Tente novamente mais tarde.");
-			console.error("Erro ao processar turno:", error);
+			const isAppError = error instanceof AppError;
+			const message = isAppError
+				? error.message
+				: "No se pudo conectar al servidor";
+			toastError("Error al precessar turno", message);
+			console.error("Error al procesar turno:", error);
 		} finally {
 			setIsLoading(false);
 		}
@@ -113,15 +181,6 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 
 	useEffect(() => {
 		if (route.params?.onSelect) {
-			// route.params.onSelect.map((medicion: MedicionDTO) => {
-			// 	console.log(
-			// 		medicion.tanque,
-			// 		medicion.id_tanque,
-			// 		medicion.litros,
-			// 		medicion.regla,
-			// 		medicion.temperatura
-			// 	);
-			// });
 			setMedicion(route.params.onSelect);
 		}
 	}, [route.params?.onSelect]);
@@ -178,9 +237,33 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 						icon={medicion?.length > 0 ? CheckCheck : RulerDimensionLine}
 						iconColor={medicion?.length > 0 ? "#0af706" : "#000"}
 						iconSize='md'
-						onPress={() =>
-							navigation.navigate("medicion", { idBodega: selectedBodega })
-						}
+						onPress={() => {
+							if (medicion?.length > 0) {
+								// Gere um alerta com as opções de continuar ou não
+								Alert.alert(
+									"Medición existente",
+									"Já existe uma medição para esta bodega. Deseja continuar?",
+									[
+										{
+											text: "Cancelar",
+											style: "cancel",
+										},
+										{
+											text: "Continuar",
+											onPress: () => {
+												navigation.navigate("medicion", {
+													idBodega: selectedBodega,
+												});
+											},
+										},
+									]
+								);
+							} else {
+								navigation.navigate("medicion", {
+									idBodega: selectedBodega,
+								});
+							}
+						}}
 					/>
 				</InputCard>
 				<InputCard
@@ -226,8 +309,8 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 					</View>
 				</InputCard>
 				<Button
+					isLoading={isLoading}
 					onPress={procesarTurno}
-					disabled={isLoading || selectedBodega === ""}
 					title={`${inicioTurno === false ? "Iniciar Turno" : "Cerrar Turno"}`}
 				/>
 			</View>

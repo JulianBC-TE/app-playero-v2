@@ -1,6 +1,6 @@
 import { use, useEffect, useState } from "react";
 
-import { StackRoutesProps } from "@/route/StackRoutes";
+import { StackRoutesProps } from "@/route/app.routes";
 
 import { Input } from "@components/Input";
 import { InputCard } from "@components/InputCard";

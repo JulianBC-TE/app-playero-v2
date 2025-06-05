@@ -1,7 +1,7 @@
 import { Text, TouchableOpacity, View } from "react-native";
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { StackRoutesProps } from "@/route/StackRoutes";
+import { StackRoutesProps } from "@/route/app.routes";
 
 import { toastError, toastSuccess } from "@utils/toastMessage";
 import { Input } from "@components/Input";

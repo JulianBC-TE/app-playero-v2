@@ -1,7 +1,7 @@
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { StackRoutesProps } from "@/route/StackRoutes";
+import { StackRoutesProps } from "@/route/app.routes";
 import { View } from "react-native";
 import { BuscarVehiculo } from "./BuscarVehiculo";
 import { CrearVehiculo } from "./CrearVehiculo";

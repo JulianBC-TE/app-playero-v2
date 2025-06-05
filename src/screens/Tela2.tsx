@@ -1,7 +1,7 @@
 import { Input } from "@/components/Input";
 import { InputCard } from "@/components/InputCard";
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { StackRoutesProps } from "@/route/StackRoutes";
+import { StackRoutesProps } from "@/route/app.routes";
 import { useState } from "react";
 import { Text, View } from "react-native";
 

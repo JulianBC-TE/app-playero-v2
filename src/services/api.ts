@@ -1,6 +1,8 @@
 import { AppError } from "@utils/AppError";
 import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from "axios";
 import { getAuthToken, saveAuthToken } from "@storage/storageAuthToken";
+import { get } from "node_modules/axios/index.cjs";
+import { getStorageServerUrl } from "@/storage/storageServer";
 
 type SignOut = () => Promise<void>;
 type PromiseType = {
@@ -13,8 +15,7 @@ type APIInstanceProps = AxiosInstance & {
 };
 
 const api = axios.create({
-	baseURL: "http://192.168.10.233:3004",
-	timeout: 10000, // Definindo um timeout padrão de 10 segundos
+	timeout: 20000, // Definindo um timeout padrão de 10 segundos
 }) as APIInstanceProps;
 
 let failedQueue: Array<PromiseType> = [];
@@ -25,6 +26,15 @@ api.registerInterceptTokenManager = (signOut) => {
 	const requestInterceptor = api.interceptors.request.use(
 		async (config) => {
 			try {
+				const serverIP = await getStorageServerUrl();
+
+				if (serverIP) {
+					config.baseURL = serverIP;
+					if (!serverIP.startsWith("http://")) {
+						config.baseURL = `http://${serverIP}`;
+					}
+				}
+
 				const { token } = await getAuthToken();
 				if (token && config.headers) {
 					config.headers.Authorization = `Bearer ${token}`;
@@ -105,7 +115,7 @@ api.registerInterceptTokenManager = (signOut) => {
 					return new Promise(async (resolve, reject) => {
 						try {
 							const { data } = await axios.post(
-								`${api.defaults.baseURL}/sessions/refresh-token`,
+								`${api.defaults.baseURL}/api/auth/refresh-token`,
 								{ refresh_token }
 							);
 

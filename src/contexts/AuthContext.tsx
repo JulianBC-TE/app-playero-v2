@@ -10,12 +10,11 @@ import {
 import { getStorageServerUrl, saveServerUrl } from "@storage/storageServer";
 import { ClienteDTO } from "@dto/ClienteDTO";
 import { SucursalDTO } from "@/dto/userDTO copy";
-import { set } from "react-hook-form";
 
 export type AuthContextDataProps = {
 	user: UserDTO;
 	updateUserProfile: (userUpdated: UserDTO) => Promise<void>;
-	signIn: (email: string, password: string) => Promise<void>;
+	signIn: (cedula: string, password: string) => Promise<void>;
 	isLoadingUserData: boolean;
 	signOut: () => Promise<void>;
 	cliente: ClienteDTO;
@@ -72,16 +71,21 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 		}
 	}
 
-	async function signIn(email: string, password: string) {
+	async function signIn(cedula: string, password: string) {
 		try {
-			const { data } = await api.post("/sessions", {
-				email,
-				password,
+			const { data } = await api.post("/api/auth/login", {
+				cedula: Number(cedula),
+				clave: password,
 			});
-			if (data.user && data.token && data.refresh_token) {
-				UserAndTokenSave(data.user, data.token, data.refresh_token);
 
-				UserAndTokenUpdate(data.user, data.token);
+			const usuario: UserDTO = {
+				cedula: cedula,
+				name: data.name,
+			};
+
+			if (data.name && data.token) {
+				UserAndTokenSave(usuario, data.token, "");
+				UserAndTokenUpdate(usuario, data.token);
 			}
 		} catch (error) {
 			throw error;

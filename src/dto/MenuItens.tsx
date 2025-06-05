@@ -1,4 +1,4 @@
-import { StackRoutesList } from "@/route/StackRoutes";
+import { StackRoutesList } from "@/route/app.routes";
 
 import {
 	ArrowRightLeft,
@@ -33,7 +33,7 @@ export const baseMenuItems: menuItemType[] = [
 		name: "Salida",
 		icon: Fuel,
 		route: "cliente",
-		enabled: false,
+		enabled: true,
 		params: {},
 	},
 	{
