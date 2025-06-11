@@ -19,8 +19,13 @@ import { TurnoDTO } from "@/dto/TurnoDTO";
 import { RulerDimensionLine, CheckCheck } from "lucide-react-native";
 import { useAppContext } from "@/hooks/useAppContext";
 import { AppError } from "@/utils/AppError";
-import { set } from "react-hook-form";
 
+/**
+ * Componente para gestionar el turno de trabajo.
+ *
+ * @param param0 - Props de navegación y ruta.
+ * @returns Componente de turno.
+ */
 export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 	const [isLoading, setIsLoading] = useState(false);
 	const [inicioTurno, setInicioTurno] = useState(false);
@@ -29,9 +34,20 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 	const [selectedBodega, setSelectedBodega] = useState("");
 	const [bodegas, setBodegas] = useState<BodegaDTO[]>([]);
 	const [medicion, setMedicion] = useState<MedicionDTO[]>([]);
+	const [totalizadorInicial, setTotalizadorInicial] = useState(0);
+	const [totalizadorFinal, setTotalizadorFinal] = useState(0);
 	const [turno, setTurno] = useState<TurnoDTO[]>([]);
 	const { sucursal, user } = useAppContext();
 
+	/**
+	 * Abre la cámara del dispositivo, solicita permisos si es necesario,
+	 * y agrega la foto capturada (en base64) al estado de imágenes.
+	 * Muestra mensajes de éxito o error según el resultado.
+	 *
+	 * @async
+	 * @function handlePhotoCapture
+	 * @returns {Promise<void>}
+	 */
 	async function handlePhotoCapture() {
 		try {
 			setIsLoading(true);
@@ -65,6 +81,12 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 		}
 	}
 
+	/**
+	 * Muestra un alerta de confirmación para eliminar una foto.
+	 * Si el usuario confirma, elimina la foto del estado de imágenes.
+	 *
+	 * @param {number} indexParaRemover - El índice de la foto a eliminar.
+	 */
 	const removerFoto = (indexParaRemover: number) => {
 		Alert.alert("Apagar Foto", "Está seguro de que desea eliminar esta foto?", [
 			{
@@ -82,6 +104,15 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 		]);
 	};
 
+	/**
+	 * Procesa el turno actual, recopilando datos de picos y mediciones,
+	 * y enviando un registro al servidor.
+	 * Muestra mensajes de éxito o error según el resultado.
+	 *
+	 * @async
+	 * @function procesarTurno
+	 * @returns {Promise<void>}
+	 */
 	async function procesarTurno() {
 		setIsLoading(true);
 		try {
@@ -189,6 +220,15 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 		fetchTurno();
 	}, []);
 
+	/**
+	 * Obtiene el estado actual del turno y la lista de bodegas.
+	 * Establece el estado de inicioTurno en función de los datos obtenidos.
+	 * Maneja errores y actualiza el estado de carga en consecuencia.
+	 *
+	 * @async
+	 * @function fetchTurno
+	 * @returns {Promise<void>}
+	 */
 	async function fetchTurno() {
 		try {
 			setIsLoading(true);

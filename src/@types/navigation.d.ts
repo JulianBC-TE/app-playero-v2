@@ -1,19 +1,26 @@
 import { MedicionDTO } from "@/dto/MedicionDTO";
+import { PersonaDTO } from "@/dto/PersonaDTO";
 
 export type RootStackParamList = {
 	Home: undefined;
 	Config: undefined;
 	Turno: { onSelect: MedicionDTO[] } | undefined;
 	Cliente: { enabledSelect?: boolean } | undefined;
-	BuscarCliente: { enabledSelect?: boolean } | undefined;
+	BuscarCliente: { fromScreen?: string; enabledSelect?: boolean } | undefined;
 	CrearCliente: undefined;
-	BuscarPersona: { enabledEdit?: boolean; enabledSelect?: boolean } | undefined;
+	BuscarPersona:
+		| { fromScreen?: string; enabledEdit?: boolean; enabledSelect?: boolean }
+		| undefined;
 	EditarPersona: { cedula: number; nombre: string } | undefined;
 	Vehiculo: undefined;
-	BuscarVehiculo: { enabledSelect?: boolean } | undefined;
-	CrearVehiculo: undefined;
+	BuscarVehiculo: { fromScreen?: string; enabledSelect?: boolean } | undefined;
+	CrearVehiculo: { onCliente?: ClienteDTO } | undefined;
 	Medicion: { idBodega: string } | undefined;
-	TelaDeAssinatura: { onSave: (base64: string) => void } | undefined;
+	Firma: { fromScreen?: string; persona: PersonaDTO | null } | undefined;
+	Salida:
+		| { onFirma?: string; onPersona: PersonaDTO; onVehiculo: VehiculoDTO }
+		| undefined;
+	TelaTeste: { onPersona: PersonaDTO; onVehiculo: VehiculoDTO } | undefined;
 };
 
 declare global {

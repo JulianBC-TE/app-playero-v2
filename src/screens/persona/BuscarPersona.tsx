@@ -17,6 +17,7 @@ import { EmptyList } from "@/components/EmptyList";
 import { toastError, toastSuccess } from "@utils/toastMessage";
 
 import { StackRoutesProps } from "@/route/app.routes";
+import { ScreenHeader } from "@/components/ScreenHeader";
 
 interface Props {
 	enabledEdit?: boolean;
@@ -36,6 +37,7 @@ export function BuscarPersona({
 	const [hasMore, setHasMore] = useState(true);
 	const enabledEdit = route.params?.enabledEdit ?? false;
 	const [isLoading, setIsLoading] = useState(false);
+	const fromScreen = route.params?.fromScreen || "";
 
 	// Cria o debounce uma vez
 	const debouncedSetQuery = useRef(
@@ -52,8 +54,8 @@ export function BuscarPersona({
 
 		if (!enabledEdit) {
 			if (route.params?.enabledSelect) {
+				navigation.popTo(fromScreen as any, { onPersona: persona });
 				toastSuccess("", `Selecionado ${nombre}`);
-				navigation.goBack();
 			} else {
 				toastError(
 					"Selección no permitida",
@@ -138,6 +140,7 @@ export function BuscarPersona({
 
 	return (
 		<View className='flex-1'>
+			{fromScreen && <ScreenHeader title='Buscar Personas' />}
 			<View className='flex-1 p-4'>
 				<InputCard
 					title='Busqueda:'

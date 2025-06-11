@@ -17,6 +17,7 @@ import { toastError, toastSuccess } from "@utils/toastMessage";
 import { XCircle, Search } from "lucide-react-native";
 import { EmptyList } from "@/components/EmptyList";
 import { StackRoutesProps } from "@/route/app.routes";
+import { ScreenHeader } from "@/components/ScreenHeader";
 
 const PAGE_SIZE = 15;
 
@@ -30,7 +31,7 @@ export function BuscarVehiculo({
 	const [debouncedQuery, setDebouncedQuery] = useState("");
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [hasMore, setHasMore] = useState(true);
-
+	const fromScreen = route.params?.fromScreen || "";
 	const [isLoading, setIsLoading] = useState(false);
 
 	// Cria o debounce uma vez
@@ -41,11 +42,17 @@ export function BuscarVehiculo({
 	).current;
 
 	function handleSelectVehiculo(id: string, descripcion: string) {
+		const vehiculo: VehiculoDTO = {
+			id_vehiculo: id,
+			descripcion_vehiculo: descripcion,
+			ruc: "",
+		};
+
 		if (!route.params?.enabledSelect) {
 			return;
 		} else {
+			navigation.popTo(fromScreen as any, { onVehiculo: vehiculo });
 			toastSuccess("Vehículo", `${descripcion} seleccionado.`);
-			navigation.goBack();
 		}
 	}
 
@@ -119,6 +126,7 @@ export function BuscarVehiculo({
 
 	return (
 		<View className='flex-1 items-center justify-center'>
+			{fromScreen && <ScreenHeader title='Buscar Vehículos' />}
 			<View className='flex-1 p-4'>
 				<InputCard
 					title='Busqueda:'

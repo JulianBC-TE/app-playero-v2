@@ -1,4 +1,4 @@
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { StackRoutesProps } from "@/route/app.routes";
 
@@ -12,9 +12,10 @@ import { ClienteDTO } from "@dto/ClienteDTO";
 import { useCliente } from "@hooks/useCliente";
 
 import { toastError, toastSuccess } from "@utils/toastMessage";
-import { XCircle, Search } from "lucide-react-native";
+import { XCircle, Search, RefreshCcw } from "lucide-react-native";
 import { FlatList, TouchableOpacity, View } from "react-native";
 import { EmptyList } from "@/components/EmptyList";
+import { Button } from "@/components/Button";
 
 export function BuscarCliente({
 	navigation,
@@ -23,23 +24,14 @@ export function BuscarCliente({
 	const { setCliente } = useCliente();
 	const [search, setSearch] = useState("");
 	const [filteredClientes, setFilteredClientes] = useState<ClienteDTO[]>([]);
-
+	const [reload, setReload] = useState(false);
 	const [isLoading, setIsLoading] = useState(true);
 	const [clientes, setClientes] = useState<ClienteDTO[]>([]);
 	const enabledSelect = route.params?.enabledSelect ?? false;
 
 	function handleSelectClientes(cliente: ClienteDTO) {
-		if (enabledSelect) {
-			setCliente(cliente);
-			navigation.goBack();
-		} else {
-			// navigation.navigate("editarpersona", {
-			// 	cedula,
-			// 	nombre,
-			// });
-			// Edita o cliente selecionado
-		}
-		console.log("Cliente:", cliente);
+		setCliente(cliente); // Coloca o cliente selecionado no contexto
+		navigation.goBack();
 	}
 
 	useEffect(() => {
@@ -59,10 +51,9 @@ export function BuscarCliente({
 	}, [search, clientes]);
 
 	async function fetchClientes() {
+		setIsLoading(true);
+		console.log("Fetching clientes...");
 		try {
-			console.log("Apagando cliente do contexto");
-			setCliente(null);
-			setIsLoading(true);
 			const response = await api.get("/api/clientes");
 
 			const clientesData: ClienteDTO[] = response.data.map(
@@ -81,13 +72,14 @@ export function BuscarCliente({
 				: "Hay un error para buscar Clientes";
 			toastError(title, description);
 		} finally {
+			setReload(false);
 			setIsLoading(false);
 		}
 	}
 
 	useEffect(() => {
 		fetchClientes();
-	}, []);
+	}, [reload]);
 
 	return (
 		<View className='flex-1'>
@@ -96,33 +88,46 @@ export function BuscarCliente({
 					title='Busqueda:'
 					required={false}
 				>
-					<View className='flex-row w-full items-center relative'>
-						<Input
-							className='ml-10'
-							value={search}
-							onChangeText={setSearch}
-							placeholder='Informe el nombre/RUC del cliente'
-						/>
-						<View className='absolute left-3 mt-2'>
-							<Search
-								className='absolute left-3 mt-2'
-								size={18}
-								color='#666'
+					<View className='flex-row items-center gap-2 p-4'>
+						<View className='flex-row w-full items-center relative'>
+							<Input
+								className='ml-10'
+								value={search}
+								onChangeText={setSearch}
+								placeholder='Informe el nombre/RUC del cliente'
 							/>
-						</View>
-						{search.trim() !== "" && (
-							<TouchableOpacity
-								className='absolute right-3 mt-2'
-								onPress={() => {
-									setSearch("");
-								}}
-							>
-								<XCircle
+
+							<View className='absolute left-3 mt-2'>
+								<Search
+									className='absolute left-3 mt-2'
 									size={18}
 									color='#666'
 								/>
-							</TouchableOpacity>
-						)}
+							</View>
+							{search.trim() !== "" && (
+								<TouchableOpacity
+									className='absolute right-3 mt-2'
+									onPress={() => {
+										setSearch("");
+									}}
+								>
+									<XCircle
+										size={18}
+										color='#666'
+									/>
+								</TouchableOpacity>
+							)}
+						</View>
+						<View className='flex items-center justify-center'>
+							<RefreshCcw
+								size={24}
+								color='#000'
+								onPress={() => {
+									setFilteredClientes([]);
+									setReload(true);
+								}}
+							/>
+						</View>
 					</View>
 				</InputCard>
 

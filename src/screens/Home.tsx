@@ -7,11 +7,11 @@ import { api } from "@/services/api";
 import { useAppContext } from "@/hooks/useAppContext";
 import { SucursalDTO } from "@/dto/userDTO copy";
 import { useEffect, useState } from "react";
-import Toast from "react-native-toast-message";
 import { Loading } from "@/components/Loading";
 import { baseMenuItems, menuItemType } from "@/dto/MenuItens";
 
 import { Cog } from "lucide-react-native";
+import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
 
 export function Home({ navigation }: StackRoutesProps<"home">) {
 	const [isLoading, setIsLoading] = useState(true);
@@ -31,16 +31,54 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 			const sucursalData: SucursalDTO = response.data[0];
 			setSucursal(sucursalData);
 
-			const turno = await api.get("/api/registros/turno/status");
-			const { inicio_turno } = turno.data;
+			const turno = await api.get(
+				`api/registros/turno/status/${sucursalData.id_sucursal}`
+			);
+			console.log("Turno Response:", turno.data);
 
+			const turnoData: StatusTurnoDTO = {
+				status: turno.data.status,
+				Inicio_turno: turno.data.Inicio_turno,
+				Fin_turno: turno.data.Fin_turno,
+				Fin_turno_anterior: turno.data.Fin_turno_anterior,
+			};
+			console.log("Turno Data:", turnoData);
 			const updatedMenu = baseMenuItems.map((item) => {
-				if (item.name === "Traspaso" || item.name === "Abastecimiento") {
-					return { ...item, enabled: inicio_turno };
+				if (
+					item.name === "Salida" ||
+					item.name === "Traspaso" ||
+					item.name === "Calibración" ||
+					item.name === "Abastecimiento"
+				) {
+					if (
+						turnoData.status === "falta_anteriores" ||
+						turnoData.status === "normal" ||
+						turnoData.status === "cerrado"
+					) {
+						return { ...item, enabled: false };
+					} else {
+						return { ...item, enabled: true };
+					}
+				} else {
+					if (item.name === "Turno") {
+						//turno?: "abierto" | "cerrado" | "pendiente" | "iniciar" | "falta_cerrar";
+						if (turnoData.status === "falta_anterior") {
+							return { ...item, turno: "pendiente" as const, enabled: true };
+						} else if (turnoData.status === "normal") {
+							return { ...item, turno: "iniciar" as const, enabled: true };
+						} else if (turnoData.status === "iniciado") {
+							return { ...item, turno: "abierto" as const, enabled: true };
+						} else if (turnoData.status === "falta_cerrar") {
+							return { ...item, turno: "falta_cerrar" as const };
+						} else if (turnoData.status === "cerrado") {
+							return { ...item, turno: "cerrado" as const, enabled: true };
+						}
+					} else {
+						return { ...item, enabled: true };
+					}
+					return item;
 				}
-				return { ...item, enabled: true };
 			});
-
 			setMenuItems(updatedMenu);
 			setIsready(true);
 		} catch (error) {
@@ -59,7 +97,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 			setSucursal(null);
 
 			Alert.alert(
-				"Erro ao carregar Sucursal",
+				"No se pudo cargar la sucursal",
 				"Recarregar?",
 				[
 					{ text: "Cancelar", style: "cancel" },
@@ -108,6 +146,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 										)
 									}
 									enabled={item.enabled}
+									turno={item.turno}
 								/>
 							)}
 						/>

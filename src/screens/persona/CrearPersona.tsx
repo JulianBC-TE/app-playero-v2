@@ -96,6 +96,7 @@ export function CrearPersona() {
 							rules={{ required: "cedula de identidad es requerido" }}
 							render={({ field: { onChange, value } }) => (
 								<Input
+									keyboardType='number-pad'
 									className='font-medium text-xl'
 									placeholder='Informe cédula'
 									placeholderTextColor='$gray600'

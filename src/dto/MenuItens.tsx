@@ -17,7 +17,8 @@ export type menuItemType = {
 	name: string;
 	icon: LucideIcon;
 	route: keyof StackRoutesList;
-	enabled: boolean;
+	enabled?: boolean;
+	turno?: "abierto" | "cerrado" | "pendiente" | "iniciar" | "falta_cerrar";
 	params: object;
 };
 
@@ -26,14 +27,15 @@ export const baseMenuItems: menuItemType[] = [
 		name: "Turno",
 		icon: ArrowRightLeft,
 		route: "turno",
-		enabled: false,
+		enabled: true,
+		turno: "iniciar",
 		params: {},
 	},
 	{
 		name: "Salida",
 		icon: Fuel,
-		route: "cliente",
-		enabled: true,
+		route: "salida",
+		enabled: false,
 		params: {},
 	},
 	{
@@ -54,14 +56,14 @@ export const baseMenuItems: menuItemType[] = [
 		name: "Equipo/Vehículo",
 		icon: Tractor,
 		route: "vehiculo",
-		enabled: false,
+		enabled: true,
 		params: {},
 	},
 	{
 		name: "Personas",
 		icon: Users,
 		route: "persona",
-		enabled: false,
+		enabled: true,
 		params: {},
 	},
 	{
@@ -71,10 +73,11 @@ export const baseMenuItems: menuItemType[] = [
 		enabled: false,
 		params: {},
 	},
+
 	{
-		name: "Firma",
+		name: "Teste",
 		icon: Pencil,
-		route: "telaDeAssinatura",
+		route: "telaTeste",
 		enabled: true,
 		params: {},
 	},

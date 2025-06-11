@@ -16,7 +16,12 @@ import { BuscarVehiculo } from "@/screens/vehiculo/BuscarVehiculo";
 import { CrearVehiculo } from "@/screens/vehiculo/CrearVehiculo";
 import { Medicion } from "@/screens/turno/Medicion";
 import { MedicionDTO } from "@/dto/MedicionDTO";
-import { TelaDeAssinatura } from "@/screens/TelaDeAssinatura";
+import { Firma } from "@/screens/Firma";
+import { TelaTeste } from "@/screens/TelaTeste"; // Assuming TelaTeste is a test screen
+import { PersonaDTO } from "@/dto/PersonaDTO";
+import { VehiculoDTO } from "@/dto/VehiculoDTO";
+import { Salida } from "@/screens/salida/Salida";
+import { ClienteDTO } from "@/dto/ClienteDTO";
 
 export type StackRoutesList = {
 	home: undefined;
@@ -24,14 +29,20 @@ export type StackRoutesList = {
 	persona: undefined;
 	turno: { onSelect: MedicionDTO[] } | undefined;
 	cliente: { enabledSelect?: boolean } | undefined;
-	buscarcliente: { enabledSelect?: boolean } | undefined;
+	buscarcliente: { fromScreen?: string; enabledSelect?: boolean } | undefined;
 	editarpersona: { cedula: number; nombre: string } | undefined;
-	buscarpersona: { enabledEdit?: boolean; enabledSelect?: boolean } | undefined;
+	buscarpersona:
+		| { fromScreen?: string; enabledEdit?: boolean; enabledSelect?: boolean }
+		| undefined;
 	vehiculo: undefined;
-	buscarvehiculo: { enabledSelect?: boolean } | undefined;
-	crearvehiculo: undefined;
+	buscarvehiculo: { fromScreen?: string; enabledSelect?: boolean } | undefined;
+	crearvehiculo: { onCliente?: ClienteDTO } | undefined;
 	medicion: { idBodega: string } | undefined; // Assuming Medicion is a part of Turno for this example
-	telaDeAssinatura: { onSave: (base64: string) => void } | undefined;
+	firma: { fromScreen?: string; persona: PersonaDTO | null } | undefined;
+	salida:
+		| { onFirma?: string; onPersona: PersonaDTO; onVehiculo: VehiculoDTO }
+		| undefined;
+	telaTeste: { onPersona: PersonaDTO; onVehiculo: VehiculoDTO } | undefined;
 };
 
 export type StackRoutesProps<T extends keyof StackRoutesList> =
@@ -96,8 +107,16 @@ export function StackRoutes() {
 				component={Config} // Assuming Medicion is a part of Turno for this example
 			/>
 			<Stack.Screen
-				name='telaDeAssinatura'
-				component={TelaDeAssinatura} // Assuming Medicion is a part of Turno for this example
+				name='firma'
+				component={Firma} // Assuming Medicion is a part of Turno for this example
+			/>
+			<Stack.Screen
+				name='salida'
+				component={Salida} // Assuming TelaTeste is a test screen
+			/>
+			<Stack.Screen
+				name='telaTeste'
+				component={TelaTeste} // Assuming TelaTeste is a test screen
 			/>
 		</Stack.Navigator>
 	);

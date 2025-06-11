@@ -13,7 +13,8 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import { api } from "@services/api";
 import { SaveIcon, SquarePlus } from "lucide-react-native";
-import { useCliente } from "@hooks/useCliente";
+import { ClienteDTO } from "@/dto/ClienteDTO";
+import { useCliente } from "@/hooks/useCliente";
 
 type FormData = {
 	id_vehiculo: string;
@@ -184,7 +185,6 @@ export function CrearVehiculo({
 								clearErrors();
 								setIsSaved(false);
 							}}
-							isLoading={false}
 							icon={SquarePlus}
 							iconSize='md'
 							iconColor='#000'

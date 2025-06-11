@@ -4,7 +4,7 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { StackRoutesProps } from "@/route/app.routes";
 import { View } from "react-native";
 import { BuscarCliente } from "./BuscarCliente";
-import { Tela2 } from "../Tela2";
+import { CrearCliente } from "./CrearCliente";
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -22,11 +22,8 @@ export function Cliente({ navigation, route }: StackRoutesProps<"cliente">) {
 					}}
 				/>
 				<Tab.Screen
-					name='Tela2'
-					component={Tela2}
-					options={{
-						tabBarLabel: "Crear",
-					}}
+					name='Crear'
+					component={CrearCliente}
 				/>
 			</Tab.Navigator>
 		</View>
