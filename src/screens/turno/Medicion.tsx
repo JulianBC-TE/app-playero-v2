@@ -2,12 +2,12 @@ import * as ImagePicker from "expo-image-picker";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { StackRoutesProps } from "@/route/app.routes";
-import { Alert, FlatList, Image, View } from "react-native";
+import { Alert, Image, View } from "react-native";
 import { Button } from "@/components/Button";
 import { PhotoButton } from "@/components/PhotoButton";
 
 import { toastError, toastSuccess } from "@utils/toastMessage";
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { InputCard } from "@/components/InputCard";
 import { Input } from "@/components/Input";
 import { api } from "@/services/api";
@@ -18,9 +18,8 @@ import { Select } from "@/components/Select";
 import * as yup from "yup";
 import { yupResolver } from "@hookform/resolvers/yup";
 
-import { Check, Undo } from "lucide-react-native";
-import { Controller, set, useForm } from "react-hook-form";
-import { MedicionesCard } from "@/components/MedicionesCard";
+import { Check } from "lucide-react-native";
+import { Controller, useForm } from "react-hook-form";
 
 type FormData = {
 	altura_regla: string;
@@ -53,6 +52,9 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 	const [tanques, setTanques] = useState<TanqueDTO[]>([]);
 	const [selectedTanques, setSelectedTanques] = useState("");
 	const [medicion, setMedicion] = useState<MedicionDTO[]>([]);
+	const [fromScreen, setFromScreen] = useState(
+		route.params?.fromScreen || "turno"
+	);
 
 	const {
 		control,
@@ -119,8 +121,7 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 				"Tanques Medidos",
 				"Todos los tanques han sido medidos con éxito."
 			);
-			console.log("Qtd. Mediciones:", updatedMediciones.length);
-			navigation.popTo("turno", { onSelect: updatedMediciones });
+			navigation.popTo(fromScreen as any, { onMedicion: updatedMediciones });
 		}
 	};
 
@@ -188,10 +189,6 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 			fetchTanques();
 		}
 	}, []);
-
-	useEffect(() => {
-		console.log(selectedTanques);
-	}, [tanques, selectedTanques]);
 
 	return (
 		<View className='flex-1'>
@@ -280,22 +277,6 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 				</InputCard>
 
 				<View className='w-full flex-col justify-center gap-4'>
-					<View>
-						{/* <FlatList
-							className='mt-2'
-							data={medicion}
-							keyExtractor={(item) => item.id_tanque}
-							renderItem={({ item }) => (
-								<MedicionesCard
-									data={item as MedicionDTO}
-									onPress={() => {
-										handleRemoveMedicion(item.id_tanque);
-									}}
-								/>
-							)}
-							showsVerticalScrollIndicator={false}
-						/> */}
-					</View>
 					<View className='flex-row justify-center gap-4'>
 						<Button
 							title='Definir'
@@ -305,16 +286,6 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 							iconSize='md'
 							iconColor='#000'
 						/>
-						{/* {medicion.length > 0 && (
-							<Button
-								title='Concluir'
-								onPress={volver}
-								isLoading={isLoading}
-								icon={Undo}
-								iconSize='md'
-								iconColor='#000'
-							/>
-						)} */}
 					</View>
 				</View>
 			</View>

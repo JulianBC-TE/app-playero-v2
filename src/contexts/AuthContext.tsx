@@ -9,7 +9,7 @@ import {
 } from "@storage/storageAuthToken";
 import { getStorageServerUrl, saveServerUrl } from "@storage/storageServer";
 import { ClienteDTO } from "@dto/ClienteDTO";
-import { SucursalDTO } from "@/dto/userDTO copy";
+import { SucursalDTO } from "@/dto/sucursalDTO";
 
 export type AuthContextDataProps = {
 	user: UserDTO;

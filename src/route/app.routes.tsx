@@ -17,17 +17,34 @@ import { CrearVehiculo } from "@/screens/vehiculo/CrearVehiculo";
 import { Medicion } from "@/screens/turno/Medicion";
 import { MedicionDTO } from "@/dto/MedicionDTO";
 import { Firma } from "@/screens/Firma";
-import { TelaTeste } from "@/screens/TelaTeste"; // Assuming TelaTeste is a test screen
+import { TelaTeste } from "@/screens/TelaTeste";
 import { PersonaDTO } from "@/dto/PersonaDTO";
 import { VehiculoDTO } from "@/dto/VehiculoDTO";
 import { Salida } from "@/screens/salida/Salida";
 import { ClienteDTO } from "@/dto/ClienteDTO";
+import { Traspaso } from "@/screens/traspaso/Traspaso";
+import { Calibracion } from "@/screens/calibracion/Calibracion";
+import { Sequencias } from "@/screens/calibracion/Sequencias";
+import { SequenciaCalibracionDTO } from "@/dto/SequenciaCalibracionDTO";
 
 export type StackRoutesList = {
 	home: undefined;
-	config: undefined; // Assuming Medicion is a part of Turno for this example
+	config: undefined;
 	persona: undefined;
-	turno: { onSelect: MedicionDTO[] } | undefined;
+	turno:
+		| { onFirma?: string; onPersona: PersonaDTO; onMedicion: MedicionDTO[] }
+		| undefined;
+	traspaso:
+		| { onFirma?: string; onPersona: PersonaDTO; onMedicion: MedicionDTO[] }
+		| undefined;
+	calibracion:
+		| {
+				onFirma?: string;
+				onPersona?: PersonaDTO;
+				onSequencia?: SequenciaCalibracionDTO;
+		  }
+		| undefined;
+	sequencias: { pico_surtidor?: number } | undefined;
 	cliente: { enabledSelect?: boolean } | undefined;
 	buscarcliente: { fromScreen?: string; enabledSelect?: boolean } | undefined;
 	editarpersona: { cedula: number; nombre: string } | undefined;
@@ -37,7 +54,7 @@ export type StackRoutesList = {
 	vehiculo: undefined;
 	buscarvehiculo: { fromScreen?: string; enabledSelect?: boolean } | undefined;
 	crearvehiculo: { onCliente?: ClienteDTO } | undefined;
-	medicion: { idBodega: string } | undefined; // Assuming Medicion is a part of Turno for this example
+	medicion: { fromScreen?: string; idBodega: string } | undefined;
 	firma: { fromScreen?: string; persona: PersonaDTO | null } | undefined;
 	salida:
 		| { onFirma?: string; onPersona: PersonaDTO; onVehiculo: VehiculoDTO }
@@ -100,23 +117,35 @@ export function StackRoutes() {
 			/>
 			<Stack.Screen
 				name='medicion'
-				component={Medicion} // Assuming Medicion is a part of Turno for this example
+				component={Medicion}
 			/>
 			<Stack.Screen
 				name='config'
-				component={Config} // Assuming Medicion is a part of Turno for this example
+				component={Config}
 			/>
 			<Stack.Screen
 				name='firma'
-				component={Firma} // Assuming Medicion is a part of Turno for this example
+				component={Firma}
 			/>
 			<Stack.Screen
 				name='salida'
-				component={Salida} // Assuming TelaTeste is a test screen
+				component={Salida}
+			/>
+			<Stack.Screen
+				name='traspaso'
+				component={Traspaso}
+			/>
+			<Stack.Screen
+				name='calibracion'
+				component={Calibracion}
+			/>
+			<Stack.Screen
+				name='sequencias'
+				component={Sequencias}
 			/>
 			<Stack.Screen
 				name='telaTeste'
-				component={TelaTeste} // Assuming TelaTeste is a test screen
+				component={TelaTeste}
 			/>
 		</Stack.Navigator>
 	);

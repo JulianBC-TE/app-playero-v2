@@ -8,7 +8,6 @@ import {
 	DraftingCompass,
 	Replace,
 	Tractor,
-	Cog,
 	LucideIcon,
 	Pencil,
 } from "lucide-react-native";
@@ -41,8 +40,8 @@ export const baseMenuItems: menuItemType[] = [
 	{
 		name: "Traspaso",
 		icon: Container,
-		route: "cliente",
-		enabled: false,
+		route: "traspaso",
+		enabled: true,
 		params: {},
 	},
 	{
@@ -69,8 +68,15 @@ export const baseMenuItems: menuItemType[] = [
 	{
 		name: "Calibración",
 		icon: DraftingCompass,
-		route: "medicion",
+		route: "calibracion",
 		enabled: false,
+		params: {},
+	},
+	{
+		name: "Mediciones",
+		icon: DraftingCompass,
+		route: "sequencias",
+		enabled: true,
 		params: {},
 	},
 

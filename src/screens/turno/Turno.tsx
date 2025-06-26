@@ -1,5 +1,14 @@
 import * as ImagePicker from "expo-image-picker";
-import { Alert, Image, Pressable, ScrollView, View } from "react-native";
+import {
+	Alert,
+	Image,
+	Pressable,
+	ScrollView,
+	View,
+	StyleSheet,
+	TouchableOpacity,
+	Text,
+} from "react-native";
 import { useEffect, useState } from "react";
 import { api } from "@/services/api";
 import { StackRoutesProps } from "@/route/app.routes";
@@ -19,6 +28,7 @@ import { TurnoDTO } from "@/dto/TurnoDTO";
 import { RulerDimensionLine, CheckCheck } from "lucide-react-native";
 import { useAppContext } from "@/hooks/useAppContext";
 import { AppError } from "@/utils/AppError";
+import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
 
 /**
  * Componente para gestionar el turno de trabajo.
@@ -28,15 +38,17 @@ import { AppError } from "@/utils/AppError";
  */
 export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 	const [isLoading, setIsLoading] = useState(false);
+	const [faltaAnterior, setFaltaAnterior] = useState(false);
+	const [listaBodegasFaltaAnterior, setListaBodegasFaltaAnterior] = useState<
+		BodegaDTO[]
+	>([]);
 	const [inicioTurno, setInicioTurno] = useState(false);
 	const [base64Images, setBase64Images] = useState<string[]>([]);
-	const [observations, setObservations] = useState("");
+	const [obs, setObs] = useState("");
+	const [obsAdicional, setObsAdicional] = useState("");
 	const [selectedBodega, setSelectedBodega] = useState("");
 	const [bodegas, setBodegas] = useState<BodegaDTO[]>([]);
 	const [medicion, setMedicion] = useState<MedicionDTO[]>([]);
-	const [totalizadorInicial, setTotalizadorInicial] = useState(0);
-	const [totalizadorFinal, setTotalizadorFinal] = useState(0);
-	const [turno, setTurno] = useState<TurnoDTO[]>([]);
 	const { sucursal, user } = useAppContext();
 
 	/**
@@ -113,14 +125,18 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 	 * @function procesarTurno
 	 * @returns {Promise<void>}
 	 */
+
+	// A medição pode ter vários tanques não se deve comparar com bodegas.length
 	async function procesarTurno() {
+		if (medicion.length === 0 || medicion.length < bodegas.length) {
+			Alert.alert(
+				"Medición requerida",
+				"Debe realizar las mediciones de tanque antes de procesar el turno."
+			);
+			return;
+		}
 		setIsLoading(true);
 		try {
-			console.log(
-				"Iniciando procesamiento de turno para bodega...",
-				selectedBodega
-			);
-
 			// 1. Buscar todos los picos de la bodega selecionada
 			const picosResult = await api.get("/api/picos", {
 				params: {
@@ -159,7 +175,6 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 			const totalizadorLitros = medicion.reduce((acc, cur) => {
 				return acc + (cur.litros ?? 0);
 			}, 0);
-			console.log("Totalizador Litros:", totalizadorLitros);
 
 			// 3. Criar o registro de turno
 			const nuevoTurno: TurnoDTO = {
@@ -169,7 +184,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 				hora,
 				ci_playero: Number(user.cedula),
 				litros: totalizadorLitros,
-				observacion: observations,
+				observacion: obs + "|" + obsAdicional,
 				// fotos_observacion: [],
 				fotos_observacion: base64Images,
 				med_tanques: medicion.map((med) => ({
@@ -197,6 +212,16 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 				"Turno procesado",
 				`El turno ha sido ${inicioTurno ? "iniciado" : "cerrado"} con éxito.`
 			);
+			// Remove a bodega da lista de bodegas
+			setBodegas((prevBodegas) =>
+				prevBodegas.filter(
+					(bodegas) => Number(bodegas.id_bodega) !== Number(selectedBodega)
+				)
+			);
+			//setSelectedBodega(""); // Limpa a bodega selecionada
+			setObs("");
+			setBase64Images([]);
+			setMedicion([]);
 			console.log("Turno procesado con éxito");
 		} catch (error) {
 			const isAppError = error instanceof AppError;
@@ -211,10 +236,10 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 	}
 
 	useEffect(() => {
-		if (route.params?.onSelect) {
-			setMedicion(route.params.onSelect);
+		if (route.params?.onMedicion) {
+			setMedicion(route.params.onMedicion);
 		}
-	}, [route.params?.onSelect]);
+	}, [route.params?.onMedicion]);
 
 	useEffect(() => {
 		fetchTurno();
@@ -232,14 +257,61 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 	async function fetchTurno() {
 		try {
 			setIsLoading(true);
-			const turno = await api.get("/api/registros/turno/status");
-			const { inicio_turno } = turno.data;
-			setInicioTurno(inicio_turno);
+			const turno = await api.get(
+				`api/registros/turno/status/${sucursal.id_sucursal}`
+			);
+			const turnoData: StatusTurnoDTO = {
+				status: turno.data.status,
+				Inicio_turno: turno.data.Inicio_turno,
+				Fin_turno: turno.data.Fin_turno,
+				Fin_turno_anterior: turno.data.Fin_turno_anterior,
+			};
+			if (turnoData.status === "falta_anterior") {
+				setListaBodegasFaltaAnterior([]);
+				turnoData.Fin_turno_anterior.falta.map(async (bodega: number) => {
+					await api.get(`/api/bodegas/one/${bodega}`).then((response) => {
+						const bodegaData: BodegaDTO = response.data;
+						setListaBodegasFaltaAnterior((prev) => [...prev, bodegaData]);
+					});
+				});
+				setFaltaAnterior(true);
+			}
 
-			const response = await api.get("/api/bodegas");
-			const sucursal = response.data[0];
-			if (sucursal?.bodegas?.length) {
-				setBodegas(sucursal.bodegas);
+			let statusTurnoEstado = false;
+			if (
+				//turnoData.status === "falta_anterior" ||
+				turnoData.status === "iniciado" ||
+				turnoData.status === "falta_cerrar"
+			) {
+				setInicioTurno(false);
+			} else {
+				statusTurnoEstado = true;
+				setInicioTurno(true);
+			}
+
+			const response = await api.get(`/api/bodegas/${sucursal.id_sucursal}`);
+			const sucursalData = response.data;
+			if (sucursalData?.bodegas) {
+				const bodegasFiltradas: BodegaDTO[] = [];
+				sucursalData.bodegas.map((bodega: BodegaDTO) => {
+					if (statusTurnoEstado) {
+						// Iniciar turno
+						if (
+							bodega.id_bodega &&
+							turnoData.Inicio_turno.falta.includes(Number(bodega.id_bodega))
+						) {
+							bodegasFiltradas.push(bodega);
+						}
+					} else {
+						if (
+							bodega.id_bodega &&
+							turnoData.Fin_turno.falta.includes(Number(bodega.id_bodega))
+						) {
+							bodegasFiltradas.push(bodega);
+						}
+					}
+				});
+				setBodegas(bodegasFiltradas);
 			}
 		} catch (error) {
 			toastError("Erro ao buscar turno", "Tente novamente mais tarde.");
@@ -249,10 +321,64 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 		}
 	}
 
-	return (
+	return faltaAnterior ? (
+		<View className='flex-1'>
+			<ScreenHeader title='Turno no Cerrado' />
+
+			<View style={styles.overlay}>
+				<View style={styles.modalContent}>
+					<Text className='font-bold text-red-500 text-center text-2xl underline mb-4'>
+						Importente!!!
+					</Text>
+					<Text className='font-medium text-justify text-xl mb-4'>
+						La fecha anterior no se registró el cierro de turno. Favor indique
+						el motivo por el cual no se realizó el cierre de:
+					</Text>
+					<Text className='font-medium text-justify text-xl mb-4'>
+						{listaBodegasFaltaAnterior.map((bodega) => (
+							<Text
+								key={bodega.id_bodega}
+								className='font-medium text-justify text-xl mb-4'
+							>
+								- {bodega.descripcion_bodega}
+							</Text>
+						))}
+					</Text>
+					<InputCard
+						className='min-h-40'
+						title='Indique el motivo'
+						required
+					>
+						<Input
+							value={obsAdicional}
+							placeholder='Describa el motivo'
+							multiline
+							numberOfLines={4}
+							onChangeText={setObsAdicional}
+						/>
+					</InputCard>
+					<TouchableOpacity
+						style={styles.button}
+						onPress={() => {
+							if (obsAdicional.trim() === "") {
+								Alert.alert(
+									"Motivo requerido",
+									"Por favor describa el motivo."
+								);
+								return;
+							}
+							setFaltaAnterior(false);
+						}}
+					>
+						<Text style={styles.buttonText}>Guardar</Text>
+					</TouchableOpacity>
+				</View>
+			</View>
+		</View>
+	) : (
 		<View className='flex-1'>
 			<ScreenHeader
-				title={`${inicioTurno === false ? "Iniciar Turno" : "Cerrar Turno"}`}
+				title={`${inicioTurno === true ? "Iniciar Turno" : "Cerrar Turno"}`}
 			/>
 			<View className='flex-1 p-4 gap-4 items-center'>
 				<InputCard
@@ -292,6 +418,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 											text: "Continuar",
 											onPress: () => {
 												navigation.navigate("medicion", {
+													fromScreen: "turno",
 													idBodega: selectedBodega,
 												});
 											},
@@ -315,8 +442,8 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 						numberOfLines={4}
 						textAlignVertical='top'
 						className='ml-2'
-						value={observations}
-						onChangeText={setObservations}
+						value={obs}
+						onChangeText={setObs}
 						placeholder={`Observaciones ${
 							inicioTurno ? "para el cierre" : "para la apertura"
 						} de turno`}
@@ -351,9 +478,49 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 				<Button
 					isLoading={isLoading}
 					onPress={procesarTurno}
-					title={`${inicioTurno === false ? "Iniciar Turno" : "Cerrar Turno"}`}
+					title={`${inicioTurno === true ? "Iniciar Turno" : "Cerrar Turno"}`}
 				/>
 			</View>
 		</View>
 	);
 }
+
+const styles = StyleSheet.create({
+	container: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+		backgroundColor: "#f0f0f0",
+	},
+	overlay: {
+		flex: 1,
+		backgroundColor: "rgba(0, 0, 0, 0.5)",
+		//justifyContent: "center",
+		alignItems: "center",
+	},
+	modalContent: {
+		marginTop: 100,
+		width: 350,
+		padding: 20,
+		backgroundColor: "#fff",
+		borderRadius: 10,
+		elevation: 5, // Android shadow
+	},
+	title: {
+		fontSize: 18,
+		marginBottom: 20,
+		textAlign: "center",
+	},
+	button: {
+		marginTop: 20,
+		backgroundColor: "#007BFF",
+		paddingVertical: 10,
+		paddingHorizontal: 20,
+		borderRadius: 5,
+	},
+	buttonText: {
+		color: "#fff",
+		fontSize: 16,
+		textAlign: "center",
+	},
+});

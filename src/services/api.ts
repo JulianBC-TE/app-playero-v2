@@ -15,7 +15,7 @@ type APIInstanceProps = AxiosInstance & {
 };
 
 const api = axios.create({
-	timeout: 20000, // Definindo um timeout padrão de 10 segundos
+	timeout: 22000, // Definindo um timeout padrão de 10 segundos
 }) as APIInstanceProps;
 
 let failedQueue: Array<PromiseType> = [];

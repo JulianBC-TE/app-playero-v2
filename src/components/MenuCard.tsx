@@ -24,7 +24,6 @@ export function MenuCard({
 }: Props) {
 	// Define a cor de fundo com base no turno ou no enabled
 	const getBackgroundClass = () => {
-		console.log("Turno>>>>>:", turno);
 		if (turno) {
 			switch (turno) {
 				case "abierto":
@@ -36,7 +35,7 @@ export function MenuCard({
 				case "iniciar":
 					return "bg-teColorTurnoAbrir";
 				case "falta_cerrar":
-					return "teColorTurnoCierreEspecial";
+					return "bg-teColorTurnoPendiente";
 				default:
 					return "bg-gray-100";
 			}

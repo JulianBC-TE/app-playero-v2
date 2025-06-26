@@ -5,13 +5,14 @@ import { MenuCard } from "@/components/MenuCard";
 import { StackRoutesList, StackRoutesProps } from "@/route/app.routes";
 import { api } from "@/services/api";
 import { useAppContext } from "@/hooks/useAppContext";
-import { SucursalDTO } from "@/dto/userDTO copy";
-import { useEffect, useState } from "react";
+import { SucursalDTO } from "@/dto/sucursalDTO";
+import { useCallback, useEffect, useState } from "react";
 import { Loading } from "@/components/Loading";
 import { baseMenuItems, menuItemType } from "@/dto/MenuItens";
 
 import { Cog } from "lucide-react-native";
 import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
+import { useFocusEffect } from "@react-navigation/native";
 
 export function Home({ navigation }: StackRoutesProps<"home">) {
 	const [isLoading, setIsLoading] = useState(true);
@@ -34,26 +35,26 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 			const turno = await api.get(
 				`api/registros/turno/status/${sucursalData.id_sucursal}`
 			);
-			console.log("Turno Response:", turno.data);
 
 			const turnoData: StatusTurnoDTO = {
 				status: turno.data.status,
+				// status: "falta_cerrar", // For testing purposes, set to "normal"
 				Inicio_turno: turno.data.Inicio_turno,
 				Fin_turno: turno.data.Fin_turno,
 				Fin_turno_anterior: turno.data.Fin_turno_anterior,
 			};
-			console.log("Turno Data:", turnoData);
+			console.log(turnoData);
 			const updatedMenu = baseMenuItems.map((item) => {
 				if (
 					item.name === "Salida" ||
-					item.name === "Traspaso" ||
+					//item.name === "Traspaso" ||
 					item.name === "Calibración" ||
 					item.name === "Abastecimiento"
 				) {
 					if (
-						turnoData.status === "falta_anteriores" ||
-						turnoData.status === "normal" ||
-						turnoData.status === "cerrado"
+						turnoData.status === "falta_anterior" ||
+						turnoData.status === "normal"
+						// turnoData.status === "cerrado"
 					) {
 						return { ...item, enabled: false };
 					} else {
@@ -98,11 +99,11 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 
 			Alert.alert(
 				"No se pudo cargar la sucursal",
-				"Recarregar?",
+				"Recargar?",
 				[
 					{ text: "Cancelar", style: "cancel" },
 					{
-						text: "Recarregar",
+						text: "Recargar",
 						onPress: () => fetchSucursal(),
 					},
 				],
@@ -115,12 +116,14 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 		}
 	}
 
-	useEffect(() => {
-		if (!isReady) fetchSucursal();
-	}, [isReady]);
+	useFocusEffect(
+		useCallback(() => {
+			fetchSucursal();
+		}, [])
+	);
 
 	return (
-		<View>
+		<View className='flex-1 justify-between'>
 			{!isLoading ? (
 				<View>
 					<HomeHeader />
@@ -151,7 +154,8 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 							)}
 						/>
 					</View>
-					<View className='mb-4 mt-4'>
+
+					<View>
 						<Text className='text-center text-lg font-bold'>
 							{sucursal?.descripcion_sucursal || "Nenhuma Sucursal Selecionada"}
 							({sucursal?.id_sucursal})
