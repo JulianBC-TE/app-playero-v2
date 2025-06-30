@@ -245,19 +245,9 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			setIsLoading(true);
 			await api.post("/api/traspasos", data);
 			toastSuccess("Traspaso", "Traspaso guardado exitosamente.");
-			setPersona(null);
-			setSelectedBodegaDestino("");
-			setMedicionInicial([]);
-			setMedicionFinal([]);
-			setFirma("");
-			setObs("");
-			setBase64Obs("");
-			setSalida(0);
-			setCargaCombustible("000,00");
-			setTotalizadorPicoInicial(0);
-			setTotalizadorPicoFinal(0);
 			await removeTraspaso();
 			await removePersona();
+			navigation.navigate("home");
 		} catch (error) {
 			console.log("Error al guardar traspaso:", error);
 			toastError("Traspaso", "Ocurrió un error al guardar el traspaso.");
@@ -344,8 +334,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			toastError("Registro de Salida", "Intente nuevamente.");
 			setIsLoading(false);
 			return;
-		} finally {
-			setIsLoading(false);
 		}
 	}
 
@@ -418,7 +406,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	const fetchBox = useCallback(async () => {
 		console.log("[fetchBox]", estadoRestaurado, shouldContinue, salida);
 
-		if (estadoRestaurado === false || shouldContinue === false) return;
+		if (!estadoRestaurado || !shouldContinue) return;
 		try {
 			let idPicoBox = Number(idPico_surtidor);
 			console.log("ID Pico Surtidor:", idPico_surtidor);
@@ -435,6 +423,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			console.log("Buscando datos de salida...", idPicoBox);
 			const response = await api.get(`/api/salida-control/${idPicoBox}`);
 			if (response.data.estado === "B") {
+				console.log("[FetchBox] Finalizado:", idPico_surtidor);
 				setSalida(2);
 				setShouldContinue(false);
 				setIsLoading(false);
@@ -447,10 +436,10 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				setSalida(0);
 				setShouldContinue(false);
 			}
-			console.log("[FetchBox] Pico Surtidor:", idPico_surtidor);
-			console.log("[FetchBox] Erro ao buscar dados:", error);
+			console.log("[FetchBox ERRO] Pico Surtidor:", idPico_surtidor);
+			console.log("[FetchBox ERRO] Erro ao buscar dados:", error);
 		}
-	}, [estadoRestaurado, setSalida, setShouldContinue]);
+	}, [estadoRestaurado, shouldContinue, idPico_surtidor]);
 
 	const fetchLoop = useCallback(async () => {
 		console.log("[fetchLoop]", estadoRestaurado, shouldContinue, salida);
@@ -463,7 +452,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				fetchLoop(); // Reentrância controlada
 			}, 3000);
 		}
-	}, [estadoRestaurado, fetchBox, shouldContinue]);
+	}, [estadoRestaurado, shouldContinue, fetchBox]);
 
 	useEffect(() => {
 		if (estadoRestaurado && shouldContinue) {

@@ -24,18 +24,15 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 		navigation.navigate(route, params as any);
 	}
 
-	async function fetchSucursal() {
+	async function fetchTurno() {
+		console.log("Fetching turno for sucursal:", sucursal.id_sucursal);
+		if (!sucursal?.id_sucursal) {
+			return;
+		}
 		try {
-			setIsLoading(true);
-
-			const response = await api.get("/api/sucursales");
-			const sucursalData: SucursalDTO = response.data[0];
-			setSucursal(sucursalData);
-
 			const turno = await api.get(
-				`api/registros/turno/status/${sucursalData.id_sucursal}`
+				`api/registros/turno/status/${sucursal.id_sucursal}`
 			);
-
 			const turnoData: StatusTurnoDTO = {
 				status: turno.data.status,
 				// status: "falta_cerrar", // For testing purposes, set to "normal"
@@ -43,7 +40,6 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 				Fin_turno: turno.data.Fin_turno,
 				Fin_turno_anterior: turno.data.Fin_turno_anterior,
 			};
-			console.log(turnoData);
 			const updatedMenu = baseMenuItems.map((item) => {
 				if (
 					item.name === "Salida" ||
@@ -81,22 +77,48 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 				}
 			});
 			setMenuItems(updatedMenu);
-			setIsready(true);
 		} catch (error) {
-			const fallbackMenu = [
-				...baseMenuItems,
-				{
-					name: "Config",
-					icon: Cog,
-					route: "config" as keyof StackRoutesList,
-					enabled: true,
-					params: {},
-				},
-			];
+			console.error("Erro ao buscar turnos:", error);
+			Alert.alert(
+				"No se pudo cargar el turno",
+				"Recargar?",
+				[
+					{ text: "Cancelar", style: "cancel" },
+					{
+						text: "Recargar",
+						onPress: () => fetchTurno(),
+					},
+				],
+				{ cancelable: false }
+			);
+			// const fallbackMenu = [
+			// 	...baseMenuItems,
+			// 	{
+			// 		name: "Config",
+			// 		icon: Cog,
+			// 		route: "config" as keyof StackRoutesList,
+			// 		enabled: true,
+			// 		params: {},
+			// 	},
+			// ];
+			// setMenuItems(fallbackMenu);
 
-			setMenuItems(fallbackMenu);
-			setSucursal(null);
+			console.log("Erro ao buscar turnos:", error);
+		} finally {
+			setIsLoading(false);
+		}
+	}
 
+	async function fetchSucursal() {
+		try {
+			console.log("Fetching sucursal...");
+			if (!sucursal.id_sucursal) {
+				const response = await api.get("/api/sucursales");
+				const sucursalData: SucursalDTO = response.data[0];
+				setSucursal(sucursalData);
+			}
+		} catch (error) {
+			console.error("Erro ao buscar sucursal:", error);
 			Alert.alert(
 				"No se pudo cargar la sucursal",
 				"Recargar?",
@@ -109,16 +131,27 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 				],
 				{ cancelable: false }
 			);
-
-			console.log("Erro ao buscar sucursal:", error);
-		} finally {
-			setIsLoading(false);
 		}
 	}
 
+	useEffect(() => {
+		if (!sucursal?.id_sucursal) {
+			fetchSucursal();
+		}
+	}, []);
+
+	useEffect(() => {
+		if (sucursal?.id_sucursal) {
+			fetchTurno();
+		}
+	}, [sucursal?.id_sucursal]);
+
 	useFocusEffect(
 		useCallback(() => {
-			fetchSucursal();
+			if (sucursal?.id_sucursal) {
+				console.log("Focus effect triggered, fetching turno...");
+				fetchTurno();
+			}
 		}, [])
 	);
 

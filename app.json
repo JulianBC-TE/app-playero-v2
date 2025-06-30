@@ -9,19 +9,19 @@
 		"splash": {
 			"image": "./assets/splash.png",
 			"resizeMode": "contain",
-			"backgroundColor": "#DADCDD"
+			"backgroundColor": "#FFFFFF"
 		},
 		"android": {
 			"edgeToEdgeEnabled": true,
 			"adaptiveIcon": {
 				"foregroundImage": "./assets/adaptive-icon.png",
-				"backgroundColor": "#DADCDD",
+				"backgroundColor": "#FFFFFF",
 				"resizeMode": "contain"
 			},
 			"splash": {
 				"image": "./assets/splash.png",
 				"resizeMode": "contain",
-				"backgroundColor": "#DADCDD"
+				"backgroundColor": "#FFFFFF"
 			},
 			"package": "com.tecnoedil.playero"
 		},
