@@ -1,9 +1,9 @@
 import { View } from "react-native";
 import { Loading } from "./Loading";
-import { Picker } from "@react-native-picker/picker";
+import { Picker, PickerProps } from "@react-native-picker/picker";
 import { useEffect } from "react";
 
-interface SelectProps<T> {
+interface SelectProps<T> extends Partial<PickerProps<string>> {
 	isLoading: boolean;
 	data: T[];
 	selectedValue?: string;
@@ -19,6 +19,7 @@ export function Select<T>({
 	setSelectedValue,
 	labelField,
 	valueField,
+	...rest
 }: SelectProps<T>) {
 	useEffect(() => {
 		if (!isLoading && data.length > 0 && !selectedValue) {
@@ -36,6 +37,7 @@ export function Select<T>({
 					style={{ width: "100%", color: "#000" }}
 					selectedValue={selectedValue}
 					onValueChange={(itemValue) => setSelectedValue(itemValue)}
+					{...rest}
 				>
 					{data.map((item, index) => (
 						<Picker.Item

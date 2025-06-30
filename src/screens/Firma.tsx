@@ -8,7 +8,8 @@ export function Firma({ navigation, route }: StackRoutesProps<"firma">) {
 	const fromScreen = route.params?.fromScreen || "";
 	const persona: PersonaDTO | null = route.params?.persona || null;
 
-	const handleSave = (base64: string) => {
+	const handleSave = (signature: string) => {
+		const base64 = signature.replace(/^data:image\/png;base64,/, "");
 		navigation.popTo(fromScreen as any, { onFirma: base64 });
 	};
 

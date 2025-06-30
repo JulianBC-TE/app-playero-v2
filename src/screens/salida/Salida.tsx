@@ -90,7 +90,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 		control,
 		handleSubmit,
 		reset,
-		setValue,
 		formState: { errors },
 	} = useForm({
 		resolver: yupResolver(registrarSalidaSchema),
@@ -177,24 +176,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 		}
 	}
 
-	async function handleComenzar() {
-		try {
-			setIsLoading(true);
-			picos.map((pico) => {
-				if (pico.id_pico === Number(selectedPico)) {
-					setIdPicoSurtidor(pico.id_pico_surtidor);
-				}
-			});
-			const response = await api.get(`/autorizar/${idPico_surtidor}`);
-			return true;
-		} catch (error) {
-			console.error("Error al iniciar la carga:", error);
-			return false;
-		} finally {
-			setIsLoading(false);
-		}
-	}
-
 	async function handleSaveAll() {
 		let id_bodega = 0;
 		let id_pico_surtidor = 0;
@@ -242,7 +223,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 		try {
 			setIsLoading(true);
 			const result = await api.post("/api/tickets", data);
-			console.log("handleSaveAll called");
 			setIsLoading(true);
 			setPersona(null);
 			setVehiculo(null);
@@ -253,9 +233,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 			setBase64Kilometraje("");
 			setBase64Obs("");
 			reset();
-			setValue("horometro", "");
-			setValue("kilometraje", "");
-			setValue("observaciones", "");
 			setSalida(0);
 			setCargaCombustible("000,00");
 			setTotalizadorPicoInicial(0);
@@ -273,7 +250,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 		horometro,
 		observaciones,
 	}: FormData) {
-		setIsLoading(true);
 		if (!persona) {
 			Alert.alert("Persona requerida", "Debe seleccionar un operador.");
 			return;
@@ -321,6 +297,8 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 		}
 
 		try {
+			setIsLoading(true);
+
 			setIdPicoSurtidor(Number(picoSurtidor.id_pico_surtidor));
 			const response = await api.post("/api/autorizar", {
 				pico: Number(picoSurtidor.id_pico_surtidor),
@@ -406,7 +384,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 
 		if (shouldContinue) {
 			intervalRef.current = setTimeout(() => {
-				console.log("Agendando nova verificação...");
 				fetchLoop(); // Reentrância controlada
 			}, 3000);
 		}
@@ -533,7 +510,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 							</View>
 						</InputCard>
 						<InputCard
-							title='Pico expedidor:'
+							title='Pico expendedor:'
 							required={true}
 							locked={salida !== 0}
 						>
@@ -567,7 +544,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 											keyboardType='number-pad'
 											align='center'
 											placeholder='Informe el horómetro'
-											// value={value}
+											value={value ?? ""}
 											onChangeText={onChange}
 											errorMessage={errors.horometro?.message}
 										/>
@@ -597,7 +574,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 											keyboardType='number-pad'
 											align='center'
 											placeholder='Informe el kilometraje'
-											// value={value}
+											value={value ?? ""}
 											onChangeText={onChange}
 											errorMessage={errors.kilometraje?.message}
 										/>
@@ -715,17 +692,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 								</View>
 							</>
 						)}
-						<Button
-							title='Finalizar'
-							onPress={() => {
-								setIsLoading(!isLoading);
-								setSalida(0);
-								setShouldContinue(false);
-							}}
-							icon={Fuel}
-							iconSize='md'
-							iconColor='#000'
-						/>
 					</View>
 				</ScrollView>
 			</KeyboardAvoidingView>

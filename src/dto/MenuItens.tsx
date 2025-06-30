@@ -41,7 +41,7 @@ export const baseMenuItems: menuItemType[] = [
 		name: "Traspaso",
 		icon: Container,
 		route: "traspaso",
-		enabled: true,
+		enabled: false,
 		params: {},
 	},
 	{
@@ -70,21 +70,6 @@ export const baseMenuItems: menuItemType[] = [
 		icon: DraftingCompass,
 		route: "calibracion",
 		enabled: false,
-		params: {},
-	},
-	{
-		name: "Mediciones",
-		icon: DraftingCompass,
-		route: "sequencias",
-		enabled: true,
-		params: {},
-	},
-
-	{
-		name: "Teste",
-		icon: Pencil,
-		route: "telaTeste",
-		enabled: true,
 		params: {},
 	},
 ];

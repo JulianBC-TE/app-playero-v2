@@ -47,7 +47,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 			const updatedMenu = baseMenuItems.map((item) => {
 				if (
 					item.name === "Salida" ||
-					//item.name === "Traspaso" ||
+					item.name === "Traspaso" ||
 					item.name === "Calibración" ||
 					item.name === "Abastecimiento"
 				) {

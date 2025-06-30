@@ -29,10 +29,9 @@ import { PersonaDTO } from "./PersonaDTO";
 
 export type TraspasoDTO = {
 	json: {
-		statusSalida: number;
-		bod_origem: number;
+		bod_origen: number;
 		bod_destino: number;
-		id_tamque_destino: number;
+		id_tanque_destino: number;
 		regla_altura_inicial: string;
 		regla_altura_final: string;
 		litros_tanque_inicial: number;
@@ -44,13 +43,13 @@ export type TraspasoDTO = {
 		taxilitro_final: number;
 		litros_pico: number;
 		obs_traspaso: string;
-		foto_obs: string[];
+		foto_obs_traspaso: string[];
 		foto_medicion_inicial: string[] | [];
 		foto_medicion_final: string[] | [];
 		fecha: string;
 		hora: string;
 		firma_receptor: string[];
 		id_playero: number;
-		persona: PersonaDTO | null;
+		id_encargado_receptor: number;
 	};
 };

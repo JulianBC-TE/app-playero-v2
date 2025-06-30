@@ -1,7 +1,7 @@
 {
 	"expo": {
-		"name": "myapp",
-		"slug": "myapp",
+		"name": "playero",
+		"slug": "playero",
 		"version": "1.0.0",
 		"orientation": "portrait",
 		"icon": "./assets/icon.png",
@@ -12,6 +12,7 @@
 			"backgroundColor": "#DADCDD"
 		},
 		"android": {
+			"edgeToEdgeEnabled": true,
 			"adaptiveIcon": {
 				"foregroundImage": "./assets/adaptive-icon.png",
 				"backgroundColor": "#DADCDD",
@@ -22,7 +23,7 @@
 				"resizeMode": "contain",
 				"backgroundColor": "#DADCDD"
 			},
-			"package": "com.anonymous.myapp"
+			"package": "com.tecnoedil.playero"
 		},
 		"plugins": ["expo-font"]
 	}

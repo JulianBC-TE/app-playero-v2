@@ -1,5 +1,5 @@
 import { useNavigation } from "@react-navigation/native";
-import { ArrowLeftSquare, Hourglass } from "lucide-react-native";
+import { ArrowLeftSquare, UserLock } from "lucide-react-native";
 import { Text, TouchableOpacity, View } from "react-native";
 type Props = {
 	title: string;
@@ -19,7 +19,7 @@ export function ScreenHeader({ title, disableBackButton }: Props) {
 				</TouchableOpacity>
 			)}
 			{disableBackButton && (
-				<Hourglass
+				<UserLock
 					color='#ffffffe6'
 					size={32}
 				/>

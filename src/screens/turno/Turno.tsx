@@ -29,6 +29,7 @@ import { RulerDimensionLine, CheckCheck } from "lucide-react-native";
 import { useAppContext } from "@/hooks/useAppContext";
 import { AppError } from "@/utils/AppError";
 import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
+import { set } from "react-hook-form";
 
 /**
  * Componente para gestionar el turno de trabajo.
@@ -50,6 +51,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 	const [bodegas, setBodegas] = useState<BodegaDTO[]>([]);
 	const [medicion, setMedicion] = useState<MedicionDTO[]>([]);
 	const { sucursal, user } = useAppContext();
+	const [blockHeader, setBlockHeader] = useState(false);
 
 	/**
 	 * Abre la cámara del dispositivo, solicita permisos si es necesario,
@@ -82,12 +84,14 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 				const { base64 } = photoSelected.assets[0];
 				if (typeof base64 === "string") {
 					setBase64Images((prev) => [...prev, base64]);
-					toastSuccess("Foto capturada", "A foto foi capturada com sucesso.");
+					toastSuccess(
+						"Foto capturada",
+						"La foto ha sido capturada con éxito."
+					);
 				}
 			}
 		} catch (error) {
-			toastError("Erro ao capturar foto", "Tente novamente mais tarde.");
-			console.error("Erro ao capturar foto:", error);
+			toastError("Error al capturar foto", "Intente nuevamente más tarde.");
 		} finally {
 			setIsLoading(false);
 		}
@@ -135,38 +139,29 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 			);
 			return;
 		}
-		setIsLoading(true);
 		try {
+			setIsLoading(true);
 			// 1. Buscar todos los picos de la bodega selecionada
 			const picosResult = await api.get("/api/picos", {
 				params: {
 					id_bodega: selectedBodega,
 				},
 			});
-			//console.log("Picos obtidos:", picosResult.data.picos);
 			const picos = picosResult.data.picos;
-
+			const resultadosTotalizadores: { pico: number; totalizador: any }[] = [];
 			// 2. Buscar el taxilitro de cada pico
 			// Horustech tiene un id para cada pido y guarda el taxilitro
 			// de forma individual
-			const resultadosTotalizadores = await Promise.all(
-				picos.map(async (pico: any) => {
-					//console.log("Processando pico surtidor:", pico.id_pico_surtidor);
-					const totalizadorResult = await api.get(
-						`/api/totalizador/${pico.id_pico_surtidor}`
-					);
-					//console.log("Totalizado:", totalizadorResult.data.totalizador);
-					return {
-						pico: pico.id_pico,
-						totalizador: totalizadorResult.data.totalizador,
-					};
-				})
-			);
-			// Soma os totalizadores para calcular el taxilitro general
-			const taxilitroGeneral = resultadosTotalizadores.reduce((acc, cur) => {
-				return acc + Number(cur.totalizador ?? 0);
-			}, 0);
-			console.log("Taxilitro General:", taxilitroGeneral);
+			console.log("Bodega Selecionada:", selectedBodega);
+			for (const pico of picos) {
+				const totalizadorResult = await api.get(
+					`/api/totalizador/${pico.id_pico_surtidor}`
+				);
+				resultadosTotalizadores.push({
+					pico: pico.id_pico,
+					totalizador: totalizadorResult.data.totalizador,
+				});
+			}
 
 			const now = new Date();
 			const fecha = now.toISOString().slice(0, 10);
@@ -200,10 +195,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 					taxilitro: result.totalizador,
 				})),
 			};
-			console.log(
-				"Nuevo Turno:",
-				JSON.stringify({ json: nuevoTurno }, null, 2)
-			);
+
 			await api.post(
 				"/api/registros/turno/" + (inicioTurno ? "inicio" : "fin"),
 				{ json: nuevoTurno }
@@ -213,23 +205,29 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 				`El turno ha sido ${inicioTurno ? "iniciado" : "cerrado"} con éxito.`
 			);
 			// Remove a bodega da lista de bodegas
-			setBodegas((prevBodegas) =>
-				prevBodegas.filter(
-					(bodegas) => Number(bodegas.id_bodega) !== Number(selectedBodega)
-				)
+			const remainBodegas = bodegas.filter(
+				(bodega) => Number(bodega.id_bodega) !== Number(selectedBodega)
 			);
-			//setSelectedBodega(""); // Limpa a bodega selecionada
+			setBodegas(remainBodegas);
+			// Si hay más turnos para procesar, se debe bloquear el header
+			setBlockHeader(true);
 			setObs("");
 			setBase64Images([]);
 			setMedicion([]);
-			console.log("Turno procesado con éxito");
+			if (remainBodegas.length === 0) {
+				toastSuccess(
+					"Abertura de Turnos",
+					"Todos los turnos han sido procesados."
+				);
+				navigation.navigate("home");
+			}
 		} catch (error) {
+			console.log("Error al procesar turno:", error);
 			const isAppError = error instanceof AppError;
 			const message = isAppError
 				? error.message
 				: "No se pudo conectar al servidor";
 			toastError("Error al precessar turno", message);
-			console.error("Error al procesar turno:", error);
 		} finally {
 			setIsLoading(false);
 		}
@@ -314,8 +312,10 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 				setBodegas(bodegasFiltradas);
 			}
 		} catch (error) {
-			toastError("Erro ao buscar turno", "Tente novamente mais tarde.");
-			console.error("Erro ao buscar turno:", error);
+			toastError(
+				"Error al buscar turno",
+				"No se pudo obtener el estado del turno."
+			);
 		} finally {
 			setIsLoading(false);
 		}
@@ -331,8 +331,8 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 						Importente!!!
 					</Text>
 					<Text className='font-medium text-justify text-xl mb-4'>
-						La fecha anterior no se registró el cierro de turno. Favor indique
-						el motivo por el cual no se realizó el cierre de:
+						En la fecha anterior no se registró el cierre de turno. Favor
+						indique el motivo por el cual no se realizó el cierre de:
 					</Text>
 					<Text className='font-medium text-justify text-xl mb-4'>
 						{listaBodegasFaltaAnterior.map((bodega) => (
@@ -379,6 +379,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 		<View className='flex-1'>
 			<ScreenHeader
 				title={`${inicioTurno === true ? "Iniciar Turno" : "Cerrar Turno"}`}
+				disableBackButton={blockHeader}
 			/>
 			<View className='flex-1 p-4 gap-4 items-center'>
 				<InputCard

@@ -78,7 +78,6 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 			);
 			return;
 		}
-		console.log("Tanque selecionado:", selectedTanques);
 		// Busca o nome do tanque selecionado
 		const tanqueSelecionado = tanques.find(
 			(t) => t.id_tanque === +selectedTanques
@@ -157,7 +156,6 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 			}
 		} catch (error) {
 			toastError("Error ao capturar foto", "Intente nuevamente más tarde.");
-			console.error("Erro ao capturar foto:", error);
 		} finally {
 			setIsLoading(false);
 		}
@@ -177,8 +175,10 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 				setTanques(data.tanques);
 			}
 		} catch (error) {
-			toastError("Erro ao buscar tanques", "Tente novamente mais tarde.");
-			console.error("Erro ao buscar tanques:", error);
+			toastError(
+				"Error al buscar tanques",
+				"No se pudieron cargar los tanques."
+			);
 		} finally {
 			setIsLoading(false);
 		}
@@ -213,6 +213,7 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 						name='altura_regla'
 						render={({ field: { onChange, value } }) => (
 							<Input
+								keyboardType='number-pad'
 								align='center'
 								textAlignVertical='top'
 								className='ml-2 text-center'
@@ -230,6 +231,7 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 						name='litros'
 						render={({ field: { onChange, value } }) => (
 							<Input
+								keyboardType='number-pad'
 								align='center'
 								textAlignVertical='top'
 								className='ml-2'
@@ -247,6 +249,7 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 						name='temperatura'
 						render={({ field: { onChange, value } }) => (
 							<Input
+								keyboardType='number-pad'
 								align='center'
 								textAlignVertical='top'
 								className='ml-2'

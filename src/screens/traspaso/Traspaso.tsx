@@ -19,6 +19,7 @@ import {
 import {
 	Camera,
 	CheckCheck,
+	FileTerminal,
 	Fuel,
 	Pencil,
 	RulerDimensionLine,
@@ -40,6 +41,14 @@ import {
 	removeTraspaso,
 	saveTraspaso,
 } from "@/storage/storageTraspaso";
+import { set } from "react-hook-form";
+import {
+	getStoragePersona,
+	removePersona,
+	savePersona,
+} from "@/storage/storagePersona";
+import { get } from "node_modules/axios/index.cjs";
+import { rem } from "nativewind";
 
 export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	const [selectedBodegaOrigem, setSelectedBodegaOrigem] = useState<string>("");
@@ -69,6 +78,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	const [obsAdicional, setObsAdicional] = useState<string>("");
 	const [shouldContinue, setShouldContinue] = useState(false);
 	const intervalRef = useRef<NodeJS.Timeout | null>(null);
+	const [estadoRestaurado, setEstadoRestaurado] = useState(false);
 
 	// fotoType precisa ser um enum com 4 possíveis casos
 	async function handlePhotoCapture(
@@ -92,15 +102,11 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				const { base64 } = photoSelected.assets[0];
 				if (typeof base64 === "string") {
 					setBase64Obs(base64);
-					toastSuccess(
-						"Registro Fotográfico",
-						"Foto capturada con exitosamente."
-					);
+					toastSuccess("Registro Fotográfico", "Foto capturada exitosamente.");
 				}
 			}
 		} catch (error) {
 			toastError("Error ao capturar foto", "Intente nuevamente más tarde.");
-			console.error("Erro ao capturar foto:", error);
 		} finally {
 			setIsLoading(false);
 		}
@@ -127,24 +133,23 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			});
 			const picos: PicoDTO[] = data.data.picos;
 			setPicos(picos);
+			setSelectedPico(picos[0]?.id_pico.toString() || "");
+			setEstadoRestaurado(true);
 		} catch (error) {
-			console.error("Error al buscar picos:", error);
-			toastError("Error al buscar picos", "Intente nuevamente más tarde.");
+			toastError("Error al buscar picos", "Intente nuevamente.");
 		} finally {
 			setIsLoading(false);
 		}
 	}
 
 	async function fetchBodegas() {
-		setIsLoading(true);
 		try {
+			setIsLoading(true);
 			// Obtem las bodegas de origen. Si hay solo una bodega, no se muestra el select
 			const origen = await api.get(`api/bodegas/${sucursal.id_sucursal}`);
 			setBodegaOrigem(origen.data.bodegas);
 			if (origen.data.bodegas.length === 1) {
 				setSelectedBodegaOrigem(origen.data.bodegas[0].id_bodega);
-			} else {
-				setSelectedBodegaOrigem("");
 			}
 
 			// Obtem las bodegas para traspaso
@@ -153,7 +158,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			);
 			setBodegaDestino(destino.data.bodegas);
 		} catch (error) {
-			console.error("Error al buscar bodega:", error);
 			toastError("Error al buscar bodega", "Intente nuevamente más tarde.");
 		} finally {
 			setIsLoading(false);
@@ -167,20 +171,12 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 		const now = new Date();
 		const fecha = now.toISOString().slice(0, 10);
 		const hora = now.toTimeString().slice(0, 8);
-		picos.map((pico) => {
-			if (pico.id_pico === Number(selectedPico)) {
-				// id_bodega = pico.id_bodega;
-				// id_pico_surtidor = pico.id_pico_surtidor;
-				setIdPicoSurtidor(pico.id_pico_surtidor);
-			}
-		});
 
 		const data: TraspasoDTO = {
 			json: {
-				statusSalida: 1,
-				bod_origem: Number(selectedBodegaOrigem),
+				bod_origen: Number(selectedBodegaOrigem),
 				bod_destino: Number(selectedBodegaDestino),
-				id_tamque_destino: Number(medicionInicial[0].id_tanque),
+				id_tanque_destino: Number(medicionInicial[0].id_tanque),
 				regla_altura_inicial: medicionInicial[0].regla.toString(),
 				litros_tanque_inicial: medicionInicial[0].litros,
 				temp_inicial: medicionInicial[0].temperatura,
@@ -189,13 +185,12 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				litros_tanque_final: 0,
 				temp_final: 0,
 				foto_medicion_final: [],
-
 				id_pico: Number(selectedPico),
 				taxilitro_inicial: totalizadorPicoInicial, // Este valor debe ser calculado o enviado
 				taxilitro_final: totalizadorPicoFinal, // Este valor debe ser calculado o enviado
 				litros_pico: 0, // Este valor debe ser calculado o enviado
 				obs_traspaso: obs + " >>" + obsAdicional || "",
-				foto_obs: base64Obs ? [base64Obs] : [],
+				foto_obs_traspaso: base64Obs ? [base64Obs] : [],
 				foto_medicion_inicial: medicionInicial[0].foto_tanque
 					? [medicionInicial[0].foto_tanque]
 					: [],
@@ -203,18 +198,19 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				hora: hora,
 				firma_receptor: [],
 				id_playero: Number(user.cedula),
-				persona: persona || null,
+				id_encargado_receptor: Number(persona?.cedula),
 			},
 		};
 		saveTraspaso(data);
+		savePersona(persona);
 		return data;
 	}
 
 	async function handleSaveAll() {
 		if (medicionFinal.length === 0) {
 			Alert.alert(
-				"Medición Inicial requerida",
-				"Debe registrar la medición inicial del tanque receptor."
+				"Medición final es requerida",
+				"Debe registrar la medición final del tanque receptor."
 			);
 			return;
 		}
@@ -227,7 +223,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 		const data: TraspasoDTO = await getStorageTraspaso();
 
 		data.json.firma_receptor = firma ? [firma] : [];
-
 		data.json.regla_altura_final = medicionFinal[0].regla.toString();
 		data.json.litros_tanque_final = medicionFinal[0].litros;
 		data.json.temp_final = medicionFinal[0].temperatura;
@@ -237,15 +232,24 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 		data.json.obs_traspaso =
 			obs + (obsAdicional.length > 0 ? " >>" + obsAdicional : "");
 
+		data.json.litros_pico = Number(cargaCombustible.replace(",", "."));
+		data.json.taxilitro_inicial = totalizadorPicoInicial;
+		data.json.taxilitro_final = totalizadorPicoFinal;
+
+		// data.json.foto_medicion_final = [];
+		// data.json.foto_medicion_inicial = [];
+		// data.json.foto_obs = [];
+		// data.json.firma_receptor = [];
+		// console.log("Data to save:", data);
 		try {
 			setIsLoading(true);
 			await api.post("/api/traspasos", data);
-			setIsLoading(true);
+			toastSuccess("Traspaso", "Traspaso guardado exitosamente.");
 			setPersona(null);
 			setSelectedBodegaDestino("");
 			setMedicionInicial([]);
 			setMedicionFinal([]);
-			setFirma(null);
+			setFirma("");
 			setObs("");
 			setBase64Obs("");
 			setSalida(0);
@@ -253,17 +257,16 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			setTotalizadorPicoInicial(0);
 			setTotalizadorPicoFinal(0);
 			await removeTraspaso();
+			await removePersona();
 		} catch (error) {
-			console.error("Error al guardar los datos:", error);
-			toastError("Registro de Salida", "Intente nuevamente más tarde.");
+			console.log("Error al guardar traspaso:", error);
+			toastError("Traspaso", "Ocurrió un error al guardar el traspaso.");
 		} finally {
 			setIsLoading(false);
 		}
 	}
 
 	async function handleTraspaso() {
-		setIsLoading(true);
-
 		if (!persona) {
 			Alert.alert("Persona requerida", "Debe seleccionar un chofer/operador.");
 			return;
@@ -289,11 +292,16 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			return;
 		}
 
+		console.log("Pico Selecionado:", selectedPico);
+		console.log("Picos:", picos);
 		const picoSurtidor = picos.find(
 			(pico) => pico.id_pico === Number(selectedPico)
 		);
+		console.log("Pico Surtidor encontrado:", picoSurtidor);
+		setIdPicoSurtidor(Number(picoSurtidor?.id_pico_surtidor));
+		console.log("Pico Surtidor:", picoSurtidor?.id_pico_surtidor);
 
-		if (!picoSurtidor) {
+		if (!picoSurtidor || picoSurtidor.id_pico_surtidor === 0) {
 			Alert.alert(
 				"ID Pico Surtidor",
 				"El valor para el pico surtidor no fue encontrado."
@@ -309,6 +317,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 		}
 
 		try {
+			setIsLoading(true);
+
 			setIdPicoSurtidor(Number(picoSurtidor.id_pico_surtidor));
 			const response = await api.post("/api/autorizar", {
 				pico: Number(picoSurtidor.id_pico_surtidor),
@@ -325,14 +335,13 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 					"El pico no está disponible para la carga."
 				);
 			}
+			saveState();
 			setSalida(1);
 			setShouldContinue(true);
-			saveState();
 		} catch (error) {
 			setSalida(0);
 			setShouldContinue(false);
-			console.error("Error al iniciar la carga:", error);
-			toastError("Registro de Salida", "Intente nuevamente más tarde.");
+			toastError("Registro de Salida", "Intente nuevamente.");
 			setIsLoading(false);
 			return;
 		} finally {
@@ -343,33 +352,37 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	useEffect(() => {
 		if (sucursal) {
 			fetchBodegas();
+
 			(async () => {
 				const storedTraspaso = await getStorageTraspaso();
 
 				if (storedTraspaso && storedTraspaso.json) {
-					setSalida(storedTraspaso.json.statusSalida);
-					setIsLoading(true);
-					setShouldContinue(storedTraspaso.json.statusSalida === 1);
+					console.log("Restaurando traspaso desde almacenamiento local");
 					const { json } = storedTraspaso;
-					setSelectedBodegaOrigem(json.bod_origem.toString());
+					const personaStorage = await getStoragePersona();
+
+					setSelectedBodegaOrigem(json.bod_origen.toString());
 					setSelectedBodegaDestino(json.bod_destino.toString());
-					setIdPicoSurtidor(json.id_pico);
 					setSelectedPico(json.id_pico.toString());
 					setTotalizadorPicoInicial(json.taxilitro_inicial);
 					setTotalizadorPicoFinal(json.taxilitro_final);
-					// setCargaCombustible(json.litros_pico.toFixed(2));
-					setBase64Obs(json.foto_obs[0] || "");
+					setBase64Obs(json.foto_obs_traspaso[0] || "");
 					setMedicionInicial([
 						{
-							tanque: "", // Provide a suitable value if available
-							id_tanque: json.id_tamque_destino.toString(),
+							tanque: "",
+							id_tanque: json.id_tanque_destino.toString(),
 							regla: Number(json.regla_altura_inicial),
 							litros: json.litros_tanque_inicial,
 							temperatura: json.temp_inicial,
 							foto_tanque: json.foto_medicion_inicial[0] || "",
 						},
 					]);
-					setPersona(json.persona || null);
+					setPersona(personaStorage);
+					setSalida(1);
+					setIsLoading(true);
+					setShouldContinue(true);
+				} else {
+					setSelectedBodegaOrigem("");
 				}
 			})();
 		}
@@ -403,8 +416,24 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	}, [selectedBodegaOrigem]);
 
 	const fetchBox = useCallback(async () => {
+		console.log("[fetchBox]", estadoRestaurado, shouldContinue, salida);
+
+		if (estadoRestaurado === false || shouldContinue === false) return;
 		try {
-			const response = await api.get(`/api/salida-control/${idPico_surtidor}`);
+			let idPicoBox = Number(idPico_surtidor);
+			console.log("ID Pico Surtidor:", idPico_surtidor);
+			console.log("ID Pico Selecionado:", selectedPico);
+			console.log("Picos:", picos);
+			if (idPicoBox === 0) {
+				// Busca el pico surtidor correspondiente para ser usado en el looping
+				const picoSurtidor = picos.find(
+					(pico) => pico.id_pico === Number(selectedPico)
+				);
+				setIdPicoSurtidor(Number(picoSurtidor?.id_pico_surtidor));
+				idPicoBox = Number(picoSurtidor?.id_pico_surtidor);
+			}
+			console.log("Buscando datos de salida...", idPicoBox);
+			const response = await api.get(`/api/salida-control/${idPicoBox}`);
 			if (response.data.estado === "B") {
 				setSalida(2);
 				setShouldContinue(false);
@@ -414,25 +443,30 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				setCargaCombustible(response.data.volumenDespachado.toFixed(2));
 			}
 		} catch (error) {
-			console.error("Erro ao buscar dados:", error);
+			if (idPico_surtidor === 0) {
+				setSalida(0);
+				setShouldContinue(false);
+			}
+			console.log("[FetchBox] Pico Surtidor:", idPico_surtidor);
+			console.log("[FetchBox] Erro ao buscar dados:", error);
 		}
-	}, [idPico_surtidor, setSalida, setShouldContinue, setCargaCombustible]);
+	}, [estadoRestaurado, setSalida, setShouldContinue]);
 
 	const fetchLoop = useCallback(async () => {
-		if (!shouldContinue) return;
-
-		await fetchBox();
+		console.log("[fetchLoop]", estadoRestaurado, shouldContinue, salida);
+		if (estadoRestaurado && shouldContinue) {
+			await fetchBox();
+		}
 
 		if (shouldContinue) {
 			intervalRef.current = setTimeout(() => {
-				console.log("Agendando nova verificação...");
 				fetchLoop(); // Reentrância controlada
 			}, 3000);
 		}
-	}, [fetchBox, shouldContinue]);
+	}, [estadoRestaurado, fetchBox, shouldContinue]);
 
 	useEffect(() => {
-		if (shouldContinue) {
+		if (estadoRestaurado && shouldContinue) {
 			fetchLoop();
 		}
 
@@ -442,11 +476,14 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				intervalRef.current = null;
 			}
 		};
-	}, [shouldContinue, fetchLoop]);
+	}, [estadoRestaurado, shouldContinue, fetchLoop]);
 
 	return turnoCerrado ? (
 		<View className='flex-1'>
-			<ScreenHeader title='Salida Excepcional' />
+			<ScreenHeader
+				title='Salida Excepcional'
+				disableBackButton={salida === 2}
+			/>
 
 			<View style={styles.overlay}>
 				<View style={styles.modalContent}>
@@ -525,14 +562,16 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 						</InputCard>
 						{bodegaOrigem.length > 1 && (
 							<InputCard
-								title='Bodega Origem'
+								title='Bodega de Origen'
 								required={true}
 								locked={salida !== 0}
 							>
 								<View className='flex-row items-center p-2 gap-2'>
 									<Select
+										enabled={salida === 0}
 										data={bodegaOrigem}
 										isLoading={isLoading}
+										selectedValue={selectedBodegaOrigem}
 										setSelectedValue={setSelectedBodegaOrigem}
 										labelField='descripcion_bodega'
 										valueField='id_bodega'
@@ -547,8 +586,10 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 						>
 							<View className='flex-row items-center p-2 gap-2'>
 								<Select
+									enabled={salida === 0}
 									data={bodegaDestino}
 									isLoading={isLoading}
+									selectedValue={selectedBodegaDestino}
 									setSelectedValue={setSelectedBodegaDestino}
 									labelField='descripcion_bodega'
 									valueField='id_bodega'
@@ -562,6 +603,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 						>
 							{salida === 0 && (
 								<Select
+									enabled={salida === 0}
 									data={picos}
 									isLoading={isLoading}
 									selectedValue={selectedPico}
@@ -577,11 +619,11 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 							)}
 						</InputCard>
 						<InputCard
-							title='Medición Inicial del Tanque Receptor'
+							title='Medición Inicial del Tanque Expendedor'
 							required
 						>
 							<Button
-								disabled={selectedBodegaDestino === ""}
+								disabled={selectedBodegaDestino === "" || salida === 2}
 								title='Medir'
 								icon={
 									medicionInicial?.length > 0 ? CheckCheck : RulerDimensionLine
@@ -593,7 +635,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 										// Gere um alerta com as opções de continuar ou não
 										Alert.alert(
 											"Medición existente",
-											"Já existe uma medição para esta bodega. Deseja continuar?",
+											"Ya existe una medición para esta bodega. ¿Desea continuar?",
 											[
 												{
 													text: "Cancelar",
@@ -688,7 +730,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 												// Gere um alerta com as opções de continuar ou não
 												Alert.alert(
 													"Medición existente",
-													"Já existe uma medição para esta bodega. Deseja continuar?",
+													"Ya existe una medición para esta bodega. ¿Desea continuar?",
 													[
 														{
 															text: "Cancelar",
@@ -698,6 +740,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 															text: "Continuar",
 															onPress: () => {
 																navigation.navigate("medicion", {
+																	fromScreen: "traspaso",
 																	idBodega: selectedBodegaDestino,
 																});
 															},
@@ -759,45 +802,41 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 								</View>
 							</>
 						)}
-
-						{/* <Button
-							title='Salvar estado'
-							onPress={() => {
-								saveState();
-							}}
-							icon={Fuel}
-							iconSize='md'
-							iconColor='#000'
-						/>
-						<Button
-							title='Obter estado'
-							onPress={async () => {
-								const data: TraspasoDTO = await getStorageTraspaso();
-								if (data && data.json) {
-									setSelectedBodegaOrigem(data.json.bod_origem.toString());
-									setSelectedBodegaDestino(data.json.bod_destino.toString());
-									setIdPicoSurtidor(data.json.id_pico);
-									setSelectedPico(data.json.id_pico.toString());
-									setTotalizadorPicoInicial(data.json.taxilitro_inicial);
-									setTotalizadorPicoFinal(data.json.taxilitro_final);
-									setPersona(data.json.persona);
-									set;
-									console.log("Estado obtido:", data);
-								}
-							}}
-							icon={Fuel}
-							iconSize='md'
-							iconColor='#000'
-						/>
-						<Button
-							title='apagar estado'
-							onPress={async () => {
-								await removeTraspaso();
-							}}
-							icon={Fuel}
-							iconSize='md'
-							iconColor='#000'
-						/> */}
+					</View>
+					<View className='flex-row items-center p-4'>
+						<View>
+							<Button
+								title='Remover Estado'
+								onPress={async () => {
+									await removeTraspaso();
+									await removePersona();
+								}}
+								isLoading={isLoading}
+								icon={SaveAll}
+								iconSize='md'
+								iconColor='#000'
+							/>
+						</View>
+						<View>
+							<Text className='text-black font-bold'>
+								Pico Selecionado:{selectedPico}
+							</Text>
+							<Text className='text-black font-bold'>
+								IdPicoSelecionado:{idPico_surtidor}
+							</Text>
+							<Text className='text-black font-bold'>
+								Estado Inicial:
+								{estadoRestaurado ? "Restaurado" : "No restaurado"}
+							</Text>
+							<Text className='text-black font-bold'>
+								ShouldContinue:
+								{shouldContinue ? "True" : "False"}
+							</Text>
+							<Text className='text-black font-bold'>
+								Salida:
+								{salida}
+							</Text>
+						</View>
 					</View>
 				</ScrollView>
 			</KeyboardAvoidingView>
