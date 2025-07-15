@@ -249,7 +249,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			await removePersona();
 			navigation.navigate("home");
 		} catch (error) {
-			console.log("Error al guardar traspaso:", error);
 			toastError("Traspaso", "Ocurrió un error al guardar el traspaso.");
 		} finally {
 			setIsLoading(false);
@@ -282,14 +281,10 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			return;
 		}
 
-		console.log("Pico Selecionado:", selectedPico);
-		console.log("Picos:", picos);
 		const picoSurtidor = picos.find(
 			(pico) => pico.id_pico === Number(selectedPico)
 		);
-		console.log("Pico Surtidor encontrado:", picoSurtidor);
 		setIdPicoSurtidor(Number(picoSurtidor?.id_pico_surtidor));
-		console.log("Pico Surtidor:", picoSurtidor?.id_pico_surtidor);
 
 		if (!picoSurtidor || picoSurtidor.id_pico_surtidor === 0) {
 			Alert.alert(
@@ -345,7 +340,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				const storedTraspaso = await getStorageTraspaso();
 
 				if (storedTraspaso && storedTraspaso.json) {
-					console.log("Restaurando traspaso desde almacenamiento local");
 					const { json } = storedTraspaso;
 					const personaStorage = await getStoragePersona();
 
@@ -404,14 +398,9 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	}, [selectedBodegaOrigem]);
 
 	const fetchBox = useCallback(async () => {
-		console.log("[fetchBox]", estadoRestaurado, shouldContinue, salida);
-
 		if (!estadoRestaurado || !shouldContinue) return;
 		try {
 			let idPicoBox = Number(idPico_surtidor);
-			console.log("ID Pico Surtidor:", idPico_surtidor);
-			console.log("ID Pico Selecionado:", selectedPico);
-			console.log("Picos:", picos);
 			if (idPicoBox === 0) {
 				// Busca el pico surtidor correspondiente para ser usado en el looping
 				const picoSurtidor = picos.find(
@@ -420,10 +409,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				setIdPicoSurtidor(Number(picoSurtidor?.id_pico_surtidor));
 				idPicoBox = Number(picoSurtidor?.id_pico_surtidor);
 			}
-			console.log("Buscando datos de salida...", idPicoBox);
 			const response = await api.get(`/api/salida-control/${idPicoBox}`);
 			if (response.data.estado === "B") {
-				console.log("[FetchBox] Finalizado:", idPico_surtidor);
 				setSalida(2);
 				setShouldContinue(false);
 				setIsLoading(false);
@@ -436,13 +423,10 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				setSalida(0);
 				setShouldContinue(false);
 			}
-			console.log("[FetchBox ERRO] Pico Surtidor:", idPico_surtidor);
-			console.log("[FetchBox ERRO] Erro ao buscar dados:", error);
 		}
 	}, [estadoRestaurado, shouldContinue, idPico_surtidor]);
 
 	const fetchLoop = useCallback(async () => {
-		console.log("[fetchLoop]", estadoRestaurado, shouldContinue, salida);
 		if (estadoRestaurado && shouldContinue) {
 			await fetchBox();
 		}
@@ -470,7 +454,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	return turnoCerrado ? (
 		<View className='flex-1'>
 			<ScreenHeader
-				title='Salida Excepcional'
+				title='Traspaso Excepcional'
 				disableBackButton={salida === 2}
 			/>
 
@@ -608,7 +592,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 							)}
 						</InputCard>
 						<InputCard
-							title='Medición Inicial del Tanque Expendedor'
+							title='Medición Inicial del Tanque Receptor'
 							required
 						>
 							<Button
@@ -792,7 +776,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 							</>
 						)}
 					</View>
-					<View className='flex-row items-center p-4'>
+					{/* <View className='flex-row items-center p-4'>
 						<View>
 							<Button
 								title='Remover Estado'
@@ -826,7 +810,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 								{salida}
 							</Text>
 						</View>
-					</View>
+					</View> */}
 				</ScrollView>
 			</KeyboardAvoidingView>
 		</View>

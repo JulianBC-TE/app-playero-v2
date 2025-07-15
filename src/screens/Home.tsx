@@ -5,34 +5,29 @@ import { MenuCard } from "@/components/MenuCard";
 import { StackRoutesList, StackRoutesProps } from "@/route/app.routes";
 import { api } from "@/services/api";
 import { useAppContext } from "@/hooks/useAppContext";
-import { SucursalDTO } from "@/dto/sucursalDTO";
 import { useCallback, useEffect, useState } from "react";
 import { Loading } from "@/components/Loading";
 import { baseMenuItems, menuItemType } from "@/dto/MenuItens";
 
-import { Cog } from "lucide-react-native";
 import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
 import { useFocusEffect } from "@react-navigation/native";
 
 export function Home({ navigation }: StackRoutesProps<"home">) {
 	const [isLoading, setIsLoading] = useState(true);
-	const [isReady, setIsready] = useState(false);
 	const [menuItems, setMenuItems] = useState<menuItemType[]>(baseMenuItems);
-	const { setSucursal, sucursal, serverIP } = useAppContext();
+	const { sucursal, serverIP } = useAppContext();
 
 	function handleOpenMenu(route: keyof StackRoutesList, params: object) {
 		navigation.navigate(route, params as any);
 	}
 
-	async function fetchTurno() {
-		console.log("Fetching turno for sucursal:", sucursal.id_sucursal);
-		if (!sucursal?.id_sucursal) {
-			return;
-		}
+	async function fetchTurno(retry = false) {
 		try {
+			console.log(`Fetching turno...[${serverIP}]`);
 			const turno = await api.get(
 				`api/registros/turno/status/${sucursal.id_sucursal}`
 			);
+			console.log("Turno actualizado exitosamente");
 			const turnoData: StatusTurnoDTO = {
 				status: turno.data.status,
 				// status: "falta_cerrar", // For testing purposes, set to "normal"
@@ -77,8 +72,13 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 				}
 			});
 			setMenuItems(updatedMenu);
-		} catch (error) {
-			console.error("Erro ao buscar turnos:", error);
+		} catch (error: any) {
+			console.log("Erro ao buscar turnos:", error);
+			if (!retry && error?.message?.toLowerCase().includes("network error")) {
+				console.log("Ententando novamente:");
+				setTimeout(() => fetchTurno(true), 1500);
+				return;
+			}
 			Alert.alert(
 				"No se pudo cargar el turno",
 				"Recargar?",
@@ -86,72 +86,19 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 					{ text: "Cancelar", style: "cancel" },
 					{
 						text: "Recargar",
-						onPress: () => fetchTurno(),
+						onPress: () => fetchTurno(false),
 					},
 				],
 				{ cancelable: false }
 			);
-			// const fallbackMenu = [
-			// 	...baseMenuItems,
-			// 	{
-			// 		name: "Config",
-			// 		icon: Cog,
-			// 		route: "config" as keyof StackRoutesList,
-			// 		enabled: true,
-			// 		params: {},
-			// 	},
-			// ];
-			// setMenuItems(fallbackMenu);
-
-			console.log("Erro ao buscar turnos:", error);
 		} finally {
 			setIsLoading(false);
 		}
 	}
 
-	async function fetchSucursal() {
-		try {
-			console.log("Fetching sucursal...");
-			if (!sucursal.id_sucursal) {
-				const response = await api.get("/api/sucursales");
-				const sucursalData: SucursalDTO = response.data[0];
-				setSucursal(sucursalData);
-			}
-		} catch (error) {
-			console.error("Erro ao buscar sucursal:", error);
-			Alert.alert(
-				"No se pudo cargar la sucursal",
-				"Recargar?",
-				[
-					{ text: "Cancelar", style: "cancel" },
-					{
-						text: "Recargar",
-						onPress: () => fetchSucursal(),
-					},
-				],
-				{ cancelable: false }
-			);
-		}
-	}
-
-	useEffect(() => {
-		if (!sucursal?.id_sucursal) {
-			fetchSucursal();
-		}
-	}, []);
-
-	useEffect(() => {
-		if (sucursal?.id_sucursal) {
-			fetchTurno();
-		}
-	}, [sucursal?.id_sucursal]);
-
 	useFocusEffect(
 		useCallback(() => {
-			if (sucursal?.id_sucursal) {
-				console.log("Focus effect triggered, fetching turno...");
-				fetchTurno();
-			}
+			fetchTurno();
 		}, [])
 	);
 

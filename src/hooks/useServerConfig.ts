@@ -1,6 +1,7 @@
 // useServerConfig.ts
 import { useState, useEffect } from "react";
 import { getStorageServerUrl } from "@storage/storageServer";
+import { getStorageSucursal } from "@/storage/storageSucursal";
 
 export function useServerConfig() {
 	const [isChecking, setIsChecking] = useState(true);
@@ -9,6 +10,7 @@ export function useServerConfig() {
 	useEffect(() => {
 		async function load() {
 			const ip = await getStorageServerUrl();
+			const sucursal = await getStorageSucursal();
 			setHasServerIP(!!ip);
 			setIsChecking(false);
 		}

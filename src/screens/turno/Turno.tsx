@@ -75,6 +75,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 			}
 			const photoSelected = await ImagePicker.launchCameraAsync({
 				mediaTypes: "images",
+				cameraType: ImagePicker.CameraType.back,
 				allowsEditing: false,
 				aspect: [4, 4],
 				quality: 0.3,
@@ -445,9 +446,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 						className='ml-2'
 						value={obs}
 						onChangeText={setObs}
-						placeholder={`Observaciones ${
-							inicioTurno ? "para el cierre" : "para la apertura"
-						} de turno`}
+						placeholder={"Observaciones de la medicion"}
 					/>
 				</InputCard>
 				<InputCard

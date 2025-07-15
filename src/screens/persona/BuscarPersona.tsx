@@ -1,7 +1,7 @@
 import { Input } from "@components/Input";
 import { InputCard } from "@components/InputCard";
 import { PersonaCard } from "@components/PersonaCard";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@services/api";
 import { PersonaDTO } from "@dto/PersonaDTO";
 import {
@@ -10,7 +10,7 @@ import {
 	View,
 	TouchableOpacity,
 } from "react-native";
-import { XCircle, Search } from "lucide-react-native";
+import { XCircle, Search, RefreshCw } from "lucide-react-native";
 
 import debounce from "lodash.debounce";
 import { EmptyList } from "@/components/EmptyList";
@@ -18,6 +18,7 @@ import { toastError, toastSuccess } from "@utils/toastMessage";
 
 import { StackRoutesProps } from "@/route/app.routes";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { useFocusEffect } from "@react-navigation/native";
 
 interface Props {
 	enabledEdit?: boolean;
@@ -38,6 +39,7 @@ export function BuscarPersona({
 	const enabledEdit = route.params?.enabledEdit ?? false;
 	const [isLoading, setIsLoading] = useState(false);
 	const fromScreen = route.params?.fromScreen || "";
+	const [editcreate, setEditCreate] = useState(false);
 
 	// Cria o debounce uma vez
 	const debouncedSetQuery = useRef(
@@ -72,6 +74,7 @@ export function BuscarPersona({
 
 	const fetchData = useCallback(
 		async (reset = false) => {
+			console.log("Buscando personas:");
 			if (isLoading || (!hasMore && !reset)) return;
 
 			setIsLoading(true);
@@ -109,6 +112,7 @@ export function BuscarPersona({
 	);
 
 	useEffect(() => {
+		console.log("Refazendo a lista");
 		fetchData(true);
 	}, [debouncedQuery]);
 
@@ -171,6 +175,19 @@ export function BuscarPersona({
 								}}
 							>
 								<XCircle
+									size={18}
+									color='#666'
+								/>
+							</TouchableOpacity>
+						) : null}
+						{debouncedQuery.length === 0 ? (
+							<TouchableOpacity
+								className='absolute right-3 mt-2'
+								onPress={() => {
+									handleReset();
+								}}
+							>
+								<RefreshCw
 									size={18}
 									color='#666'
 								/>

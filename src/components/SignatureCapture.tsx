@@ -30,7 +30,7 @@ export function SignatureCapture({ onSave, onClear, title, persona }: Props) {
 		<View className='flex-1 bg-teColorSecundarioMedio items-center justify-center p-4'>
 			<Text className='text-lg font-semibold mb-2'>{title}</Text>
 
-			<View className='h-72 w-full border border-gray-400 rounded-md overflow-hidden bg-white'>
+			<View className='h-[400px] w-full border border-gray-400 rounded-md overflow-hidden bg-white'>
 				<Signature
 					key={signatureKey}
 					ref={ref}

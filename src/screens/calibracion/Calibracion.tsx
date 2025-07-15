@@ -47,14 +47,11 @@ export function Calibracion({
 	const [obsAdicional, setObsAdicional] = useState("");
 	const [persona, setPersona] = useState<PersonaDTO | null>(null);
 	const [firma, setFirma] = useState<string | null>(null);
-	const [photoPrecintoColocado, setPhotoPrecintoColocado] = useState<
-		string | null
-	>(null);
-	const [photoPrecintoRetirado, setPhotoPrecintoRetirado] = useState<
-		string | null
-	>(null);
-	const [numeroPrecintoRetirar, setNumeroPrecintoRetirar] = useState("");
-	const [numeroPrecinto, setNumeroPrecinto] = useState("");
+	const [photoPrecintoAtual, setPhotoPrecintoAtual] = useState<string>("");
+	const [photoPrecintoColocado, setPhotoPrecintoColocado] =
+		useState<string>("");
+	const [numeroPrecintoColocado, setNumeroPrecintoColocado] = useState("");
+	const [numeroPrecintoAtual, setNumeroPrecintoAtual] = useState("");
 	const [salida, setSalida] = useState(0);
 
 	const [mediciones, setMediciones] = useState<SequenciaCalibracionDTO>({
@@ -90,7 +87,7 @@ export function Calibracion({
 							setPhotoPrecintoColocado(base64);
 							break;
 						case "retirado":
-							setPhotoPrecintoRetirado(base64);
+							setPhotoPrecintoAtual(base64);
 							break;
 					}
 					toastSuccess(
@@ -116,22 +113,30 @@ export function Calibracion({
 			return;
 		}
 		if (tipoOperacionSeleccionado === "2") {
-			if (numeroPrecinto === "") {
+			if (numeroPrecintoAtual === "") {
 				Alert.alert(
 					"Precinto",
 					"Debe ingresar el número de precinto a retirar."
 				);
 				return;
 			}
-			if (numeroPrecintoRetirar === "") {
+			if (photoPrecintoAtual === "") {
 				Alert.alert(
 					"Precinto",
-					"Debe ingresar el número de precinto a retirar."
+					"Debe capturar una foto del precinto colocado."
 				);
 				return;
 			}
 
-			if (photoPrecintoRetirado === "") {
+			if (numeroPrecintoColocado === "") {
+				Alert.alert(
+					"Precinto",
+					"Debe ingresar el número de precinto a colocar."
+				);
+				return;
+			}
+
+			if (photoPrecintoColocado === "") {
 				Alert.alert(
 					"Precinto",
 					"Debe capturar una foto del precinto colocado."
@@ -140,18 +145,15 @@ export function Calibracion({
 			}
 		}
 
-		if (!persona) {
-			Alert.alert("Persona requerida", "Debe seleccionar un operador.");
-			return;
-		}
 		if (!selectedPico) {
 			Alert.alert("Pico requerido", "Debe seleccionar un pico expedidor.");
 			return;
 		}
 
 		const picoSurtidor = picos.find(
-			(pico) => pico.id_pico === Number(selectedPico)
+			(pico) => pico.id_pico_surtidor === Number(selectedPico)
 		);
+		console.log("Pico Surtidor:", picoSurtidor);
 
 		if (!picoSurtidor) {
 			Alert.alert(
@@ -214,7 +216,6 @@ export function Calibracion({
 	}, []);
 
 	async function saveAllData() {
-		console.log("Guardando todos los datos...");
 		setIsLoading(true);
 		try {
 			const now = new Date();
@@ -242,11 +243,11 @@ export function Calibracion({
 					taxilitro_inicial: mediciones.taxilitroInicial,
 					taxilitro_final: mediciones.taxilitroFinal,
 					nro_precinto_retirado:
-						tipoOperacionSeleccionado === "2" ? numeroPrecinto : "",
+						tipoOperacionSeleccionado === "2" ? numeroPrecintoAtual : "",
 					nro_precinto_colocado:
-						tipoOperacionSeleccionado === "2" ? numeroPrecintoRetirar : "",
+						tipoOperacionSeleccionado === "2" ? numeroPrecintoColocado : "",
 					foto_precinto_retirado:
-						tipoOperacionSeleccionado === "2" ? photoPrecintoRetirado : "",
+						tipoOperacionSeleccionado === "2" ? photoPrecintoAtual : "",
 					foto_precinto_colocado:
 						tipoOperacionSeleccionado === "2" ? photoPrecintoColocado : "",
 					firma_calibrador: firma,
@@ -275,47 +276,57 @@ export function Calibracion({
 	return turnoCerrado ? (
 		<View className='flex-1'>
 			<ScreenHeader title='Turno Cerrado' />
-
-			<View style={styles.overlay}>
-				<View style={styles.modalContent}>
-					<Text className='font-bold text-red-500 text-center text-2xl underline mb-4'>
-						Importente!!!
-					</Text>
-					<Text className='font-medium text-justify text-xl mb-4'>
-						Está intentando registrar una calibración y el turno se encuentra
-						cerrado. Una vez finalizad se debe realizar el cierre
-						correspondiente las bodegas correspondientes.
-					</Text>
-					<InputCard
-						className='min-h-40'
-						title='Indique el motivo'
-						required
-					>
-						<Input
-							value={obsAdicional}
-							placeholder='Describa el motivo'
-							multiline
-							numberOfLines={4}
-							onChangeText={setObsAdicional}
-						/>
-					</InputCard>
-					<TouchableOpacity
-						style={styles.button}
-						onPress={() => {
-							if (obsAdicional.trim() === "") {
-								Alert.alert(
-									"Motivo requerido",
-									"Por favor describa el motivo."
-								);
-								return;
-							}
-							setTurnoCerrado(false);
-						}}
-					>
-						<Text style={styles.buttonText}>Guardar</Text>
-					</TouchableOpacity>
-				</View>
-			</View>
+			<KeyboardAvoidingView
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
+				style={{ flex: 1 }}
+			>
+				<ScrollView
+					contentContainerStyle={{ flexGrow: 1 }}
+					keyboardShouldPersistTaps='handled'
+					showsVerticalScrollIndicator={false}
+				>
+					<View style={styles.overlay}>
+						<View style={styles.modalContent}>
+							<Text className='font-bold text-red-500 text-center text-2xl underline mb-4'>
+								Importente!!!
+							</Text>
+							<Text className='font-medium text-justify text-xl mb-4'>
+								Está intentando registrar una calibración y el turno se
+								encuentra cerrado. Una vez finalizad se debe realizar el cierre
+								correspondiente las bodegas correspondientes.
+							</Text>
+							<InputCard
+								className='min-h-40'
+								title='Indique el motivo'
+								required
+							>
+								<Input
+									value={obsAdicional}
+									placeholder='Describa el motivo'
+									multiline
+									numberOfLines={4}
+									onChangeText={setObsAdicional}
+								/>
+							</InputCard>
+							<TouchableOpacity
+								style={styles.button}
+								onPress={() => {
+									if (obsAdicional.trim() === "") {
+										Alert.alert(
+											"Motivo requerido",
+											"Por favor describa el motivo."
+										);
+										return;
+									}
+									setTurnoCerrado(false);
+								}}
+							>
+								<Text style={styles.buttonText}>Guardar</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+				</ScrollView>
+			</KeyboardAvoidingView>
 		</View>
 	) : (
 		<View className='flex-1'>
@@ -380,8 +391,8 @@ export function Calibracion({
 										keyboardType='number-pad'
 										align='center'
 										placeholder='Número de precinto'
-										value={numeroPrecinto}
-										onChangeText={setNumeroPrecinto}
+										value={numeroPrecintoAtual}
+										onChangeText={setNumeroPrecintoAtual}
 									/>
 									<Camera
 										disabled={isLoading}
@@ -405,8 +416,8 @@ export function Calibracion({
 										keyboardType='number-pad'
 										align='center'
 										placeholder='Número de precinto'
-										value={numeroPrecintoRetirar}
-										onChangeText={setNumeroPrecintoRetirar}
+										value={numeroPrecintoColocado}
+										onChangeText={setNumeroPrecintoColocado}
 									/>
 									<Camera
 										disabled={salida !== 0}
@@ -494,7 +505,7 @@ export function Calibracion({
 							<>
 								<View className='flex-row gap-4'>
 									<Button
-										disabled={mediciones.totalMediciones === 0 || !firma}
+										disabled={mediciones.totalMediciones === 0}
 										title='Firmar'
 										onPress={() =>
 											navigation.navigate("firma", {

@@ -18,12 +18,12 @@ export function VehiculoCard({ data, ...rest }: Props) {
 				<View className='flex-1'>
 					<Text
 						numberOfLines={1}
-						className='text-lg font-bold text-black'
+						className='text-lg text-black'
 					>
 						{data.descripcion_vehiculo}
 					</Text>
 					<View className='flex-row mt-1'>
-						<Text className='text-sm text-gray-500'>
+						<Text className='text-sm font-bold text-black'>
 							{`${data.id_vehiculo}`}
 						</Text>
 						<Text className='text-sm text-gray-500 ml-2'>{`${data.ruc}`}</Text>

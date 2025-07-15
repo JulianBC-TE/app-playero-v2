@@ -10,6 +10,7 @@ import {
 import { getStorageServerUrl, saveServerUrl } from "@storage/storageServer";
 import { ClienteDTO } from "@dto/ClienteDTO";
 import { SucursalDTO } from "@/dto/sucursalDTO";
+import { getStorageSucursal, saveSucursal } from "@/storage/storageSucursal";
 
 export type AuthContextDataProps = {
 	user: UserDTO;
@@ -139,12 +140,15 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 
 	async function loadServerIP() {
 		const ip = await getStorageServerUrl();
+		const sucursal = await getStorageSucursal();
 		setServerIPState(ip);
+		setSucursal(sucursal);
 		setIsLoadingServerIP(false);
 	}
 
 	async function setSucursalState(sucursal: SucursalDTO | null) {
 		if (sucursal !== null) {
+			await saveSucursal(sucursal);
 			setSucursal(sucursal);
 		} else {
 			setSucursal({} as SucursalDTO);

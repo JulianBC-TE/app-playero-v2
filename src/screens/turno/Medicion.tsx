@@ -140,6 +140,7 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 			const photoSelected = await ImagePicker.launchCameraAsync({
 				mediaTypes: "images",
 				allowsEditing: false,
+				cameraType: ImagePicker.CameraType.back,
 				aspect: [4, 4],
 				quality: 0.3,
 				base64: true,
@@ -194,7 +195,10 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 		<View className='flex-1'>
 			<ScreenHeader title='Medición' />
 			<View className='flex-1 p-4 gap-4 items-center'>
-				<InputCard title='Tanque'>
+				<InputCard
+					title='Tanque'
+					required
+				>
 					<Select
 						data={tanques}
 						isLoading={isLoading}
@@ -207,7 +211,10 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 
 				{/* Crie uma renderização condicional baseado na seleção de um tanque */}
 
-				<InputCard title='Altura Regla'>
+				<InputCard
+					title='Altura Regla'
+					required
+				>
 					<Controller
 						control={control}
 						name='altura_regla'
@@ -225,7 +232,10 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 						)}
 					/>
 				</InputCard>
-				<InputCard title='Litros'>
+				<InputCard
+					title='Litros'
+					required
+				>
 					<Controller
 						control={control}
 						name='litros'
@@ -243,7 +253,10 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 						)}
 					/>
 				</InputCard>
-				<InputCard title='Temperatura'>
+				<InputCard
+					title='Temperatura'
+					required
+				>
 					<Controller
 						control={control}
 						name='temperatura'
@@ -264,6 +277,7 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 				<InputCard
 					title='Fotos'
 					className='min-h-48'
+					required
 				>
 					<View className='w-full items-center p-4 gap-2'>
 						<Image

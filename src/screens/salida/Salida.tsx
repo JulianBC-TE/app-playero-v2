@@ -222,8 +222,8 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 		};
 		try {
 			setIsLoading(true);
-			const result = await api.post("/api/tickets", data);
-			setIsLoading(true);
+			await api.post("/api/tickets", data);
+			setIsLoading(false);
 			setPersona(null);
 			setVehiculo(null);
 
@@ -237,6 +237,8 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 			setCargaCombustible("000,00");
 			setTotalizadorPicoInicial(0);
 			setTotalizadorPicoFinal(0);
+			toastSuccess("Registro de Salida", "Salida registrada exitosamente.");
+			navigation.navigate("home");
 		} catch (error) {
 			console.error("Error al guardar los datos:", error);
 			toastError("Registro de Salida", "Intente nuevamente más tarde.");
@@ -405,48 +407,58 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 	return turnoCerrado ? (
 		<View className='flex-1'>
 			<ScreenHeader title='Salida Excepcional' />
-
-			<View style={styles.overlay}>
-				<View style={styles.modalContent}>
-					<Text className='font-bold text-red-500 text-center text-2xl underline mb-4'>
-						Importente!!!
-					</Text>
-					<Text className='font-medium text-justify text-xl mb-4'>
-						Está intentando registrar una salida y el turno se encuentra
-						cerrado. Una vez finalizada la/s carga/s se deberá realizar el
-						cierre correspondiente en el apartado “Cierre Extra”, para las
-						bodegas que hayan sufrido movimientos.
-					</Text>
-					<InputCard
-						className='min-h-40'
-						title='Indique el motivo'
-						required
-					>
-						<Input
-							value={obsAdicional}
-							placeholder='Describa el motivo'
-							multiline
-							numberOfLines={4}
-							onChangeText={setObsAdicional}
-						/>
-					</InputCard>
-					<TouchableOpacity
-						style={styles.button}
-						onPress={() => {
-							if (obsAdicional.trim() === "") {
-								Alert.alert(
-									"Motivo requerido",
-									"Por favor describa el motivo."
-								);
-								return;
-							}
-							setTurnoCerrado(false);
-						}}
-					>
-						<Text style={styles.buttonText}>Guardar</Text>
-					</TouchableOpacity>
-				</View>
-			</View>
+			<KeyboardAvoidingView
+				behavior={Platform.OS === "ios" ? "padding" : "height"}
+				style={{ flex: 1 }}
+			>
+				<ScrollView
+					contentContainerStyle={{ flexGrow: 1 }}
+					keyboardShouldPersistTaps='handled'
+					showsVerticalScrollIndicator={false}
+				>
+					<View style={styles.overlay}>
+						<View style={styles.modalContent}>
+							<Text className='font-bold text-red-500 text-center text-2xl underline mb-4'>
+								Importente!!!
+							</Text>
+							<Text className='font-medium text-justify text-xl mb-4'>
+								Está intentando registrar una salida y el turno se encuentra
+								cerrado. Una vez finalizada la/s carga/s se deberá realizar el
+								cierre correspondiente en el apartado “Cierre Extra”, para las
+								bodegas que hayan sufrido movimientos.
+							</Text>
+							<InputCard
+								className='min-h-40'
+								title='Indique el motivo'
+								required
+							>
+								<Input
+									value={obsAdicional}
+									placeholder='Describa el motivo'
+									multiline
+									numberOfLines={4}
+									onChangeText={setObsAdicional}
+								/>
+							</InputCard>
+							<TouchableOpacity
+								style={styles.button}
+								onPress={() => {
+									if (obsAdicional.trim() === "") {
+										Alert.alert(
+											"Motivo requerido",
+											"Por favor describa el motivo."
+										);
+										return;
+									}
+									setTurnoCerrado(false);
+								}}
+							>
+								<Text style={styles.buttonText}>Guardar</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+				</ScrollView>
+			</KeyboardAvoidingView>
 		</View>
 	) : (
 		<View className='flex-1'>

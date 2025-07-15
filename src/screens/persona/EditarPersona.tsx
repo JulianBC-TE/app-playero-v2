@@ -59,9 +59,9 @@ export function EditarPersona({
 		try {
 			setIsLoading(true);
 			console.log(cedula, data.nombre_apellido);
-			// await api.patch(`/api/personas/${cedula}`, {
-			// 	nombre_apellido: data.nombre_apellido.toUpperCase(),
-			// });
+			await api.patch(`/api/personas/${cedula}`, {
+				nombre_apellido: data.nombre_apellido.toUpperCase(),
+			});
 			setIsLoading(false);
 			toastSuccess("Grabación exitosa", "Persona editada con éxito");
 			navigation.goBack();

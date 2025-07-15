@@ -13,7 +13,6 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import { api } from "@services/api";
 import { SaveIcon, SquarePlus } from "lucide-react-native";
-import { ClienteDTO } from "@/dto/ClienteDTO";
 import { useCliente } from "@/hooks/useCliente";
 
 type FormData = {
@@ -66,9 +65,10 @@ export function CrearVehiculo({
 				// converter para maiúsculo e remover espaços
 				id_vehiculo: id_vehiculo.toUpperCase().replace(/\s+/g, ""),
 				descripcion_vehiculo: descripcion_vehiculo.toUpperCase(),
+				ruc: cliente?.ruc,
 			});
 			setIsSaved(true);
-			toastSuccess("Vehículo creado", "Vehículo creado exitosamente");
+			toastSuccess("Creación de vehículo", "Vehículo creado exitosamente");
 		} catch (error) {
 			console.log(error);
 			let statusCode: number | undefined;
@@ -83,18 +83,12 @@ export function CrearVehiculo({
 				"Error en la creación",
 				statusCode === 409
 					? "Ya existe un vehiculo con este registro"
-					: "Error al crear la persona, intente nuevamente"
+					: "Error al crear vehículo, intente nuevamente"
 			);
 		} finally {
 			setIsLoading(false);
 		}
 	}
-
-	useEffect(() => {
-		if (cliente) {
-			console.log("Cliente:", cliente);
-		}
-	}, [cliente]);
 
 	return (
 		<View className='flex-1'>

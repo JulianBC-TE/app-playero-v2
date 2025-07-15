@@ -38,3 +38,4 @@ yarn-error.*
 
 commit_msg.txt
 auto_commit.sh
+credentials.json

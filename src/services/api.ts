@@ -1,7 +1,6 @@
 import { AppError } from "@utils/AppError";
 import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from "axios";
 import { getAuthToken, saveAuthToken } from "@storage/storageAuthToken";
-import { get } from "node_modules/axios/index.cjs";
 import { getStorageServerUrl } from "@/storage/storageServer";
 
 type SignOut = () => Promise<void>;
@@ -41,6 +40,7 @@ api.registerInterceptTokenManager = (signOut) => {
 				}
 				return config;
 			} catch (error) {
+				console.log("aqui 1", error);
 				return Promise.reject(error);
 			}
 		},
@@ -55,11 +55,7 @@ api.registerInterceptTokenManager = (signOut) => {
 		async (error) => {
 			if (!error.response) {
 				// Erros de rede ou timeouts
-				return Promise.reject(
-					new AppError(
-						"Não foi possível conectar ao servidor. Verifique sua conexão."
-					)
-				);
+				return Promise.reject(new AppError("No se pudo conectar al servidor."));
 			}
 
 			const { response } = error;
@@ -79,7 +75,7 @@ api.registerInterceptTokenManager = (signOut) => {
 						signOut();
 						return Promise.reject(
 							new AppError(
-								"Sua sessão expirou. Por favor, faça login novamente."
+								"Su sesión ha expirado. Por favor, inicie sesión nuevamente."
 							)
 						);
 					}
@@ -90,7 +86,9 @@ api.registerInterceptTokenManager = (signOut) => {
 					if (!refresh_token) {
 						signOut();
 						return Promise.reject(
-							new AppError("Sem token de autenticação. Por favor, faça login.")
+							new AppError(
+								"Sin token de autenticación. Por favor, inicie sesión."
+							)
 						);
 					}
 
@@ -132,8 +130,9 @@ api.registerInterceptTokenManager = (signOut) => {
 								try {
 									originalRequest.data = JSON.parse(originalRequest.data);
 								} catch (e) {
+									console.log("aqui 2", e);
 									console.warn(
-										"Falha ao fazer parse dos dados da requisição original:",
+										"Falla al parsear los datos de la solicitud original:",
 										e
 									);
 								}
@@ -153,6 +152,7 @@ api.registerInterceptTokenManager = (signOut) => {
 							console.log("Token atualizado com sucesso");
 							resolve(api(originalRequest));
 						} catch (refreshError) {
+							console.log("aqui 3", error);
 							// Processando falhas na fila
 							failedQueue.forEach((request) => {
 								request.onFailure(refreshError as AxiosError);
@@ -200,7 +200,7 @@ api.registerInterceptTokenManager = (signOut) => {
 
 			// Fallback para qualquer outro tipo de erro
 			return Promise.reject(
-				new AppError("Ocorreu um erro inesperado", error.code)
+				new AppError("Ocurrió un error inesperado", error.code)
 			);
 		}
 	);

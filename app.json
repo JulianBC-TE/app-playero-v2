@@ -1,38 +1,48 @@
 {
-  "expo": {
-    "name": "playero",
-    "slug": "playero",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
-    },
-    "android": {
-      "edgeToEdgeEnabled": true,
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF",
-        "resizeMode": "contain"
-      },
-      "splash": {
-        "image": "./assets/splash.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#FFFFFF"
-      },
-      "package": "com.tecnoedil.playero"
-    },
-    "plugins": [
-      "expo-font"
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "55673440-17ef-44b4-837c-b3640dcf1cd8"
-      }
-    },
-    "owner": "mlima001"
-  }
+	"expo": {
+		"name": "playero",
+		"slug": "app-playero",
+		"version": "1.0.0",
+		"orientation": "portrait",
+		"icon": "./assets/icon.png",
+		"userInterfaceStyle": "automatic",
+		"splash": {
+			"image": "./assets/splash.png",
+			"resizeMode": "contain",
+			"backgroundColor": "#FFFFFF"
+		},
+		"android": {
+			"edgeToEdgeEnabled": true,
+			"adaptiveIcon": {
+				"foregroundImage": "./assets/adaptive-icon.png",
+				"backgroundColor": "#FFFFFF"
+			},
+			"splash": {
+				"image": "./assets/splash.png",
+				"resizeMode": "contain",
+				"backgroundColor": "#FFFFFF"
+			},
+			"package": "com.tecnoedil.playero"
+		},
+		"plugins": [
+			"expo-font",
+			[
+				"expo-build-properties",
+				{
+					"android": {
+						"usesCleartextTraffic": true
+					}
+				}
+			]
+		],
+		"owner": "tecnoedil",
+		"ios": {
+			"bundleIdentifier": "com.tecnoedil.playero"
+		},
+		"extra": {
+			"eas": {
+				"projectId": "814d9950-1119-490e-be96-57c420897927"
+			}
+		}
+	}
 }
