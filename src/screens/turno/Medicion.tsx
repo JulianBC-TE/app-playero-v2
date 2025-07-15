@@ -1,10 +1,7 @@
-import * as ImagePicker from "expo-image-picker";
-
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { StackRoutesProps } from "@/route/app.routes";
-import { Alert, Image, View } from "react-native";
+import { Image, View } from "react-native";
 import { Button } from "@/components/Button";
-import { PhotoButton } from "@/components/PhotoButton";
 
 import { toastError, toastSuccess } from "@utils/toastMessage";
 import { useEffect, useState } from "react";
@@ -20,6 +17,7 @@ import { yupResolver } from "@hookform/resolvers/yup";
 
 import { Check } from "lucide-react-native";
 import { Controller, useForm } from "react-hook-form";
+import { Photo } from "@/components/Photo";
 
 type FormData = {
 	altura_regla: string;
@@ -127,39 +125,6 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 	function handleRemoveMedicion(idTanque: string) {
 		setMedicion((prev) => prev.filter((item) => item.id_tanque !== idTanque));
 		toastSuccess("Medición removida", "La medición ha sido removida.");
-	}
-
-	async function handlePhotoCapture() {
-		try {
-			setIsLoading(true);
-			const { status } = await ImagePicker.requestCameraPermissionsAsync();
-			if (status !== "granted") {
-				Alert.alert("Permiso", "Necesitamos permiso para acceder a la cámara.");
-				return;
-			}
-			const photoSelected = await ImagePicker.launchCameraAsync({
-				mediaTypes: "images",
-				allowsEditing: false,
-				cameraType: ImagePicker.CameraType.back,
-				aspect: [4, 4],
-				quality: 0.3,
-				base64: true,
-			});
-			if (!photoSelected.canceled) {
-				const { base64 } = photoSelected.assets[0];
-				if (typeof base64 === "string") {
-					setBase64Image(base64);
-					toastSuccess(
-						"Registro Fotográfico",
-						"Foto capturada con exitosamente."
-					);
-				}
-			}
-		} catch (error) {
-			toastError("Error ao capturar foto", "Intente nuevamente más tarde.");
-		} finally {
-			setIsLoading(false);
-		}
 	}
 
 	async function fetchTanques() {
@@ -285,10 +250,10 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 							className='mr-4 w-20 h-20 rounded-lg border border-gray-300'
 							resizeMode='cover'
 						/>
-						<PhotoButton
-							isLoading={isLoading}
+						<Photo
+							form='button'
 							iconSize='lg'
-							onPress={handlePhotoCapture}
+							setImage={setBase64Image}
 						/>
 					</View>
 				</InputCard>

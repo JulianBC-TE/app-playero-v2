@@ -1,16 +1,16 @@
-import * as ImagePicker from "expo-image-picker";
 import { StackRoutesProps } from "@/route/app.routes";
 import { api } from "@/services/api";
-import { toastError, toastSuccess } from "@/utils/toastMessage";
+import { toastError } from "@/utils/toastMessage";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { InputCard } from "@/components/InputCard";
 import { Button } from "@/components/Button";
-import { Camera, Fuel, ListCheck, RotateCw, Save } from "lucide-react-native";
+import { Fuel, ListCheck, RotateCw, Save } from "lucide-react-native";
 import { Loading } from "@/components/Loading";
 import { Select } from "@/components/Select";
 import { SequenciaCalibracionDTO } from "@/dto/SequenciaCalibracionDTO";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { Photo } from "@/components/Photo";
 
 export function Sequencias({
 	navigation,
@@ -58,37 +58,8 @@ export function Sequencias({
 		setSalida(3);
 	}
 
-	async function handlePhotoSequencia() {
-		try {
-			setIsLoading(true);
-			const { status } = await ImagePicker.requestCameraPermissionsAsync();
-			if (status !== "granted") {
-				Alert.alert("Permiso", "Necesitamos permiso para acceder a la cámara.");
-				return;
-			}
-			const photoSelected = await ImagePicker.launchCameraAsync({
-				mediaTypes: "images",
-				allowsEditing: false,
-				aspect: [4, 4],
-				quality: 0.3,
-				base64: true,
-			});
-			if (!photoSelected.canceled) {
-				const { base64 } = photoSelected.assets[0];
-				if (typeof base64 === "string") {
-					setPhotoSequencia(base64);
-					toastSuccess(
-						"Registro Fotográfico",
-						"Foto capturada con exitosamente."
-					);
-				}
-			}
-		} catch (error) {
-			toastError("Error ao capturar foto", "Intente nuevamente más tarde.");
-			console.error("Erro ao capturar foto:", error);
-		} finally {
-			setIsLoading(false);
-		}
+	async function handlePhotoSequencia(base64: string) {
+		setPhotoSequencia(base64);
 	}
 
 	async function handleMedicion() {
@@ -260,10 +231,12 @@ export function Sequencias({
 								/>
 							</View>
 							<View>
-								<Camera
-									color={"#000"}
-									size={24}
-									onPress={() => handlePhotoSequencia()}
+								<Photo
+									form='icon'
+									iconSize='lg'
+									iconColor='#000'
+									setImage={handlePhotoSequencia}
+									disabled={isLoading || !valorMedicion}
 								/>
 							</View>
 						</View>

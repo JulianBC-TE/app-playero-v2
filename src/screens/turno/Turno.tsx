@@ -1,4 +1,3 @@
-import * as ImagePicker from "expo-image-picker";
 import {
 	Alert,
 	Image,
@@ -17,7 +16,6 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { InputCard } from "@/components/InputCard";
 import { Button } from "@/components/Button";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
-import { PhotoButton } from "@/components/PhotoButton";
 import { Input } from "@/components/Input";
 import { Select } from "@/components/Select";
 
@@ -29,7 +27,7 @@ import { RulerDimensionLine, CheckCheck } from "lucide-react-native";
 import { useAppContext } from "@/hooks/useAppContext";
 import { AppError } from "@/utils/AppError";
 import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
-import { set } from "react-hook-form";
+import { Photo } from "@/components/Photo";
 
 /**
  * Componente para gestionar el turno de trabajo.
@@ -62,40 +60,8 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 	 * @function handlePhotoCapture
 	 * @returns {Promise<void>}
 	 */
-	async function handlePhotoCapture() {
-		try {
-			setIsLoading(true);
-			const { status } = await ImagePicker.requestCameraPermissionsAsync();
-			if (status !== "granted") {
-				Alert.alert(
-					"Permissão necessária",
-					"Precisamos de permissão para acessar a câmera."
-				);
-				return;
-			}
-			const photoSelected = await ImagePicker.launchCameraAsync({
-				mediaTypes: "images",
-				cameraType: ImagePicker.CameraType.back,
-				allowsEditing: false,
-				aspect: [4, 4],
-				quality: 0.3,
-				base64: true,
-			});
-			if (!photoSelected.canceled) {
-				const { base64 } = photoSelected.assets[0];
-				if (typeof base64 === "string") {
-					setBase64Images((prev) => [...prev, base64]);
-					toastSuccess(
-						"Foto capturada",
-						"La foto ha sido capturada con éxito."
-					);
-				}
-			}
-		} catch (error) {
-			toastError("Error al capturar foto", "Intente nuevamente más tarde.");
-		} finally {
-			setIsLoading(false);
-		}
+	async function handlePhotoCapture(base64: string) {
+		setBase64Images((prev) => [...prev, base64]);
 	}
 
 	/**
@@ -468,9 +434,10 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 								</Pressable>
 							))}
 						</ScrollView>
-						<PhotoButton
+						<Photo
+							form='button'
 							iconSize='lg'
-							onPress={handlePhotoCapture}
+							setImage={handlePhotoCapture}
 							isLoading={isLoading}
 						/>
 					</View>

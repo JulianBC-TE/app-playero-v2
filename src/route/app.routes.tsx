@@ -17,7 +17,6 @@ import { CrearVehiculo } from "@/screens/vehiculo/CrearVehiculo";
 import { Medicion } from "@/screens/turno/Medicion";
 import { MedicionDTO } from "@/dto/MedicionDTO";
 import { Firma } from "@/screens/Firma";
-import { TelaTeste } from "@/screens/TelaTeste";
 import { PersonaDTO } from "@/dto/PersonaDTO";
 import { VehiculoDTO } from "@/dto/VehiculoDTO";
 import { Salida } from "@/screens/salida/Salida";
@@ -26,6 +25,7 @@ import { Traspaso } from "@/screens/traspaso/Traspaso";
 import { Calibracion } from "@/screens/calibracion/Calibracion";
 import { Sequencias } from "@/screens/calibracion/Sequencias";
 import { SequenciaCalibracionDTO } from "@/dto/SequenciaCalibracionDTO";
+import { Abastecimiento } from "@/screens/abastecimiento/Abastecimiento";
 
 export type StackRoutesList = {
 	home: undefined;
@@ -37,6 +37,7 @@ export type StackRoutesList = {
 	traspaso:
 		| { onFirma?: string; onPersona: PersonaDTO; onMedicion: MedicionDTO[] }
 		| undefined;
+	abastecimiento: { onMedicion: MedicionDTO[] } | undefined;
 	calibracion:
 		| {
 				onFirma?: string;
@@ -59,7 +60,6 @@ export type StackRoutesList = {
 	salida:
 		| { onFirma?: string; onPersona: PersonaDTO; onVehiculo: VehiculoDTO }
 		| undefined;
-	telaTeste: { onPersona: PersonaDTO; onVehiculo: VehiculoDTO } | undefined;
 };
 
 export type StackRoutesProps<T extends keyof StackRoutesList> =
@@ -144,8 +144,8 @@ export function StackRoutes() {
 				component={Sequencias}
 			/>
 			<Stack.Screen
-				name='telaTeste'
-				component={TelaTeste}
+				name='abastecimiento'
+				component={Abastecimiento}
 			/>
 		</Stack.Navigator>
 	);

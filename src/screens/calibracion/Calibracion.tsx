@@ -12,6 +12,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
 
 import { InputCard } from "@/components/InputCard";
+import { Photo } from "@/components/Photo";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Select } from "@/components/Select";
 import { useAppContext } from "@/hooks/useAppContext";
@@ -23,7 +24,7 @@ import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
 import { Input } from "@/components/Input";
 import { TextSearch } from "@/components/TextSearch";
 import { PersonaDTO } from "@/dto/PersonaDTO";
-import { Camera, Fuel, Pencil, SaveAll } from "lucide-react-native";
+import { Fuel, Pencil, SaveAll } from "lucide-react-native";
 import { Button } from "@/components/Button";
 import { SequenciaCalibracionDTO } from "@/dto/SequenciaCalibracionDTO";
 
@@ -60,6 +61,17 @@ export function Calibracion({
 		totalMediciones: 0,
 		sequencias: [],
 	});
+
+	function handlePhotoObs(image: string) {
+		setPhotoObs(image);
+	}
+
+	function handlePhotoPrecintoColocado(image: string) {
+		setPhotoPrecintoColocado(image);
+	}
+	function handlePhotoPrecintoAtual(image: string) {
+		setPhotoPrecintoAtual(image);
+	}
 
 	async function handlePhotoPrecinto(tipo: "colocado" | "retirado" | "obs") {
 		try {
@@ -394,13 +406,12 @@ export function Calibracion({
 										value={numeroPrecintoAtual}
 										onChangeText={setNumeroPrecintoAtual}
 									/>
-									<Camera
+									<Photo
+										form='icon'
 										disabled={isLoading}
-										size={24}
-										color={isLoading ? "#756868eb" : "#000"}
-										onPress={() => {
-											handlePhotoPrecinto("retirado");
-										}}
+										iconSize='lg'
+										iconColor={isLoading ? "#756868eb" : "#000"}
+										setImage={handlePhotoPrecintoAtual}
 									/>
 								</View>
 							</InputCard>
@@ -419,13 +430,12 @@ export function Calibracion({
 										value={numeroPrecintoColocado}
 										onChangeText={setNumeroPrecintoColocado}
 									/>
-									<Camera
+									<Photo
+										form='icon'
 										disabled={salida !== 0}
-										color={salida !== 0 ? "#756868eb" : "#000"}
-										size={24}
-										onPress={() => {
-											handlePhotoPrecinto("colocado");
-										}}
+										iconSize='lg'
+										iconColor={salida !== 0 ? "#756868eb" : "#000"}
+										setImage={handlePhotoPrecintoColocado}
 									/>
 								</View>
 							</InputCard>
@@ -471,11 +481,11 @@ export function Calibracion({
 										onChangeText={setObs}
 									/>
 									<View className='flex-col gap-6'>
-										<Camera
+										<Photo
 											disabled={salida !== 0}
-											color={salida !== 0 ? "#756868eb" : "#000"}
-											size={24}
-											onPress={() => handlePhotoPrecinto("obs")}
+											iconSize='lg'
+											iconColor={salida !== 0 ? "#756868eb" : "#000"}
+											setImage={handlePhotoObs}
 										/>
 									</View>
 								</View>

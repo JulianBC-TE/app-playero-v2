@@ -9,7 +9,6 @@ import {
 	Replace,
 	Tractor,
 	LucideIcon,
-	Pencil,
 } from "lucide-react-native";
 
 export type menuItemType = {
@@ -47,7 +46,7 @@ export const baseMenuItems: menuItemType[] = [
 	{
 		name: "Abastecimiento",
 		icon: Replace,
-		route: "cliente",
+		route: "abastecimiento",
 		enabled: false,
 		params: {},
 	},

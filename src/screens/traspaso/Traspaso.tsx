@@ -1,4 +1,3 @@
-import * as ImagePicker from "expo-image-picker";
 import { Input } from "@/components/Input";
 import { InputCard } from "@/components/InputCard";
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -17,9 +16,7 @@ import {
 	Platform,
 } from "react-native";
 import {
-	Camera,
 	CheckCheck,
-	FileTerminal,
 	Fuel,
 	Pencil,
 	RulerDimensionLine,
@@ -41,14 +38,12 @@ import {
 	removeTraspaso,
 	saveTraspaso,
 } from "@/storage/storageTraspaso";
-import { set } from "react-hook-form";
 import {
 	getStoragePersona,
 	removePersona,
 	savePersona,
 } from "@/storage/storagePersona";
-import { get } from "node_modules/axios/index.cjs";
-import { rem } from "nativewind";
+import { Photo } from "@/components/Photo";
 
 export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	const [selectedBodegaOrigem, setSelectedBodegaOrigem] = useState<string>("");
@@ -79,38 +74,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	const [shouldContinue, setShouldContinue] = useState(false);
 	const intervalRef = useRef<NodeJS.Timeout | null>(null);
 	const [estadoRestaurado, setEstadoRestaurado] = useState(false);
-
-	// fotoType precisa ser um enum com 4 possíveis casos
-	async function handlePhotoCapture(
-		fotoType: "vehiculo" | "horometro" | "kilometraje" | "obs"
-	) {
-		try {
-			setIsLoading(true);
-			const { status } = await ImagePicker.requestCameraPermissionsAsync();
-			if (status !== "granted") {
-				Alert.alert("Permiso", "Necesitamos permiso para acceder a la cámara.");
-				return;
-			}
-			const photoSelected = await ImagePicker.launchCameraAsync({
-				mediaTypes: "images",
-				allowsEditing: false,
-				aspect: [4, 4],
-				quality: 0.3,
-				base64: true,
-			});
-			if (!photoSelected.canceled) {
-				const { base64 } = photoSelected.assets[0];
-				if (typeof base64 === "string") {
-					setBase64Obs(base64);
-					toastSuccess("Registro Fotográfico", "Foto capturada exitosamente.");
-				}
-			}
-		} catch (error) {
-			toastError("Error ao capturar foto", "Intente nuevamente más tarde.");
-		} finally {
-			setIsLoading(false);
-		}
-	}
 
 	async function fetchPicos() {
 		setIsLoading(true);
@@ -739,11 +702,14 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 											onChangeText={setObs}
 										/>
 										<View className='flex-col gap-6'>
-											<Camera
+											<Photo
+												form='icon'
+												iconSize='lg'
+												iconColor='#000'
+												setImage={() => {
+													setBase64Obs(base64Obs);
+												}}
 												disabled={isLoading}
-												size={24}
-												color='#000'
-												onPress={() => handlePhotoCapture("obs")}
 											/>
 										</View>
 									</View>

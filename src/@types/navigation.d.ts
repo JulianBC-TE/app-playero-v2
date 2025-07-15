@@ -8,6 +8,7 @@ export type RootStackParamList = {
 	Traspaso:
 		| { onMedicion: MedicionDTO[]; onFirma?: string; onPersona: PersonaDTO }
 		| undefined;
+	Abastecimiento: { onMedicion: MedicionDTO[] } | undefined;
 	Cliente: { enabledSelect?: boolean } | undefined;
 	BuscarCliente: { fromScreen?: string; enabledSelect?: boolean } | undefined;
 	CrearCliente: undefined;
@@ -23,7 +24,6 @@ export type RootStackParamList = {
 	Salida:
 		| { onFirma?: string; onPersona: PersonaDTO; onVehiculo: VehiculoDTO }
 		| undefined;
-	TelaTeste: { onPersona: PersonaDTO; onVehiculo: VehiculoDTO } | undefined;
 	Calibracion:
 		| {
 				onFirma?: string;

@@ -1,5 +1,4 @@
 import * as Location from "expo-location";
-import * as ImagePicker from "expo-image-picker";
 import { Input } from "@/components/Input";
 import { InputCard } from "@/components/InputCard";
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -19,7 +18,7 @@ import {
 	Platform,
 } from "react-native";
 import { Controller, useForm } from "react-hook-form";
-import { Camera, Fuel, Pencil, SaveAll } from "lucide-react-native";
+import { Fuel, Pencil, SaveAll } from "lucide-react-native";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
@@ -30,6 +29,7 @@ import { Select } from "@/components/Select";
 import { Button } from "@/components/Button";
 import { Loading } from "@/components/Loading";
 import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
+import { Photo } from "@/components/Photo";
 
 type FormData = {
 	horometro?: string | null;
@@ -100,53 +100,17 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 		},
 	});
 
-	// fotoType precisa ser um enum com 4 possíveis casos
-	async function handlePhotoCapture(
-		fotoType: "vehiculo" | "horometro" | "kilometraje" | "obs"
-	) {
-		try {
-			setIsLoading(true);
-			const { status } = await ImagePicker.requestCameraPermissionsAsync();
-			if (status !== "granted") {
-				Alert.alert("Permiso", "Necesitamos permiso para acceder a la cámara.");
-				return;
-			}
-			const photoSelected = await ImagePicker.launchCameraAsync({
-				mediaTypes: "images",
-				allowsEditing: false,
-				aspect: [4, 4],
-				quality: 0.3,
-				base64: true,
-			});
-			if (!photoSelected.canceled) {
-				const { base64 } = photoSelected.assets[0];
-				if (typeof base64 === "string") {
-					switch (fotoType) {
-						case "vehiculo":
-							setBase64Vehiculo(base64);
-							break;
-						case "horometro":
-							setBase64Horometro(base64);
-							break;
-						case "kilometraje":
-							setBase64Kilometraje(base64);
-							break;
-						case "obs":
-							setBase64Obs(base64);
-							break;
-					}
-					toastSuccess(
-						"Registro Fotográfico",
-						"Foto capturada con exitosamente."
-					);
-				}
-			}
-		} catch (error) {
-			toastError("Error ao capturar foto", "Intente nuevamente más tarde.");
-			console.error("Erro ao capturar foto:", error);
-		} finally {
-			setIsLoading(false);
-		}
+	function handlePhotoVehiculo(base64: string) {
+		setBase64Vehiculo(base64);
+	}
+	function handlePhotoHorometro(base64: string) {
+		setBase64Horometro(base64);
+	}
+	function handlePhotoKilometraje(base64: string) {
+		setBase64Kilometraje(base64);
+	}
+	function handlePhotoObs(base64: string) {
+		setBase64Obs(base64);
 	}
 
 	async function fetchPicos() {
@@ -510,14 +474,12 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 										})
 									}
 								/>
-
-								<Camera
+								<Photo
+									form='icon'
+									iconSize='lg'
+									iconColor={salida !== 0 ? "#756868eb" : "#000"}
+									setImage={handlePhotoVehiculo}
 									disabled={salida !== 0}
-									size={24}
-									color={salida !== 0 ? "#756868eb" : "#000"}
-									onPress={() => {
-										handlePhotoCapture("vehiculo");
-									}}
 								/>
 							</View>
 						</InputCard>
@@ -562,13 +524,12 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 										/>
 									)}
 								/>
-								<Camera
+								<Photo
+									form='icon'
+									iconSize='lg'
+									iconColor={salida !== 0 ? "#756868eb" : "#000"}
+									setImage={handlePhotoHorometro}
 									disabled={salida !== 0}
-									size={24}
-									color={salida !== 0 ? "#756868eb" : "#000"}
-									onPress={() => {
-										handlePhotoCapture("horometro");
-									}}
 								/>
 							</View>
 						</InputCard>
@@ -592,13 +553,12 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 										/>
 									)}
 								/>
-								<Camera
+								<Photo
+									form='icon'
+									iconSize='lg'
+									iconColor={salida !== 0 ? "#756868eb" : "#000"}
+									setImage={handlePhotoKilometraje}
 									disabled={salida !== 0}
-									size={24}
-									color={salida !== 0 ? "#756868eb" : "#000"}
-									onPress={() => {
-										handlePhotoCapture("kilometraje");
-									}}
 								/>
 							</View>
 						</InputCard>
@@ -668,11 +628,12 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 											)}
 										/>
 										<View className='flex-col gap-6'>
-											<Camera
+											<Photo
+												form='icon'
+												iconSize='lg'
+												iconColor='#000'
+												setImage={handlePhotoObs}
 												disabled={isLoading}
-												size={24}
-												color='#000'
-												onPress={() => handlePhotoCapture("obs")}
 											/>
 										</View>
 									</View>
