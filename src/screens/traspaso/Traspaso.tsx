@@ -314,7 +314,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 					setBase64Obs(json.foto_obs_traspaso[0] || "");
 					setMedicionInicial([
 						{
-							tanque: "",
+							// tanque: "",
 							id_tanque: json.id_tanque_destino.toString(),
 							regla: Number(json.regla_altura_inicial),
 							litros: json.litros_tanque_inicial,

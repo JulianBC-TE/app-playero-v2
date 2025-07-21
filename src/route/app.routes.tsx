@@ -26,6 +26,9 @@ import { Calibracion } from "@/screens/calibracion/Calibracion";
 import { Sequencias } from "@/screens/calibracion/Sequencias";
 import { SequenciaCalibracionDTO } from "@/dto/SequenciaCalibracionDTO";
 import { Abastecimiento } from "@/screens/abastecimiento/Abastecimiento";
+import { CargaCombustible } from "@/screens/abastecimiento/CargaCombustible";
+import { MedicionAbastecimiento } from "@/screens/abastecimiento/MedicionAbastecimiento";
+import { CargaZetaDTO } from "@/dto/CargaZetaDTO";
 
 export type StackRoutesList = {
 	home: undefined;
@@ -37,7 +40,22 @@ export type StackRoutesList = {
 	traspaso:
 		| { onFirma?: string; onPersona: PersonaDTO; onMedicion: MedicionDTO[] }
 		| undefined;
-	abastecimiento: { onMedicion: MedicionDTO[] } | undefined;
+	abastecimiento:
+		| {
+				onCargaZeta?: CargaZetaDTO;
+				onMedicionInicial?: MedicionDTO[] | null;
+				onMedicionFinal?: MedicionDTO[] | null;
+		  }
+		| undefined;
+	cargaCombustible: { idBodega: string } | undefined;
+	medicionAbastecimiento:
+		| {
+				fromScreen?: string;
+				idBodega: string;
+				cargaZeta: number;
+				litrosRemision: number;
+		  }
+		| undefined;
 	calibracion:
 		| {
 				onFirma?: string;
@@ -146,6 +164,14 @@ export function StackRoutes() {
 			<Stack.Screen
 				name='abastecimiento'
 				component={Abastecimiento}
+			/>
+			<Stack.Screen
+				name='cargaCombustible'
+				component={CargaCombustible}
+			/>
+			<Stack.Screen
+				name='medicionAbastecimiento'
+				component={MedicionAbastecimiento}
 			/>
 		</Stack.Navigator>
 	);

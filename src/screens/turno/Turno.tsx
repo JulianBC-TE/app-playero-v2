@@ -376,7 +376,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 								// Gere um alerta com as opções de continuar ou não
 								Alert.alert(
 									"Medición existente",
-									"Já existe uma medição para esta bodega. Deseja continuar?",
+									"Ya hay una medición inicial cargada. ¿Desea continuar?",
 									[
 										{
 											text: "Cancelar",

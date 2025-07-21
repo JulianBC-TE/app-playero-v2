@@ -8,7 +8,22 @@ export type RootStackParamList = {
 	Traspaso:
 		| { onMedicion: MedicionDTO[]; onFirma?: string; onPersona: PersonaDTO }
 		| undefined;
-	Abastecimiento: { onMedicion: MedicionDTO[] } | undefined;
+	Abastecimiento:
+		| {
+				onCargaZeta?: CargaZetaDTO | null;
+				onMedicionInicial?: MedicionDTO[] | null;
+				onMedicionFinal?: MedicionDTO[] | null;
+		  }
+		| undefined;
+	CargaCombustible: { idBodega: string } | undefined;
+	MedicionAbastecimiento:
+		| {
+				fromScreen?: string;
+				idBodega: string;
+				cargaZeta: number;
+				litrosRemision: number;
+		  }
+		| undefined;
 	Cliente: { enabledSelect?: boolean } | undefined;
 	BuscarCliente: { fromScreen?: string; enabledSelect?: boolean } | undefined;
 	CrearCliente: undefined;

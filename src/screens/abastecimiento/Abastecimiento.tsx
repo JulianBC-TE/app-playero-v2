@@ -11,31 +11,41 @@ import {
 	Image,
 } from "react-native";
 import { useEffect, useState } from "react";
-
+import {
+	CheckCheck,
+	Fuel,
+	RulerDimensionLine,
+	SaveAll,
+} from "lucide-react-native";
 import { InputCard } from "@/components/InputCard";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Select } from "@/components/Select";
 import { useAppContext } from "@/hooks/useAppContext";
-import { StackRoutesProps } from "@/route/app.routes";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { api } from "@/services/api";
 import { Input } from "@/components/Input";
 import { BodegaDTO } from "@/dto/BodegaDTO";
 import { Photo } from "@/components/Photo";
+import { Button } from "@/components/Button";
+import { StackRoutesProps } from "@/route/app.routes";
+import { CargaZetaDTO } from "@/dto/CargaZetaDTO";
+import { MedicionDTO } from "@/dto/MedicionDTO";
 
 export function Abastecimiento({
 	navigation,
 	route,
 }: StackRoutesProps<"abastecimiento">) {
 	const [tipoOperacion, setTipoOperacion] = useState([
-		{ label: "Llega en la ZETA", value: "1" },
-		{ label: "NO Llega en la ZETA", value: "2" },
+		{ label: "Llega en la ZETA", value: "0" },
+		{ label: "NO Llega en la ZETA", value: "1" },
 	]);
 	const [tipoOperacionSeleccionado, setTipoOperacionSeleccionado] =
 		useState("");
 	const [turnoCerrado, setTurnoCerrado] = useState(false);
 	const { sucursal, user } = useAppContext();
 	const [isLoading, setIsLoading] = useState(false);
+	const [obs, setObs] = useState<string>("");
+	const [base64FotoObs, setBase64FotoObs] = useState<string[]>([]);
 	const [obsAdicional, setObsAdicional] = useState("");
 	const [ordenCompra, setOrdenCompra] = useState("");
 	const [remision, setRemision] = useState("");
@@ -43,10 +53,13 @@ export function Abastecimiento({
 	const [bodegas, setBodegas] = useState<BodegaDTO[]>([]);
 	const [selectedBodega, setSelectedBodega] = useState<string>("");
 	const [base64Images, setBase64Images] = useState<string[]>([]);
+	const [formReady, setFormReady] = useState(false);
+	const [cargaZeta, setCargaZeta] = useState<CargaZetaDTO | null>(null);
+	const [medicionInicial, setMedicionInicial] = useState<MedicionDTO[]>([]);
+	const [medicionFinal, setMedicionFinal] = useState<MedicionDTO[]>([]);
 
 	async function handlePhotoCapture(image: string) {
 		setBase64Images((prev) => [...prev, image]);
-		toastSuccess("Foto capturada", "La foto ha sido capturada con éxito.");
 	}
 
 	/**
@@ -88,6 +101,103 @@ export function Abastecimiento({
 	useEffect(() => {
 		fetchBodegas();
 	}, []);
+
+	useEffect(() => {
+		if (
+			ordenCompra === "" ||
+			remision === "" ||
+			litros === "" ||
+			base64Images.length === 0
+		) {
+			setFormReady(false);
+		} else {
+			setFormReady(true);
+		}
+	}, [ordenCompra, remision, litros, base64Images]);
+
+	useEffect(() => {
+		if (route.params?.onCargaZeta) {
+			setCargaZeta(route.params.onCargaZeta);
+			console.log("Carga Zeta:", route.params.onCargaZeta);
+		}
+		if (route.params?.onMedicionInicial) {
+			setMedicionInicial(route.params.onMedicionInicial);
+		}
+		if (route.params?.onMedicionFinal) {
+			setMedicionFinal(route.params.onMedicionFinal);
+		}
+	}, [
+		route.params?.onCargaZeta,
+		route.params?.onMedicionInicial,
+		route.params?.onMedicionFinal,
+	]);
+
+	function handleFotoObs(image: string) {
+		setBase64FotoObs((prev) => [...prev, image]);
+	}
+
+	async function saveAll() {
+		const now = new Date();
+		const fecha = now.toISOString().slice(0, 10);
+		const hora = now.toTimeString().slice(0, 8);
+
+		const litrosTotalMedicionInicial =
+			medicionInicial?.reduce((acc, med) => acc + med.litros, 0) || 0;
+		const litrosTotalMedicionFinal =
+			medicionFinal?.reduce((acc, med) => acc + med.litros, 0) || 0;
+
+		const data = {
+			json: {
+				id_suc: sucursal.id_sucursal,
+				id_bod: Number(selectedBodega),
+				fecha: fecha,
+				hora: hora,
+				nro_oc: Number(ordenCompra),
+				nro_remision: remision,
+				litros_remision: Number(litros),
+				playero: Number(user.cedula),
+				foto_rev_docs: base64Images,
+				zeta_no_llega: Number(tipoOperacionSeleccionado),
+				id_pico_para_zeta: cargaZeta?.id_pico_para_zeta || 0,
+				taxilitro_inicial: cargaZeta?.taxilitro_inicial || 0,
+				taxilitro_final: cargaZeta?.taxilitro_final || 0,
+				litros_zeta: Number(cargaZeta?.litros_zeta || 0),
+				obs_repos: obs + "|" + obsAdicional,
+				foto_obs_repos: base64FotoObs,
+				litros_total_repos: String(
+					litrosTotalMedicionFinal -
+						litrosTotalMedicionInicial -
+						(cargaZeta?.litros_zeta ?? 0)
+				),
+				mediciones_tanque: medicionInicial?.map((med, index) => ({
+					id_tanque: Number(med.id_tanque),
+					inicio: {
+						regla: String(med.regla),
+						temperatura: med.temperatura,
+						litros: med.litros,
+						foto_medicion: med.foto_tanque,
+					},
+					fin: {
+						regla: String(medicionFinal[index].regla),
+						temperatura: medicionFinal[index]?.temperatura,
+						litros: medicionFinal[index]?.litros,
+						foto_medicion: medicionFinal[index]?.foto_tanque,
+					},
+				})),
+			},
+		};
+		try {
+			setIsLoading(true);
+			await api.post("/api/Abastecimientos-V2", data);
+			toastSuccess("Abastecimiento", "Abastecimiento registrado con éxito");
+			navigation.navigate("home");
+		} catch (error) {
+			console.error("Error al registrar el abastecimiento:", error);
+			toastError("Abastecimiento", "Error al registrar el abastecimiento");
+		} finally {
+			setIsLoading(false);
+		}
+	}
 
 	return turnoCerrado ? (
 		<View className='flex-1'>
@@ -160,6 +270,7 @@ export function Abastecimiento({
 						<InputCard
 							title='Orden de Compra'
 							required={true}
+							verified={ordenCompra !== ""}
 						>
 							<Input
 								keyboardType='number-pad'
@@ -172,6 +283,7 @@ export function Abastecimiento({
 						<InputCard
 							title='Número de Remisión'
 							required={true}
+							verified={remision !== ""} // Verifica si el campo está lleno para mostrar el ícono de verificación12
 						>
 							<Input
 								keyboardType='number-pad'
@@ -184,6 +296,7 @@ export function Abastecimiento({
 						<InputCard
 							title='Litros según remisión'
 							required={true}
+							verified={litros !== ""} // Verifica si el campo está lleno para mostrar el ícono de verificación
 						>
 							<Input
 								keyboardType='number-pad'
@@ -196,6 +309,8 @@ export function Abastecimiento({
 						<InputCard
 							title='Fotos de precintos y documentación'
 							className='min-h-64'
+							required={true}
+							verified={base64Images.length > 0} // Verifica si hay fotos para
 						>
 							<View className='w-full items-center p-4 gap-2'>
 								<ScrollView horizontal={true}>
@@ -214,7 +329,7 @@ export function Abastecimiento({
 								</ScrollView>
 								<Photo
 									isLoading={isLoading}
-									iconSize='xs'
+									iconSize='lg'
 									iconColor='#fff'
 									setImage={handlePhotoCapture}
 								/>
@@ -223,6 +338,7 @@ export function Abastecimiento({
 						<InputCard
 							title='Selecione la bodega'
 							required={true}
+							verified={selectedBodega !== ""} // Verifica si se ha seleccionado una bodega
 						>
 							<Select
 								data={bodegas}
@@ -234,8 +350,9 @@ export function Abastecimiento({
 							/>
 						</InputCard>
 						<InputCard
-							title='Tipo de operación'
+							title={"Tipo de operación"}
 							required={true}
+							verified={tipoOperacionSeleccionado !== ""} // Verifica si se ha seleccionado un tipo de operación
 						>
 							<Select
 								data={tipoOperacion}
@@ -246,6 +363,99 @@ export function Abastecimiento({
 								valueField='value'
 							/>
 						</InputCard>
+						{formReady && (
+							<>
+								{tipoOperacionSeleccionado === "1" && (
+									<InputCard
+										title={"Abastecimiento Zeta"}
+										required={true}
+									>
+										{cargaZeta?.litros_zeta && cargaZeta.litros_zeta > 0 && (
+											<Text className='text-red-500 text-center mb-2'>
+												{`Fue cargado ${cargaZeta?.litros_zeta} litros de combustible.`}
+											</Text>
+										)}
+										{!cargaZeta && (
+											<Button
+												title='Iniciar'
+												onPress={() => {
+													navigation.navigate("cargaCombustible", {
+														idBodega: selectedBodega,
+													});
+												}}
+												icon={Fuel}
+												iconSize='lg'
+												iconColor='#000'
+												isLoading={isLoading}
+											/>
+										)}
+									</InputCard>
+								)}
+								{medicionInicial?.length === 0 &&
+									((tipoOperacionSeleccionado === "1" &&
+										(cargaZeta?.litros_zeta ?? 0) > 0) ||
+										tipoOperacionSeleccionado === "0") && (
+										<InputCard
+											title={"Medición de tanques"}
+											required={true}
+										>
+											<Button
+												title='Medir'
+												icon={
+													(medicionInicial?.length ?? 0) > 0
+														? CheckCheck
+														: RulerDimensionLine
+												}
+												iconColor={"#000"}
+												iconSize='md'
+												onPress={() => {
+													navigation.navigate("medicionAbastecimiento", {
+														fromScreen: "abastecimiento",
+														idBodega: selectedBodega,
+														cargaZeta: cargaZeta?.litros_zeta || 0,
+														litrosRemision: Number(litros),
+													});
+												}}
+											/>
+										</InputCard>
+									)}
+								{medicionInicial?.length !== 0 && (
+									<>
+										<InputCard title='Observaciones'>
+											<View className='flex-row items-center p-2 gap-2'>
+												<Input
+													multiline
+													numberOfLines={4}
+													placeholder='observaciones'
+													value={obs}
+													onChangeText={setObs}
+												/>
+												<View className='flex-col gap-6'>
+													<Photo
+														form='icon'
+														iconSize='lg'
+														iconColor={
+															base64FotoObs.length > 0 ? "#05a722" : "#000"
+														}
+														setImage={handleFotoObs}
+														disabled={isLoading}
+													/>
+												</View>
+											</View>
+										</InputCard>
+										<Button
+											disabled={isLoading}
+											title='Grabar'
+											onPress={saveAll}
+											isLoading={isLoading}
+											icon={SaveAll}
+											iconSize='md'
+											iconColor='#000'
+										/>
+									</>
+								)}
+							</>
+						)}
 					</View>
 				</ScrollView>
 			</KeyboardAvoidingView>

@@ -87,7 +87,7 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
 		}
 
 		const newMedicion: MedicionDTO = {
-			tanque: tanqueSelecionado.descripcion_tanque || "",
+			//tanque: tanqueSelecionado.descripcion_tanque || "",
 			id_tanque: selectedTanques,
 			regla: parseFloat(altura_regla),
 			temperatura: parseFloat(temperatura),

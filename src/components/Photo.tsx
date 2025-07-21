@@ -8,7 +8,6 @@ import {
 } from "react-native";
 import { Camera } from "lucide-react-native";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
-import { useState } from "react";
 
 type Props = TouchableOpacityProps & {
 	form?: "button" | "icon";

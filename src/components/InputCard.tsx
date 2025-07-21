@@ -1,11 +1,12 @@
 import clsx from "clsx";
 import { View, Text } from "react-native";
-import { LockKeyhole } from "lucide-react-native"; // Importa apenas para garantir que os ícones sejam incluídos no bundle
+import { LockKeyhole, Check } from "lucide-react-native"; // Importa apenas para garantir que os ícones sejam incluídos no bundle
 
 export function InputCard({
 	title,
 	children,
 	required = false,
+	verified = false, // Adiciona a propriedade verified
 	locked = false,
 	className,
 }: {
@@ -14,6 +15,7 @@ export function InputCard({
 	required?: boolean;
 	locked?: boolean;
 	className?: string;
+	verified?: boolean; // Adiciona a propriedade verified
 }) {
 	return (
 		<View className='relative w-full'>
@@ -32,7 +34,14 @@ export function InputCard({
 
 			{required && !locked && (
 				<Text className='text-red-500 absolute top-0 right-1 text-3xl font-bold'>
-					*
+					{verified ? (
+						<Check
+							size={24}
+							color={"green"}
+						/>
+					) : (
+						<Text>*</Text>
+					)}
 				</Text>
 			)}
 			{locked && (

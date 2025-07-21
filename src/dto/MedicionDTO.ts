@@ -1,5 +1,5 @@
 export type MedicionDTO = {
-	tanque: string;
+	// tanque: string;
 	id_tanque: string;
 	regla: number;
 	temperatura: number;

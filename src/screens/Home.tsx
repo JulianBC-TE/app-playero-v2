@@ -5,7 +5,7 @@ import { MenuCard } from "@/components/MenuCard";
 import { StackRoutesList, StackRoutesProps } from "@/route/app.routes";
 import { api } from "@/services/api";
 import { useAppContext } from "@/hooks/useAppContext";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Loading } from "@/components/Loading";
 import { baseMenuItems, menuItemType } from "@/dto/MenuItens";
 
