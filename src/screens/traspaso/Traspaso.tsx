@@ -45,6 +45,8 @@ import {
 } from "@/storage/storagePersona";
 import { Photo } from "@/components/Photo";
 
+let idAutorizado = 0;
+
 export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	const [selectedBodegaOrigem, setSelectedBodegaOrigem] = useState<string>("");
 	const [selectedBodegaDestino, setSelectedBodegaDestino] =
@@ -199,11 +201,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 		data.json.taxilitro_inicial = totalizadorPicoInicial;
 		data.json.taxilitro_final = totalizadorPicoFinal;
 
-		// data.json.foto_medicion_final = [];
-		// data.json.foto_medicion_inicial = [];
-		// data.json.foto_obs = [];
-		// data.json.firma_receptor = [];
-		// console.log("Data to save:", data);
 		try {
 			setIsLoading(true);
 			await api.post("/api/traspasos", data);
@@ -282,7 +279,9 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 					"Pico no disponible",
 					"El pico no está disponible para la carga."
 				);
+				return;
 			}
+			idAutorizado = response.data.idUltimaCarga;
 			saveState();
 			setSalida(1);
 			setShouldContinue(true);
@@ -374,6 +373,14 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			}
 			const response = await api.get(`/api/salida-control/${idPicoBox}`);
 			if (response.data.estado === "B") {
+				if (response.data.id <= idAutorizado) {
+					setSalida(0);
+					setShouldContinue(false);
+					setIsLoading(false);
+					idAutorizado = 0;
+					return;
+				}
+				idAutorizado = 0;
 				setSalida(2);
 				setShouldContinue(false);
 				setIsLoading(false);

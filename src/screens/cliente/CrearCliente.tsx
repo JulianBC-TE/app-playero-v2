@@ -7,7 +7,6 @@ import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
 import { api } from "@services/api";
-import { useCliente } from "@hooks/useCliente";
 import { ClienteDTO } from "@dto/ClienteDTO";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { View } from "react-native";
@@ -105,10 +104,11 @@ export function CrearCliente() {
 							control={control}
 							name='nombre'
 							rules={{ required: "nombre del cliente es requerido" }}
-							render={({ field: { onChange } }) => (
+							render={({ field: { onChange, value } }) => (
 								<Input
 									placeholder='Informe razón social'
 									placeholderTextColor='$gray600'
+									value={value.toUpperCase()}
 									onChangeText={onChange}
 									errorMessage={errors.nombre?.message}
 								/>

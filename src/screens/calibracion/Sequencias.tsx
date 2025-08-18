@@ -12,6 +12,7 @@ import { SequenciaCalibracionDTO } from "@/dto/SequenciaCalibracionDTO";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Photo } from "@/components/Photo";
 
+let idAutorizado = 0; // Variable global para almacenar el ID autorizado
 export function Sequencias({
 	navigation,
 	route,
@@ -66,11 +67,7 @@ export function Sequencias({
 		try {
 			setIsLoading(true);
 			setSalida(1);
-			console.log(
-				"Iniciando carga...",
-				id_pico_surtidor,
-				typeof id_pico_surtidor
-			);
+
 			const response = await api.post("/api/autorizar", {
 				pico: id_pico_surtidor,
 			});
@@ -83,8 +80,10 @@ export function Sequencias({
 					"Pico no disponible",
 					"El pico no está disponible para la carga."
 				);
+				return;
 			}
 			console.log("Cargando...");
+			idAutorizado = response.data.idUltimaCarga;
 			setSalida(1);
 			setShouldContinue(true);
 		} catch (error) {
@@ -103,7 +102,14 @@ export function Sequencias({
 		try {
 			const response = await api.get(`/api/salida-control/${id_pico_surtidor}`);
 			if (response.data.estado === "B") {
-				console.log("Finalizando carga...");
+				if (response.data.id <= idAutorizado) {
+					setSalida(0);
+					setShouldContinue(false);
+					setIsLoading(false);
+					idAutorizado = 0;
+					return;
+				}
+				idAutorizado = 0;
 				setSalida(2);
 				setShouldContinue(false);
 

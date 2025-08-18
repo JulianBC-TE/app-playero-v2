@@ -17,7 +17,7 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 } from "react-native";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, set, useForm } from "react-hook-form";
 import { Fuel, Pencil, SaveAll } from "lucide-react-native";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { yupResolver } from "@hookform/resolvers/yup";
@@ -36,7 +36,7 @@ type FormData = {
 	kilometraje?: string | null;
 	observaciones?: string;
 };
-
+let idAutorizado = 0; // Variable para almacenar el ID autorizado
 const registrarSalidaSchema = yup.object({
 	horometro: yup
 		.string()
@@ -280,7 +280,9 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 					"Pico no disponible",
 					"El pico no está disponible para la carga."
 				);
+				return;
 			}
+			idAutorizado = response.data.idUltimaCarga;
 			setSalida(1);
 			setShouldContinue(true);
 		} catch (error) {
@@ -331,7 +333,16 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 	const fetchBox = useCallback(async () => {
 		try {
 			const response = await api.get(`/api/salida-control/${idPico_surtidor}`);
+
 			if (response.data.estado === "B") {
+				if (response.data.id <= idAutorizado) {
+					setSalida(0);
+					setShouldContinue(false);
+					setIsLoading(false);
+					idAutorizado = 0;
+					return;
+				}
+				idAutorizado = 0;
 				setSalida(2);
 				setShouldContinue(false);
 				setTotalizadorPicoInicial(response.data.taxiltroInicioDespacho);

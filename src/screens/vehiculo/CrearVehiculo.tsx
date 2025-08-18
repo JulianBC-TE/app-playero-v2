@@ -104,7 +104,7 @@ export function CrearVehiculo({
 							rules={{ required: "Identificación es requerido" }}
 							render={({ field: { onChange, value } }) => (
 								<Input
-									value={value}
+									value={value.toUpperCase()}
 									placeholder='Identificación'
 									placeholderTextColor='$gray600'
 									onChangeText={onChange}
@@ -126,7 +126,7 @@ export function CrearVehiculo({
 							rules={{ required: "Descripción es requerido" }}
 							render={({ field: { onChange, value } }) => (
 								<Input
-									value={value}
+									value={value.toUpperCase()}
 									placeholder='Descripcion'
 									placeholderTextColor='$gray600'
 									onChangeText={onChange}

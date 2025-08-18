@@ -89,6 +89,7 @@ export function MedicionAbastecimiento({
 	const litrosRemision = route.params?.litrosRemision || 0;
 
 	const {
+		watch,
 		control,
 		handleSubmit,
 		reset,
@@ -104,6 +105,10 @@ export function MedicionAbastecimiento({
 			litrosFinal: "",
 		},
 	});
+
+	const litros_inicial = Number(watch("litrosInicial"));
+	const litros_final = Number(watch("litrosFinal"));
+	const capacidadeRestante = litrosTanque - litros_inicial;
 
 	const definirMedicion = ({
 		alturaInicial,
@@ -168,6 +173,8 @@ export function MedicionAbastecimiento({
 				updatedMedicionesFinales[posic].litros -
 				updatedMedicionesIniciales[posic].litros;
 		}
+		console.log("Total Litros Cargados:", totalLitrosCargados);
+		console.log("Litros Remisión:", litrosRemision);
 		// Verifica la necesidad de registrar en otro tanque
 		if (totalLitrosCargados < litrosRemision) {
 			const tanquesAtualizados = tanques.filter(
@@ -221,7 +228,7 @@ export function MedicionAbastecimiento({
 	useEffect(() => {
 		if (selectedTanques) {
 			const tanque = tanques.find(
-				(t) => String(t.id_tanque) === selectedTanques
+				(t) => t.id_tanque === Number(selectedTanques)
 			);
 			if (tanque) {
 				setLitrosTanque(tanque.capacidad_litros);
@@ -377,7 +384,7 @@ export function MedicionAbastecimiento({
 									/>
 								</InputCard>
 								<InputCard
-									title='Litros'
+									title={`${capacidadeRestante} litros restantes para el tanque`}
 									required
 								>
 									<Controller

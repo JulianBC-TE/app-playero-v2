@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { View } from "react-native";
-import { Controller, set, useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import * as yup from "yup";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { toastError, toastSuccess } from "@utils/toastMessage";
@@ -123,7 +123,7 @@ export function CrearPersona() {
 									placeholder='Informe nombre y apellido'
 									placeholderTextColor='$gray600'
 									className='font-medium text-xl'
-									value={value}
+									value={value.toUpperCase()}
 									onChangeText={onChange}
 									errorMessage={errors.nombre?.message}
 								/>

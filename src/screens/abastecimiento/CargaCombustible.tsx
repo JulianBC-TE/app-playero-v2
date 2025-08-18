@@ -13,6 +13,8 @@ import { useAppContext } from "@/hooks/useAppContext";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { CargaZetaDTO } from "@/dto/CargaZetaDTO";
 
+let idAutorizado = 0; // Variable para almacenar el ID autorizado
+
 export function CargaCombustible({
 	navigation,
 	route,
@@ -81,7 +83,9 @@ export function CargaCombustible({
 					"Pico no disponible",
 					"El pico no está disponible para la carga."
 				);
+				return;
 			}
+			idAutorizado = response.data.idUltimaCarga;
 			setSalida(1);
 			setShouldContinue(true);
 		} catch (error) {
@@ -99,6 +103,14 @@ export function CargaCombustible({
 		try {
 			const response = await api.get(`/api/salida-control/${idPico_surtidor}`);
 			if (response.data.estado === "B") {
+				if (response.data.id <= idAutorizado) {
+					setSalida(0);
+					setShouldContinue(false);
+					setIsLoading(false);
+					idAutorizado = 0;
+					return;
+				}
+				idAutorizado = 0;
 				setSalida(2);
 				setShouldContinue(false);
 				setTotalizadorPicoInicial(response.data.taxiltroInicioDespacho);

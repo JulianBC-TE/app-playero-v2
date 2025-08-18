@@ -99,7 +99,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 
 	// A medição pode ter vários tanques não se deve comparar com bodegas.length
 	async function procesarTurno() {
-		if (medicion.length === 0 || medicion.length < bodegas.length) {
+		if (medicion.length === 0) {
 			Alert.alert(
 				"Medición requerida",
 				"Debe realizar las mediciones de tanque antes de procesar el turno."

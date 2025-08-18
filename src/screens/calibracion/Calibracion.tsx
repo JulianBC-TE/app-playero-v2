@@ -228,6 +228,18 @@ export function Calibracion({
 	}, []);
 
 	async function saveAllData() {
+		if (persona === null) {
+			Alert.alert(
+				"Persona requerida",
+				"Debe seleccionar una persona encargada."
+			);
+			return;
+		}
+		if (firma === null) {
+			Alert.alert("Firma requerida", "Debe firmar para continuar.");
+			return;
+		}
+
 		setIsLoading(true);
 		try {
 			const now = new Date();
@@ -277,6 +289,7 @@ export function Calibracion({
 				"Calibración guardada",
 				"Los datos se han guardado correctamente."
 			);
+			navigation.navigate("home");
 		} catch (error) {
 			console.error("Error al guardar todos los datos:", error);
 			toastError("Error al guardar", "Intente nuevamente más tarde.");
@@ -482,6 +495,7 @@ export function Calibracion({
 									/>
 									<View className='flex-col gap-6'>
 										<Photo
+											form='icon'
 											disabled={salida !== 0}
 											iconSize='lg'
 											iconColor={salida !== 0 ? "#756868eb" : "#000"}
@@ -511,7 +525,7 @@ export function Calibracion({
 							</InputCard>
 						)}
 
-						{mediciones.totalMediciones > 0 && (
+						{mediciones.totalMediciones > 0 && persona && (
 							<>
 								<View className='flex-row gap-4'>
 									<Button
