@@ -44,8 +44,10 @@ import {
 	savePersona,
 } from "@/storage/storagePersona";
 import { Photo } from "@/components/Photo";
+import { set } from "react-hook-form";
 
 let idAutorizado = 0;
+let continuarCarga = false;
 
 export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	const [selectedBodegaOrigem, setSelectedBodegaOrigem] = useState<string>("");
@@ -62,7 +64,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	const [persona, setPersona] = useState<PersonaDTO | null>(null);
 	const [firma, setFirma] = useState<string | null>(null);
 	const [salida, setSalida] = useState<number>(0);
-	const [cargaCombustible, setCargaCombustible] = useState<string>("000,00");
+	const [cargaCombustible, setCargaCombustible] = useState<number>(0.0);
 
 	const [selectedPico, setSelectedPico] = useState<string>("");
 	const [idPico_surtidor, setIdPicoSurtidor] = useState<number>(0);
@@ -76,6 +78,15 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	const [shouldContinue, setShouldContinue] = useState(false);
 	const intervalRef = useRef<NodeJS.Timeout | null>(null);
 	const [estadoRestaurado, setEstadoRestaurado] = useState(false);
+
+	// helper para converter string "1.234,56" ou "1234.56" em número
+	const toNumber = (v: unknown) => {
+		if (typeof v === "number") return v;
+		const s = String(v ?? "").trim();
+		if (!s) return 0;
+		// remove separador de milhar e normaliza vírgula para ponto
+		return Number(s.replace(/\./g, "").replace(",", "."));
+	};
 
 	async function fetchPicos() {
 		setIsLoading(true);
@@ -130,8 +141,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	}
 
 	function saveState() {
-		// let id_bodega = 0;
-		// let id_pico_surtidor = 0;
+		// se grabo los datos anteriormente y una nueva carga está en marcha
+		if (continuarCarga) return;
 
 		const now = new Date();
 		const fecha = now.toISOString().slice(0, 10);
@@ -185,23 +196,24 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			return;
 		}
 
-		const data: TraspasoDTO = await getStorageTraspaso();
-
-		data.json.firma_receptor = firma ? [firma] : [];
-		data.json.regla_altura_final = medicionFinal[0].regla.toString();
-		data.json.litros_tanque_final = medicionFinal[0].litros;
-		data.json.temp_final = medicionFinal[0].temperatura;
-		data.json.foto_medicion_final = medicionFinal[0].foto_tanque
-			? [medicionFinal[0].foto_tanque]
-			: [];
-		data.json.obs_traspaso =
-			obs + (obsAdicional.length > 0 ? " >>" + obsAdicional : "");
-
-		data.json.litros_pico = Number(cargaCombustible.replace(",", "."));
-		data.json.taxilitro_inicial = totalizadorPicoInicial;
-		data.json.taxilitro_final = totalizadorPicoFinal;
-
 		try {
+			const data: TraspasoDTO = await getStorageTraspaso();
+
+			data.json.firma_receptor = firma ? [firma] : [];
+			data.json.regla_altura_final = medicionFinal[0].regla.toString();
+			data.json.litros_tanque_final = medicionFinal[0].litros;
+			data.json.temp_final = medicionFinal[0].temperatura;
+			data.json.foto_medicion_final = medicionFinal[0].foto_tanque
+				? [medicionFinal[0].foto_tanque]
+				: [];
+			data.json.obs_traspaso =
+				obs + (obsAdicional.length > 0 ? " >>" + obsAdicional : "");
+
+			data.json.litros_pico = cargaCombustible;
+			data.json.taxilitro_inicial = totalizadorPicoInicial;
+			data.json.taxilitro_final = totalizadorPicoFinal;
+			console.log("Aqui");
+
 			setIsLoading(true);
 			await api.post("/api/traspasos", data);
 			toastSuccess("Traspaso", "Traspaso guardado exitosamente.");
@@ -209,6 +221,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			await removePersona();
 			navigation.navigate("home");
 		} catch (error) {
+			console.log(error);
 			toastError("Traspaso", "Ocurrió un error al guardar el traspaso.");
 		} finally {
 			setIsLoading(false);
@@ -260,7 +273,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			);
 			return;
 		}
-
 		try {
 			setIsLoading(true);
 
@@ -282,7 +294,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				return;
 			}
 			idAutorizado = response.data.idUltimaCarga;
-			saveState();
+			if (!continuarCarga) saveState();
 			setSalida(1);
 			setShouldContinue(true);
 		} catch (error) {
@@ -299,6 +311,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			fetchBodegas();
 
 			(async () => {
+				//await removeTraspaso();
+				//await removePersona();
 				const storedTraspaso = await getStorageTraspaso();
 
 				if (storedTraspaso && storedTraspaso.json) {
@@ -381,12 +395,35 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 					return;
 				}
 				idAutorizado = 0;
-				setSalida(2);
 				setShouldContinue(false);
-				setIsLoading(false);
-				setTotalizadorPicoInicial(response.data.taxiltroInicioDespacho);
-				setTotalizadorPicoFinal(response.data.taxiltroFinDespacho);
-				setCargaCombustible(response.data.volumenDespachado.toFixed(2));
+
+				if (!continuarCarga) {
+					setTotalizadorPicoInicial(response.data.taxiltroInicioDespacho);
+					setTotalizadorPicoFinal(response.data.taxiltroFinDespacho);
+					setCargaCombustible(response.data.volumenDespachado);
+				} else {
+					setTotalizadorPicoFinal(response.data.taxiltroFinDespacho);
+					setCargaCombustible((prev) => prev + response.data.volumenDespachado);
+				}
+				// Preciso somar a carga atual com a carga que já estava registrada
+
+				Alert.alert("Carga registrada", "Desea continuar la misma carga?", [
+					{
+						text: "Sí",
+						onPress: () => {
+							continuarCarga = true;
+							handleTraspaso();
+						},
+					},
+					{
+						text: "No",
+						onPress: () => {
+							setSalida(2);
+							setIsLoading(false);
+							continuarCarga = false;
+						},
+					},
+				]);
 			}
 		} catch (error) {
 			if (idPico_surtidor === 0) {
@@ -647,7 +684,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 										Litros Cargados
 									</Text>
 									<Text className='text-2xl text-black font-bold'>
-										{cargaCombustible}
+										{cargaCombustible.toFixed(2)}
 									</Text>
 								</View>
 							</View>
