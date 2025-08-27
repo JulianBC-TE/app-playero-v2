@@ -336,9 +336,18 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 						},
 					]);
 					setPersona(personaStorage);
-					setSalida(1);
+
+					// 🚨 Si ya había litros cargados, marcamos la carga como finalizada
+					if (json.litros_pico > 0) {
+						setSalida(2);
+						setShouldContinue(false); // ❌ No activar polling
+					} else {
+						setSalida(1);
+						setShouldContinue(true); // ✅ Solo si la carga está incompleta
+					}
+
 					setIsLoading(true);
-					setShouldContinue(true);
+					setEstadoRestaurado(true);
 				} else {
 					setSelectedBodegaOrigem("");
 				}
@@ -397,6 +406,12 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				idAutorizado = 0;
 				setShouldContinue(false);
 
+				if (salida === 2) {
+					setShouldContinue(false);
+					setIsLoading(false);
+					return;
+				}
+
 				if (!continuarCarga) {
 					setTotalizadorPicoInicial(response.data.taxiltroInicioDespacho);
 					setTotalizadorPicoFinal(response.data.taxiltroFinDespacho);
@@ -420,10 +435,13 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 						onPress: () => {
 							setSalida(2);
 							setIsLoading(false);
+							setShouldContinue(false); // 🚨 Detenemos polling
 							continuarCarga = false;
 						},
 					},
 				]);
+				console.log('estoy aca');
+
 			}
 		} catch (error) {
 			if (idPico_surtidor === 0) {

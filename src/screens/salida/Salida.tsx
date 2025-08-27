@@ -133,7 +133,9 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 			const picos: PicoDTO[] = data.data.picos;
 			setPicos(picos);
 		} catch (error) {
-			console.error("Error al buscar picos:", error);
+			console.error("Error al buscar picos: 1", error);
+			console.log("CONSOLE 1");
+			
 			toastError("Error al buscar picos", "Intente nuevamente más tarde.");
 		} finally {
 			setIsLoading(false);
@@ -205,6 +207,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 			navigation.navigate("home");
 		} catch (error) {
 			console.error("Error al guardar los datos:", error);
+			console.log("CONSOLE 2");
 			toastError("Registro de Salida", "Intente nuevamente más tarde.");
 		} finally {
 			setIsLoading(false);
@@ -288,6 +291,8 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 		} catch (error) {
 			setSalida(0);
 			setShouldContinue(false);
+			console.log("Error al autorizar la carga:", error);
+			console.log("CONSOLE 3");
 			toastError("Registro de Salida", "Intente nuevamente más tarde.");
 			setIsLoading(false);
 			return;
