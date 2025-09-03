@@ -46,10 +46,14 @@ import {
 import { Photo } from "@/components/Photo";
 import { set } from "react-hook-form";
 
-let idAutorizado = 0;
-let continuarCarga = false;
+//let idAutorizado = 0;
+//let continuarCarga = false;
 
 export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
+	const idAutorizadoRef = useRef<number>(0);
+	const continuarCargaRef = useRef<boolean>(false);
+	const lastIdProcesadoRef = useRef<number>(0);
+	const n = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 	const [selectedBodegaOrigem, setSelectedBodegaOrigem] = useState<string>("");
 	const [selectedBodegaDestino, setSelectedBodegaDestino] =
 		useState<string>("");
@@ -142,7 +146,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 
 	function saveState() {
 		// se grabo los datos anteriormente y una nueva carga está en marcha
-		if (continuarCarga) return;
+		if (continuarCargaRef.current) return;
 
 		const now = new Date();
 		const fecha = now.toISOString().slice(0, 10);
@@ -165,6 +169,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				taxilitro_inicial: totalizadorPicoInicial, // Este valor debe ser calculado o enviado
 				taxilitro_final: totalizadorPicoFinal, // Este valor debe ser calculado o enviado
 				litros_pico: 0, // Este valor debe ser calculado o enviado
+				last_id_salida: 0,
 				obs_traspaso: obs + " >>" + obsAdicional || "",
 				foto_obs_traspaso: base64Obs ? [base64Obs] : [],
 				foto_medicion_inicial: medicionInicial[0].foto_tanque
@@ -184,13 +189,9 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 
 	async function handleSaveAll() {
 		if (medicionFinal.length === 0) {
-			Alert.alert(
-				"Medición final es requerida",
-				"Debe registrar la medición final del tanque receptor."
-			);
+			Alert.alert("Medición final es requerida", "Debe registrar la medición final del tanque receptor.");
 			return;
 		}
-
 		if (!firma) {
 			Alert.alert("Firma requerida", "Debe registrar la firma del receptor.");
 			return;
@@ -199,23 +200,31 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 		try {
 			const data: TraspasoDTO = await getStorageTraspaso();
 
+			// Completa datos finales
 			data.json.firma_receptor = firma ? [firma] : [];
 			data.json.regla_altura_final = medicionFinal[0].regla.toString();
 			data.json.litros_tanque_final = medicionFinal[0].litros;
 			data.json.temp_final = medicionFinal[0].temperatura;
-			data.json.foto_medicion_final = medicionFinal[0].foto_tanque
-				? [medicionFinal[0].foto_tanque]
-				: [];
-			data.json.obs_traspaso =
-				obs + (obsAdicional.length > 0 ? " >>" + obsAdicional : "");
-
+			data.json.foto_medicion_final = medicionFinal[0].foto_tanque ? [medicionFinal[0].foto_tanque] : [];
+			data.json.obs_traspaso = obs + (obsAdicional.length > 0 ? " >>" + obsAdicional : "");
 			data.json.litros_pico = cargaCombustible;
 			data.json.taxilitro_inicial = totalizadorPicoInicial;
 			data.json.taxilitro_final = totalizadorPicoFinal;
+
+			// ⚠️ NO ENVIAR last_id_salida (solo cliente)
+			// OJO: no mutes "data" directo; clona y limpia:
+			const payload: TraspasoDTO = {
+				...data,
+				json: { ...data.json },
+			};
+			delete (payload.json as any).last_id_salida;
+
 			console.log("Aqui");
+			console.log("[SAVE] Litros cargaCombustible:", cargaCombustible);
 
 			setIsLoading(true);
-			await api.post("/api/traspasos", data);
+			await api.post("/api/traspasos", payload);
+
 			toastSuccess("Traspaso", "Traspaso guardado exitosamente.");
 			await removeTraspaso();
 			await removePersona();
@@ -293,8 +302,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 				);
 				return;
 			}
-			idAutorizado = response.data.idUltimaCarga;
-			if (!continuarCarga) saveState();
+			idAutorizadoRef.current = response.data.idUltimaCarga;
+			if (!continuarCargaRef.current) saveState();
 			setSalida(1);
 			setShouldContinue(true);
 		} catch (error) {
@@ -305,6 +314,41 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			return;
 		}
 	}
+
+	const promptResumeIfNeeded = (stored: TraspasoDTO) => {
+		const litros = Number(stored?.json?.litros_pico) || 0;
+		const lastId = Number(stored?.json?.last_id_salida) || 0;
+		if (litros > 0 && lastId > 0) {
+			Alert.alert(
+				"Traspaso pendiente",
+				`Tiene ${litros.toFixed(2)} L registrados. ¿Desea continuar con otra tanda?`,
+				[
+					{
+						text: "Sí",
+						onPress: () => {
+							continuarCargaRef.current = true;
+							// Preparar e iniciar nueva tanda
+							setSalida(1);
+							setIsLoading(true);
+							setShouldContinue(true);
+							handleTraspaso();
+						},
+					},
+					{
+						text: "No",
+						onPress: () => {
+							// Mantener pendiente sin polling
+							continuarCargaRef.current = false;
+							setSalida(2);
+							setIsLoading(false);
+							setShouldContinue(false);
+						},
+						style: "cancel",
+					},
+				]
+			);
+		}
+	};
 
 	useEffect(() => {
 		if (sucursal) {
@@ -323,6 +367,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 					setSelectedBodegaDestino(json.bod_destino.toString());
 					setSelectedPico(json.id_pico.toString());
 					setTotalizadorPicoInicial(json.taxilitro_inicial);
+					setCargaCombustible(storedTraspaso.json.litros_pico ?? 0); // <--- NUEVO
 					setTotalizadorPicoFinal(json.taxilitro_final);
 					setBase64Obs(json.foto_obs_traspaso[0] || "");
 					setMedicionInicial([
@@ -337,17 +382,16 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 					]);
 					setPersona(personaStorage);
 
-					// 🚨 Si ya había litros cargados, marcamos la carga como finalizada
-					if (json.litros_pico > 0) {
-						setSalida(2);
-						setShouldContinue(false); // ❌ No activar polling
-					} else {
-						setSalida(1);
-						setShouldContinue(true); // ✅ Solo si la carga está incompleta
-					}
+					// ⚠️ NO inicies polling aquí:
+					setSalida(2);             // estás en estado "pendiente / parcial"
+					setIsLoading(false);
+					setShouldContinue(false);
 
-					setIsLoading(true);
-					setEstadoRestaurado(true);
+					// 2do cinturón ante re-procesos:
+					idAutorizadoRef.current = json.last_id_salida || 0;
+
+					// 👇 Muestra el alert de reanudación si corresponde
+					promptResumeIfNeeded(storedTraspaso);
 				} else {
 					setSelectedBodegaOrigem("");
 				}
@@ -384,72 +428,108 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 
 	const fetchBox = useCallback(async () => {
 		if (!estadoRestaurado || !shouldContinue) return;
+
 		try {
 			let idPicoBox = Number(idPico_surtidor);
 			if (idPicoBox === 0) {
-				// Busca el pico surtidor correspondiente para ser usado en el looping
-				const picoSurtidor = picos.find(
-					(pico) => pico.id_pico === Number(selectedPico)
-				);
+				const picoSurtidor = picos.find(p => p.id_pico === Number(selectedPico));
 				setIdPicoSurtidor(Number(picoSurtidor?.id_pico_surtidor));
 				idPicoBox = Number(picoSurtidor?.id_pico_surtidor);
 			}
+
 			const response = await api.get(`/api/salida-control/${idPicoBox}`);
-			if (response.data.estado === "B") {
-				if (response.data.id <= idAutorizado) {
-					setSalida(0);
-					setShouldContinue(false);
-					setIsLoading(false);
-					idAutorizado = 0;
-					return;
-				}
-				idAutorizado = 0;
+			const dataResp = response?.data ?? {};
+			console.log("[FETCH BOX] Respuesta salida-control:", dataResp);
+
+			const estado = dataResp.estado as string | undefined;
+			const idResp = n(dataResp.id);
+
+			// Solo procesar al finalizar tanda
+			if (estado !== "B") return;
+
+			// Si ya procesamos este id o es anterior al autorizado, salimos
+			if (idResp && idResp <= idAutorizadoRef.current) {
+				setSalida(0);
 				setShouldContinue(false);
-
-				if (salida === 2) {
-					setShouldContinue(false);
-					setIsLoading(false);
-					return;
-				}
-
-				if (!continuarCarga) {
-					setTotalizadorPicoInicial(response.data.taxiltroInicioDespacho);
-					setTotalizadorPicoFinal(response.data.taxiltroFinDespacho);
-					setCargaCombustible(response.data.volumenDespachado);
-				} else {
-					setTotalizadorPicoFinal(response.data.taxiltroFinDespacho);
-					setCargaCombustible((prev) => prev + response.data.volumenDespachado);
-				}
-				// Preciso somar a carga atual com a carga que já estava registrada
-
-				Alert.alert("Carga registrada", "Desea continuar la misma carga?", [
-					{
-						text: "Sí",
-						onPress: () => {
-							continuarCarga = true;
-							handleTraspaso();
-						},
-					},
-					{
-						text: "No",
-						onPress: () => {
-							setSalida(2);
-							setIsLoading(false);
-							setShouldContinue(false); // 🚨 Detenemos polling
-							continuarCarga = false;
-						},
-					},
-				]);
-				console.log('estoy aca');
-
+				setIsLoading(false);
+				idAutorizadoRef.current = 0;
+				return;
 			}
+			if (idResp && idResp === lastIdProcesadoRef.current) {
+				// Evita Alert duplicado en polling
+				return;
+			}
+
+			// Marcamos este id como procesado antes del Alert
+			lastIdProcesadoRef.current = idResp;
+			idAutorizadoRef.current = 0;
+			setShouldContinue(false);
+
+			// ===== BLOQUE ÚNICO: acumulado + UI + persistencia =====
+			const storageData = (await getStorageTraspaso()) ?? saveState();
+			const prev = n(storageData?.json?.litros_pico);
+			const vol = n(dataResp.volumenDespachado);
+			const lastId = n(storageData?.json?.last_id_salida) || 0;
+
+			// ⚠️ SI YA PROCESAMOS ESTE ID, SALIR SIN SUMAR
+			if (idResp && idResp <= lastId) {
+				console.log("[FETCH BOX] ID ya contabilizado, no se acumula:", idResp);
+				// opcional: actualizar UI si querés refrescar taxilitros, pero sin sumar
+				setTotalizadorPicoInicial(
+					n(storageData?.json?.taxilitro_inicial) || n(dataResp.taxiltroInicioDespacho)
+				);
+				setTotalizadorPicoFinal(n(dataResp.taxiltroFinDespacho));
+				return;
+			}
+
+			const nuevoAcum = prev + vol;
+
+			const taxIni = n(storageData?.json?.taxilitro_inicial) || n(dataResp.taxiltroInicioDespacho);
+			const taxFin = n(dataResp.taxiltroFinDespacho);
+
+			// UI una sola vez (evita parpadeo)
+			setTotalizadorPicoInicial(taxIni);
+			setTotalizadorPicoFinal(taxFin);
+			setCargaCombustible(nuevoAcum);
+
+			// Persistencia
+			storageData.json.litros_pico = nuevoAcum;
+			if (!storageData.json.taxilitro_inicial) {
+				storageData.json.taxilitro_inicial = n(dataResp.taxiltroInicioDespacho);
+			}
+			storageData.json.taxilitro_final = taxFin;
+			storageData.json.last_id_salida = idResp;
+			await saveTraspaso(storageData);
+
+			// ===== Alert =====
+			Alert.alert("Carga registrada", "¿Desea continuar la misma carga?", [
+				{
+					text: "Sí",
+					onPress: () => {
+						console.log("[ALERT] Usuario eligió: Sí (continuar)");
+						continuarCargaRef.current = true;
+						handleTraspaso(); // vuelve a autorizar siguiente tanda
+					},
+				},
+				{
+					text: "No",
+					onPress: () => {
+						console.log("[ALERT] Usuario eligió: No (finalizar parcial)");
+						setSalida(2);
+						setIsLoading(false);
+						continuarCargaRef.current = false;
+					},
+				},
+			]);
 		} catch (error) {
+			console.error("[FETCH BOX] error:", error);
 			if (idPico_surtidor === 0) {
 				setSalida(0);
 				setShouldContinue(false);
 			}
 		}
-	}, [estadoRestaurado, shouldContinue, idPico_surtidor]);
+	}, [estadoRestaurado, shouldContinue, idPico_surtidor, picos, selectedPico]);
+
 
 	const fetchLoop = useCallback(async () => {
 		if (estadoRestaurado && shouldContinue) {
