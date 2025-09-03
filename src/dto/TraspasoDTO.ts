@@ -42,6 +42,7 @@ export type TraspasoDTO = {
 		taxilitro_inicial: number;
 		taxilitro_final: number;
 		litros_pico: number;
+		last_id_salida?: number;
 		obs_traspaso: string;
 		foto_obs_traspaso: string[];
 		foto_medicion_inicial: string[] | [];
@@ -51,5 +52,7 @@ export type TraspasoDTO = {
 		firma_receptor: string[];
 		id_playero: number;
 		id_encargado_receptor: number;
+		id_autorizado?: number;
+		corte_id?: number;
 	};
 };
