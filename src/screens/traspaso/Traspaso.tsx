@@ -68,8 +68,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 	const [persona, setPersona] = useState<PersonaDTO | null>(null);
 	const [firma, setFirma] = useState<string | null>(null);
 	const [salida, setSalida] = useState<number>(0);
-	const [cargaCombustible, setCargaCombustible] = useState<number>(0.0);
-
+	//const [cargaCombustible, setCargaCombustible] = useState<number>(0.0);
+	const [cargaCombustible, setCargaCombustible] = useState<string>("000,00");
 	const [selectedPico, setSelectedPico] = useState<string>("");
 	const [idPico_surtidor, setIdPicoSurtidor] = useState<number>(0);
 	const [totalizadorPicoInicial, setTotalizadorPicoInicial] =
@@ -207,7 +207,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			data.json.temp_final = medicionFinal[0].temperatura;
 			data.json.foto_medicion_final = medicionFinal[0].foto_tanque ? [medicionFinal[0].foto_tanque] : [];
 			data.json.obs_traspaso = obs + (obsAdicional.length > 0 ? " >>" + obsAdicional : "");
-			data.json.litros_pico = cargaCombustible;
+			data.json.litros_pico = Number(cargaCombustible.replace(",", "."));
 			data.json.taxilitro_inicial = totalizadorPicoInicial;
 			data.json.taxilitro_final = totalizadorPicoFinal;
 
@@ -315,6 +315,39 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 		}
 	}
 
+	const promptStartIfNeeded = (stored: TraspasoDTO) => {
+		const litros = Number(stored?.json?.litros_pico) || 0;
+		// Si no hay litros y hay datos básicos, ofrece iniciar
+		if (litros === 0) {
+			Alert.alert(
+				"Traspaso pendiente",
+				"Aún no se despachó combustible. ¿Desea iniciar la carga ahora?",
+				[
+					{
+						text: "Sí",
+						onPress: () => {
+							continuarCargaRef.current = false; // es una 1ª tanda
+							setSalida(1);
+							setIsLoading(true);
+							setShouldContinue(true);
+							handleTraspaso(); // reautoriza y entra al loop
+						},
+					},
+					{
+						text: "No",
+						onPress: () => {
+							// Permite seguir editando cabecera / volver cuando quieras
+							setSalida(0);
+							setIsLoading(false);
+							setShouldContinue(false);
+						},
+						style: "cancel",
+					},
+				]
+			);
+		}
+	};
+
 	const promptResumeIfNeeded = (stored: TraspasoDTO) => {
 		const litros = Number(stored?.json?.litros_pico) || 0;
 		const lastId = Number(stored?.json?.last_id_salida) || 0;
@@ -367,7 +400,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 					setSelectedBodegaDestino(json.bod_destino.toString());
 					setSelectedPico(json.id_pico.toString());
 					setTotalizadorPicoInicial(json.taxilitro_inicial);
-					setCargaCombustible(storedTraspaso.json.litros_pico ?? 0); // <--- NUEVO
+					setCargaCombustible((storedTraspaso.json.litros_pico ?? 0).toFixed(2));
 					setTotalizadorPicoFinal(json.taxilitro_final);
 					setBase64Obs(json.foto_obs_traspaso[0] || "");
 					setMedicionInicial([
@@ -380,18 +413,28 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 							foto_tanque: json.foto_medicion_inicial[0] || "",
 						},
 					]);
+					
 					setPersona(personaStorage);
 
-					// ⚠️ NO inicies polling aquí:
-					setSalida(2);             // estás en estado "pendiente / parcial"
+					// NO inicies polling aquí
 					setIsLoading(false);
 					setShouldContinue(false);
 
 					// 2do cinturón ante re-procesos:
 					idAutorizadoRef.current = json.last_id_salida || 0;
 
-					// 👇 Muestra el alert de reanudación si corresponde
-					promptResumeIfNeeded(storedTraspaso);
+					const litros = Number(json.litros_pico) || 0;
+
+					if (litros > 0) {
+						// Traspaso parcial con litros: mostrar "Finalizado" (pendiente) y ofrecer reanudar
+						setSalida(2);
+						promptResumeIfNeeded(storedTraspaso); // <-- ya lo tienes
+					} else {
+						// Traspaso aún no cargó nada: volver a estado inicial y ofrecer comenzar
+						setSalida(0);
+						promptStartIfNeeded(storedTraspaso); // <-- ver función abajo
+					}
+
 				} else {
 					setSelectedBodegaOrigem("");
 				}
@@ -490,7 +533,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 			// UI una sola vez (evita parpadeo)
 			setTotalizadorPicoInicial(taxIni);
 			setTotalizadorPicoFinal(taxFin);
-			setCargaCombustible(nuevoAcum);
+			setCargaCombustible(nuevoAcum.toFixed(2));
 
 			// Persistencia
 			storageData.json.litros_pico = nuevoAcum;
@@ -782,7 +825,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 										Litros Cargados
 									</Text>
 									<Text className='text-2xl text-black font-bold'>
-										{cargaCombustible.toFixed(2)}
+										{cargaCombustible}
 									</Text>
 								</View>
 							</View>

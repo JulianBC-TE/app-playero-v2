@@ -5,6 +5,8 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { TextSearch } from "@/components/TextSearch";
 import { PersonaDTO } from "@/dto/PersonaDTO";
 import { VehiculoDTO } from "@/dto/VehiculoDTO";
+import { BackHandler } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { StackRoutesProps } from "@/route/app.routes";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -135,7 +137,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 		} catch (error) {
 			console.error("Error al buscar picos: 1", error);
 			console.log("CONSOLE 1");
-			
+
 			toastError("Error al buscar picos", "Intente nuevamente más tarde.");
 		} finally {
 			setIsLoading(false);
@@ -384,6 +386,24 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 		};
 	}, [shouldContinue, fetchLoop]);
 
+	useFocusEffect(
+		useCallback(() => {
+			const onBackPress = () => {
+				if (salida === 1 || salida === 2) {
+					return true; // bloquea el botón físico
+				}
+				return false; // permite volver atrás normalmente
+			};
+
+			const subscription = BackHandler.addEventListener(
+				"hardwareBackPress",
+				onBackPress
+			);
+
+			return () => subscription.remove(); // limpiar al salir
+		}, [salida])
+	);
+
 	return turnoCerrado ? (
 		<View className='flex-1'>
 			<ScreenHeader title='Salida Excepcional' />
@@ -444,7 +464,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 		<View className='flex-1'>
 			<ScreenHeader
 				title='Salida Combustible'
-				disableBackButton={salida === 1}
+				disableBackButton={salida === 1 || salida === 2}
 			/>
 			<KeyboardAvoidingView
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
