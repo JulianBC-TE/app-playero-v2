@@ -169,7 +169,8 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 				id_operador: Number(persona?.cedula),
 				litros: Number(cargaCombustible),
 				kilometraje: Number(control._formValues.kilometraje) || 0,
-				horometro: Number(control._formValues.horometro) || 0,
+				//horometro: Number(control._formValues.horometro) || 0,
+				horometro: Number((control._formValues.horometro || "").replace(",", ".")) || 0,
 				inicio_taxilitro: totalizadorPicoInicial, // Este valor debe ser calculado o enviado
 				fin_taxilitro: totalizadorPicoFinal, // Este valor debe ser calculado o enviado
 				ruc_cliente: "",
@@ -188,6 +189,14 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 				foto_observaciones: base64Obs ? [base64Obs] : [],
 			},
 		};
+
+		// console.log("📊 Datos numéricos antes de enviar:", {
+		// 	horometro: control._formValues.horometro,
+		// 	kilometraje: control._formValues.kilometraje,
+		// 	horometroConvertido: Number((control._formValues.horometro || "").replace(",", ".")),
+		// 	kilometrajeConvertido: Number(control._formValues.kilometraje) || 0,
+		// });
+		
 		try {
 			setIsLoading(true);
 			await api.post("/api/tickets", data);
