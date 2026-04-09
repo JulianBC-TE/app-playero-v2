@@ -19,7 +19,7 @@ export function MedicionesCard({ data, ...rest }: Props) {
 					numberOfLines={1}
 					className='text-lg font-bold text-black'
 				>
-					{data.tanque}
+					{`Tanque ${data.id_tanque}`}
 				</Text>
 			</View>
 			<TouchableOpacity {...rest}>
