@@ -44,6 +44,7 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 	const [isLoadingServerIP, setIsLoadingServerIP] = useState(true);
 
 	async function UserAndTokenUpdate(userData: UserDTO, token: string) {
+		//->settea el token default para uso comun
 		api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 		setUser(userData);
 	}
@@ -56,6 +57,7 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 		try {
 			setIsLoadingUserData(true);
 			await saveUser(userData);
+			//->se guardan los tokens en storageAuthToken
 			await saveAuthToken({ token, refresh_token });
 		} catch (error) {
 			throw error;
@@ -74,18 +76,21 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 
 	async function signIn(cedula: string, password: string) {
 		try {
+			//->se envian los datos del usuario
 			const { data } = await api.post("/api/auth/login", {
 				cedula: Number(cedula),
 				clave: password,
 			});
-
+			//->los datos del usuario se meten del el UserDTO
 			const usuario: UserDTO = {
 				cedula: cedula,
 				name: data.name,
 			};
-
+			//->los datos y los tokens formateados se actualizan
 			if (data.name && data.token) {
+				//->en el storageAuthTokens
 				UserAndTokenSave(usuario, data.token, "");
+				//->en la api
 				UserAndTokenUpdate(usuario, data.token);
 			}
 		} catch (error) {
@@ -121,8 +126,10 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 		try {
 			setIsLoadingUserData(true);
 			const userLogged = await getStorageUser();
+			//->si anteriormente se guardaron los tokens, se traen de storageAuthToken(se guardan ahí en UserAndTokenSave)
 			const { token } = await getAuthToken();
 			if (token && userLogged) {
+				//->se actualiza la api
 				UserAndTokenUpdate(userLogged, token);
 			}
 		} catch (error) {
@@ -131,6 +138,7 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 			setIsLoadingUserData(false);
 		}
 	}
+
 	async function setServerIP(ip: string | null) {
 		if (ip !== null) {
 			await saveServerUrl(ip);

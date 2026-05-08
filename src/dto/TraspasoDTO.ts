@@ -44,6 +44,7 @@ export type TraspasoDTO = {
 		litros_pico: number;
 		last_id_salida?: number;
 		obs_traspaso: string;
+		obs_adicional: string;
 		foto_obs_traspaso: string[];
 		foto_medicion_inicial: string[] | [];
 		foto_medicion_final: string[] | [];

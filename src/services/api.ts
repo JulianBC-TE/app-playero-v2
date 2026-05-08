@@ -25,19 +25,21 @@ api.registerInterceptTokenManager = (signOut) => {
 	const requestInterceptor = api.interceptors.request.use(
 		async (config) => {
 			try {
+				//->se trae el ip guardado
 				const serverIP = await getStorageServerUrl();
-
+				//->se verifica que el ip se cargue y este en el formato adecuado
 				if (serverIP) {
 					config.baseURL = serverIP;
 					if (!serverIP.startsWith("http://")) {
 						config.baseURL = `http://${serverIP}`;
 					}
 				}
-
+				//->traer el  token guardado y settearlo
 				const { token } = await getAuthToken();
 				if (token && config.headers) {
 					config.headers.Authorization = `Bearer ${token}`;
 				}
+				//->devolver el config
 				return config;
 			} catch (error) {
 				console.log("aqui 1", error);
@@ -51,7 +53,9 @@ api.registerInterceptTokenManager = (signOut) => {
 
 	// Interceptor de resposta para lidar com erros e refresh token
 	const responseInterceptor = api.interceptors.response.use(
+		//->Si fue exitosa se pasa directamente la respuesta
 		(response) => response,
+		//->si dió error, timeuot, etc, se trata
 		async (error) => {
 			if (!error.response) {
 				// Erros de rede ou timeouts
@@ -59,6 +63,7 @@ api.registerInterceptTokenManager = (signOut) => {
 			}
 
 			const { response } = error;
+			//->guardar una copia de la recuaest que falló
 			const originalRequest = error.config as AxiosRequestConfig & {
 				_retry?: boolean;
 			};
@@ -79,10 +84,10 @@ api.registerInterceptTokenManager = (signOut) => {
 							)
 						);
 					}
-
+					//->se trata de traer los tokens
 					originalRequest._retry = true;
 					const { refresh_token } = await getAuthToken();
-
+					//->se verifica que vengan los tokens
 					if (!refresh_token) {
 						signOut();
 						return Promise.reject(
@@ -91,9 +96,11 @@ api.registerInterceptTokenManager = (signOut) => {
 							)
 						);
 					}
-
+					//->si ya hay un token en refresh
 					if (isRefreshing) {
+						//->encola la request para reintentar cuando el refresh termine
 						return new Promise((resolve, reject) => {
+							// define qué hacer con esta request cuando el refresh se resuelva o falle
 							failedQueue.push({
 								onSuccess: (token: string) => {
 									if (originalRequest.headers) {
@@ -107,16 +114,16 @@ api.registerInterceptTokenManager = (signOut) => {
 							});
 						});
 					}
-
+					//->si no se esta en refreshing, ahora si se tiene que estar ya que se está refrescando la request actual
 					isRefreshing = true;
-
+					//->probamos hacer el refresh
 					return new Promise(async (resolve, reject) => {
 						try {
 							const { data } = await axios.post(
 								`${api.defaults.baseURL}/api/auth/refresh-token`,
 								{ refresh_token }
 							);
-
+							//-> si se hiso el resfresh de forma correcta ya tenemos los tokens nuevos
 							await saveAuthToken({
 								token: data.token,
 								refresh_token: data.refresh_token,
@@ -140,6 +147,7 @@ api.registerInterceptTokenManager = (signOut) => {
 
 							// Atualizando headers
 							api.defaults.headers.common.Authorization = `Bearer ${data.token}`;
+							//->si hay request origianl tambien a esa hay que actualizarle los headers
 							if (originalRequest.headers) {
 								originalRequest.headers.Authorization = `Bearer ${data.token}`;
 							}
@@ -150,6 +158,7 @@ api.registerInterceptTokenManager = (signOut) => {
 							});
 
 							console.log("Token atualizado com sucesso");
+							//-> ya con los tokens correctos se hace la recuesto original de nuevo
 							resolve(api(originalRequest));
 						} catch (refreshError) {
 							console.log("aqui 3", error);
@@ -175,6 +184,7 @@ api.registerInterceptTokenManager = (signOut) => {
 
 							signOut();
 						} finally {
+							// se resetean las flags para permitir futuros refreshes
 							isRefreshing = false;
 							failedQueue = [];
 						}
