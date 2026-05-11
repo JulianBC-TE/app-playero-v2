@@ -1,0 +1,3310 @@
+# Generado: 2026-05-11 11:44:39
+# CONTEXTO SOLICITADO  |  Objetivo: no especificado
+# Carpeta origen: C:\dev\playero_2\mobile-playero
+# Extensiones incluidas : .css, .html, .js, .jsx, .py, .ts, .tsx
+# Ignorados             : .env, .git, .next, .nuxt, .venv, __pycache__, build, coverage, dist, node_modules, venv
+# Total de archivos     : 20
+
+# ========================================================================
+
+# ÁRBOL DE ARCHIVOS
+# ========================================================================
+
+mobile-playero/
+  src/
+    backend/
+      abastecimiento-v2/
+        abastecimiento-v2.service.ts
+      abastecimiento/
+        abastecimiento.service.ts
+      auth/
+        auth.service.ts
+      autorizar/
+        autorizar.service.ts
+      bodega/
+        bodega.service.ts
+      calibracion/
+        calibracion.service.ts
+      cliente/
+        cliente.service.ts
+      persona/
+        persona.service.ts
+      pico/
+        pico.service.ts
+      db/
+        prisma-compat.ts
+      inicioTurno/
+        registro.service.ts
+        schema.ts
+      status/
+        status.service.ts
+      sucursal/
+        sucursal.service.ts
+      tanque/
+        tanque.service.ts
+      ticket/
+        ticket.service.ts
+      totalizador/
+        totalizador.service.ts
+      traspaso/
+        traspaso.service.ts
+      usuario/
+        usuario.service.ts
+      vehiculo/
+        vehiculo.service.ts
+
+# ========================================================================
+# CONTENIDO
+# ========================================================================
+
+
+# --- src\backend\abastecimiento-v2\abastecimiento-v2.service.ts ---
+
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { CreateAbastecimientoV2Dto } from './dto/create-abastecimiento-v2.dto';
+import { PrismaService } from '../../prisma/prisma.service';
+
+@Injectable()
+export class AbastecimientoV2Service {
+  constructor(private prisma: PrismaService) { }
+
+  async crearAbastecimiento(dto: CreateAbastecimientoV2Dto) {
+    const { json } = dto;
+
+    const fechaAbastecimiento = new Date(json.fecha);
+    if (isNaN(fechaAbastecimiento.getTime())) {
+      throw new BadRequestException(`La fecha '${json.fecha}' no tiene un formato válido (esperado: YYYY-MM-DD)`);
+    }
+
+    const [hh, mm, ss] = json.hora.split(':').map(Number);
+    if (
+      isNaN(hh) || isNaN(mm) || isNaN(ss) ||
+      hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59
+    ) {
+      throw new BadRequestException(`La hora '${json.hora}' no tiene un formato válido (esperado: HH:mm:ss)`);
+    }
+
+    const hora = new Date(fechaAbastecimiento);
+    hora.setHours(hh, mm, ss, 0);
+
+    // Validaciones de existencia
+    const [sucursal, bodega, playero] = await Promise.all([
+      this.prisma.sucursales.findUnique({ where: { id_sucursal: json.id_suc } }),
+      this.prisma.bodegas.findUnique({ where: { id_bodega: json.id_bod } }),
+      this.prisma.usuariosApp.findUnique({ where: { cedula: json.playero } }),
+    ]);
+
+    if (!sucursal) throw new BadRequestException(`Sucursal ID ${json.id_suc} no existe`);
+    if (!bodega) throw new BadRequestException(`Bodega ID ${json.id_bod} no existe`);
+    if (!playero) throw new BadRequestException(`Playero CI ${json.playero} no existe`);
+
+    // Validación condicional por zeta_no_llega
+    if (json.zeta_no_llega === 1) {
+      if (!json.id_pico_para_zeta) {
+        throw new BadRequestException(`Se requiere 'id_pico_para_zeta' cuando zeta_no_llega es 1`);
+      }
+
+      const picoZeta = await this.prisma.picos.findUnique({
+        where: { id_pico: json.id_pico_para_zeta }
+      });
+
+      if (!picoZeta) {
+        throw new BadRequestException(`Pico ID ${json.id_pico_para_zeta} no existe`);
+      }
+
+      // Validar los campos numéricos
+      const zetaFields = ['taxilitro_inicial', 'taxilitro_final', 'litros_zeta'];
+      for (const field of zetaFields) {
+        if (json[field] === undefined || typeof json[field] !== 'number') {
+          throw new BadRequestException(`Campo '${field}' es requerido y debe ser numérico cuando zeta_no_llega es 1`);
+        }
+      }
+
+    } else {
+      const camposZeta = ['id_pico_para_zeta', 'taxilitro_inicial', 'taxilitro_final', 'litros_zeta'];
+      const valoresEnviados = camposZeta.filter((campo) => json[campo] !== undefined && json[campo] !== null && json[campo] !== 0);
+
+      if (valoresEnviados.length > 0) {
+        throw new BadRequestException(
+          `Los campos ${valoresEnviados.join(', ')} no deben enviarse cuando 'zeta_no_llega' es 0`
+        );
+      }
+
+      // Establecer valores por defecto por seguridad
+      json.id_pico_para_zeta = null;
+      json.taxilitro_inicial = 0;
+      json.taxilitro_final = 0;
+      json.litros_zeta = 0;
+    }
+
+    // Asegurar que fotos sean arrays (o vacíos)
+    json.foto_rev_docs = Array.isArray(json.foto_rev_docs) ? json.foto_rev_docs : [];
+    json.foto_obs_repos = Array.isArray(json.foto_obs_repos) ? json.foto_obs_repos : [];
+
+    const idsTanques = (json.mediciones_tanque ?? []).map((d) => d.id_tanque);
+
+    for (const m of json.mediciones_tanque ?? []) {
+      if (!m.inicio || !m.fin) {
+        throw new BadRequestException(`Faltan datos de inicio o fin para el tanque ID ${m.id_tanque}`);
+      }
+
+      // Asignar tipo
+      m.inicio.tipo = 1;
+      m.fin.tipo = 2;
+
+      // Validar campos
+      const camposNumericos = ['temperatura', 'litros'];
+      const camposString = ['regla'];
+      const camposStringOpcionales = ['foto_medicion'];
+
+      for (const campo of camposNumericos) {
+        if (typeof m.inicio[campo] !== 'number') {
+          throw new BadRequestException(`Campo '${campo}' debe ser numérico en medición INICIO del tanque ${m.id_tanque}`);
+        }
+        if (typeof m.fin[campo] !== 'number') {
+          throw new BadRequestException(`Campo '${campo}' debe ser numérico en medición FIN del tanque ${m.id_tanque}`);
+        }
+      }
+
+      for (const campo of camposString) {
+        if (typeof m.inicio[campo] !== 'string') {
+          throw new BadRequestException(`Campo '${campo}' debe ser string en medición INICIO del tanque ${m.id_tanque}`);
+        }
+        if (typeof m.fin[campo] !== 'string') {
+          throw new BadRequestException(`Campo '${campo}' debe ser string en medición FIN del tanque ${m.id_tanque}`);
+        }
+      }
+
+      for (const campo of camposStringOpcionales) {
+        if (m.inicio[campo] !== undefined && typeof m.inicio[campo] !== 'string') {
+          throw new BadRequestException(`Campo '${campo}' debe ser un string en medición INICIO del tanque ${m.id_tanque}`);
+        }
+        if (m.fin[campo] !== undefined && typeof m.fin[campo] !== 'string') {
+          throw new BadRequestException(`Campo '${campo}' debe ser un string en medición FIN del tanque ${m.id_tanque}`);
+        }
+      }
+    }
+
+    const tanquesEncontrados = await this.prisma.tanques.findMany({
+      where: { id_tanque: { in: idsTanques } },
+    });
+
+    const tanquesFaltantes = idsTanques.filter(
+      (id) => !tanquesEncontrados.some((t) => t.id_tanque === id)
+    );
+
+    if (tanquesFaltantes.length > 0) {
+      throw new BadRequestException(`Tanque(s) no encontrados: ${tanquesFaltantes.join(', ')}`);
+    }
+
+    await this.prisma.abastecimientos.create({
+      data: {
+        tipo: 'ABASTECIMIENTO',
+        json: JSON.stringify(json),
+        fecha: fechaAbastecimiento,
+        hora,
+        sync: 0,
+      },
+    });
+
+    return {
+      message: 'Abastecimiento registrado correctamente',
+    };
+  }
+
+}
+
+
+# --- src\backend\abastecimiento\abastecimiento.service.ts ---
+
+
+// src/abastecimiento/abastecimiento.service.ts
+
+import { Injectable, Logger } from '@nestjs/common';
+
+import { HrsService } from '../horustech/hrs.service';
+
+import { AbastecimientoExtend } from './abastecimento-extended.interface'; // Asegúrate de que esta interfaz sea adecuada
+
+import { PrismaService } from '../../prisma/prisma.service';
+
+import { Despachos } from '@prisma/client'; // Importa el tipo generado por Prisma
+
+
+
+@Injectable()
+
+export class AbastecimientoService {
+
+  private readonly logger = new Logger(AbastecimientoService.name);
+
+  private readonly MAX_HORUSTECH_RECORDS = 10000; // Según DT432, vector circular de 10.000 registros (índices 0 a 9999)
+
+  // La respuesta que indicaste para un registro vacío (Comando 08)
+
+  private readonly EMPTY_RECORD_RESPONSE = '>!006B0800FFFFFFFFFFFFFFFFFFFFFFFFFF3339999FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF7E';
+
+
+
+  constructor(
+
+    private hrs: HrsService,
+
+    private prisma: PrismaService, // Inyecta el servicio de Prisma
+
+  ) { }
+
+
+
+  /** Calcula checksum Horustech (algoritmo Companytec/Horustech) */
+
+  private checksum(str: string): string {
+
+    return (
+
+      ([...str].reduce((s, c) => s + c.charCodeAt(0), 0) & 0xff)
+
+        .toString(16)
+
+        .toUpperCase()
+
+        .padStart(2, '0')
+
+    );
+
+  }
+
+
+
+  /**
+
+   * Construye el comando para leer un registro de abastecimiento extendido (Comando 08).
+
+   * Formato TX: >?CCCC08NNNNNNKK
+
+   * Donde NNNNNN es el índice de la posición a ser consultada (6 caracteres decimales).
+
+   *
+
+   * @param recordIndex El índice del registro de abastecimiento a consultar (NNNNNN, 6 caracteres decimal).
+
+   */
+
+  private buildReadAbastecimientoExtendCmd(recordIndex: number): Buffer {
+
+    const commandCode = '08';
+
+    const recordIndexStr = String(recordIndex).padStart(6, '0'); // NNNNNN (6 chars)
+
+
+
+    const dataContent = `${commandCode}${recordIndexStr}`; // Command (2) + Index (6) = 8 chars
+
+    const lenInBytes = '0008'; // Hardcoded porque el comando 08 siempre tiene 8 bytes de datos (08NNNNNN).
+
+
+
+    const body = `?${lenInBytes}${dataContent}`;
+
+    const fullCommand = `>${body}${this.checksum(body)}`;
+
+
+
+    this.logger.debug(`[AbastecimientoService] Comando TX 08 generado: ${fullCommand}`);
+
+    return Buffer.from(fullCommand, 'ascii');
+
+  }
+
+
+
+  /**
+
+   * Construye el comando para leer el siguiente abastecimiento en secuencia (Comando 02).
+
+   * Formato TX: >?CCCC02KK
+
+   *
+
+   * @returns Buffer El comando listo para enviar.
+
+   */
+
+  private buildReadAbastecimientoSequentialCmd(): Buffer {
+
+    const commandCode = '02';
+
+    const dataContent = `${commandCode}`; // Solo el código de comando
+
+    const lenInBytes = '0002'; // 2 bytes para el comando '02'
+
+
+
+    const body = `?${lenInBytes}${dataContent}`;
+
+    const fullCommand = `>${body}${this.checksum(body)}`;
+
+
+
+    this.logger.debug(`[AbastecimientoService] Comando TX 02 generado: ${fullCommand}`);
+
+    return Buffer.from(fullCommand, 'ascii');
+
+  }
+
+
+
+  /**
+
+   * Construye el comando para obtener el estado de los punteros (Comando 06).
+
+   * RX: >!CCCC 06 nnnnnn NNNNNN KK
+
+   *
+
+   * @returns Buffer El comando listo para enviar.
+
+   */
+
+  private buildGetPointerStatusCmd(): Buffer {
+
+    const commandCode = '06';
+
+    const dataContent = `${commandCode}`;
+
+    const lenInBytes = '0002'; // 2 bytes para el comando '06'
+
+
+
+    const body = `?${lenInBytes}${dataContent}`;
+
+    const fullCommand = `>${body}${this.checksum(body)}`;
+
+
+
+    this.logger.debug(`[AbastecimientoService] Comando TX 06 (Get Pointers) generado: ${fullCommand}`);
+
+    return Buffer.from(fullCommand, 'ascii');
+
+  }
+
+
+
+  /**
+
+   * Parsea la respuesta de los comandos de abastecimiento (02 o 08) a un objeto AbastecimientoExtend.
+
+   *
+
+   * @param asciiResponse La cadena de respuesta ASCII del Horustech.
+
+   * @returns AbastecimientoExtend | null El objeto parseado o null si falla o si es un registro vacío.
+
+   */
+
+  private parseAbastecimientoResponse(asciiResponse: string): AbastecimientoExtend | null {
+
+    const cleanedResponse = asciiResponse.trim();
+
+
+
+    if (cleanedResponse === '>!00020245') {
+
+      this.logger.debug('[AbastecimientoService] Comando 02 RX: No hay abastecimiento para leer.');
+
+      return null;
+
+    }
+
+    if (cleanedResponse === this.EMPTY_RECORD_RESPONSE) {
+
+      this.logger.debug('[AbastecimientoService] Comando 08 RX: Registro vacío encontrado.');
+
+      return null;
+
+    }
+
+
+
+    const regex = new RegExp(
+
+      /^>![0-9A-F]{4}(02|08)(.{6})(.{2})(.{2})(.{2})(.{6})(.{6})(.{4})(.{1})(.{1})(.{1})(.{4})(.{2})(.{2})(.{2})(.{2})(.{2})(.{10})(.{10})(.{16})(.{16})(.{8})([0-9A-F]{2})$/s
+
+    );
+
+
+
+    const match = cleanedResponse.match(regex);
+
+
+
+    if (!match) {
+
+      this.logger.error(`[AbastecimientoService] No se pudo parsear la respuesta de abastecimiento: ${cleanedResponse}`);
+
+      return null;
+
+    }
+
+
+
+    const [
+
+      ,
+
+      commandIndexStr,
+
+      recordIndexStr,
+
+      nozzleStr,
+
+      fuelCodeStr,
+
+      tankNumberStr,
+
+      totalAmountStr,
+
+      totalVolumeStr,
+
+      unitPriceStr,
+
+      decimalPlacesTotalStr,
+
+      decimalPlacesVolumeStr,
+
+      decimalPlacesUnitPriceStr,
+
+      dispensingTimeSecondsStr,
+
+      dayStr,
+
+      monthStr,
+
+      yearStr,
+
+      hourStr,
+
+      minuteStr,
+
+      initialTotalizerStr,
+
+      finalTotalizerStr,
+
+      attendantIdentifierStr,
+
+      clientIdentifierStr,
+
+      currentTankVolumeHexStr,
+
+      receivedChecksum,
+
+    ] = match;
+
+
+
+    const expectedChecksum = this.checksum(cleanedResponse.substring(1, cleanedResponse.length - 2));
+
+    const checksumValid = expectedChecksum === receivedChecksum;
+
+    if (!checksumValid) {
+
+      this.logger.warn(`[AbastecimientoService] Checksum inválido para la respuesta: ${cleanedResponse}. Esperado: ${expectedChecksum}, Recibido: ${receivedChecksum}`);
+
+    }
+
+
+
+    try {
+
+      const commandIndex = parseInt(commandIndexStr, 10);
+
+      const recordIndex = parseInt(recordIndexStr, 10);
+
+      const nozzle = parseInt(nozzleStr, 10);
+
+      const fuelCode = parseInt(fuelCodeStr, 10);
+
+      const tankNumber = parseInt(tankNumberStr, 10);
+
+
+
+      const decimalPlacesTotal = parseInt(decimalPlacesTotalStr, 10);
+
+      const decimalPlacesVolume = parseInt(decimalPlacesVolumeStr, 10);
+
+      const decimalPlacesUnitPrice = parseInt(decimalPlacesUnitPriceStr, 10);
+
+
+
+      const dispensingTimeSeconds = parseInt(dispensingTimeSecondsStr, 10);
+
+
+
+      const day = parseInt(dayStr, 10);
+
+      const month = parseInt(monthStr, 10) - 1; // Meses en JavaScript son 0-11
+
+      const year = 2000 + parseInt(yearStr, 10); // Asume años 20xx
+
+      const hour = parseInt(hourStr, 10);
+
+      const minute = parseInt(minuteStr, 10);
+
+      const date = new Date(year, month, day, hour, minute);
+
+
+
+      const currentTankVolume = parseInt(currentTankVolumeHexStr, 16);
+
+
+
+      const abastecimiento: AbastecimientoExtend = {
+
+        commandIndex,
+
+        recordIndex,
+
+        nozzle,
+
+        fuelCode,
+
+        tankNumber,
+
+        totalAmount: totalAmountStr,
+
+        totalVolume: totalVolumeStr,
+
+        unitPrice: unitPriceStr,
+
+        decimalPlacesTotal,
+
+        decimalPlacesVolume,
+
+        decimalPlacesUnitPrice,
+
+        dispensingTimeSeconds,
+
+        date,
+
+        initialTotalizer: initialTotalizerStr,
+
+        finalTotalizer: finalTotalizerStr,
+
+        attendantIdentifier: attendantIdentifierStr,
+
+        clientIdentifier: clientIdentifierStr,
+
+        currentTankVolume,
+
+        rawResponse: cleanedResponse,
+
+        checksumValid,
+
+      };
+
+
+
+      this.logger.log(`[AbastecimientoService] Abastecimiento parseado para índice ${recordIndex} (Comando ${commandIndex}):`, abastecimiento);
+
+      return abastecimiento;
+
+    } catch (e) {
+
+      this.logger.error(`[AbastecimientoService] Error al procesar los datos del abastecimiento (comando ${commandIndexStr}): ${e.message}`, e.stack);
+
+      return null;
+
+    }
+
+  }
+
+
+
+  /**
+
+   * Guarda un abastecimiento parseado en la base de datos.
+
+   * Maneja duplicados por la clave compuesta (id_hrs, fecha_hora).
+
+   * @param data El objeto AbastecimientoExtend parseado.
+
+   * @returns El registro de Despachos creado o null si ya existía y no se pudo recuperar.
+
+   */
+
+  async saveAbastecimiento(data: AbastecimientoExtend): Promise<Despachos | null> {
+
+    try {
+
+      const total_ctvs = BigInt(data.totalAmount);
+
+      const volumen_ml = BigInt(data.totalVolume);
+
+      const precio_cvl = Number(data.unitPrice); // Asegúrate que el tipo en Prisma sea compatible
+
+
+
+      const total_ini = data.initialTotalizer ? BigInt(data.initialTotalizer) : null;
+
+      const total_fin = data.finalTotalizer ? BigInt(data.finalTotalizer) : null;
+
+
+
+      const vol_tanque_ml = data.currentTankVolume !== null && data.currentTankVolume !== undefined
+
+        ? BigInt(data.currentTankVolume)
+
+        : null;
+
+
+
+      const despacho = await this.prisma.despachos.create({
+
+        data: {
+
+          id_hrs: data.recordIndex,
+
+          pico: data.nozzle,
+
+          combustible: data.fuelCode,
+
+          tanque: data.tankNumber,
+
+          total_ctvs: total_ctvs,
+
+          volumen_ml: volumen_ml,
+
+          precio_cvl: precio_cvl,
+
+          dec_total: data.decimalPlacesTotal,
+
+          dec_volumen: data.decimalPlacesVolume,
+
+          dec_precio: data.decimalPlacesUnitPrice,
+
+          tiempo_seg: data.dispensingTimeSeconds,
+
+          fecha_hora: data.date,
+
+          total_ini: total_ini,
+
+          total_fin: total_fin,
+
+          frentistaId: data.attendantIdentifier,
+
+          clienteId: data.clientIdentifier,
+
+          vol_tanque_ml: vol_tanque_ml,
+
+          sync: false,
+
+          proces: false,
+
+        },
+
+      });
+
+      this.logger.log(`Despacho ${despacho.id_hrs} guardado correctamente.`);
+
+      return despacho;
+
+    } catch (error) {
+
+      if (error.code === 'P2002') {
+
+        this.logger.warn(`Despacho con id_hrs ${data.recordIndex} y fecha ${data.date.toISOString()} ya existe. Saltando.`);
+
+        const existingDespacho = await this.prisma.despachos.findUnique({
+
+          where: {
+
+            id_hrs_fecha_hora: {
+
+              id_hrs: data.recordIndex,
+
+              fecha_hora: data.date,
+
+            },
+
+          },
+
+        });
+
+        return existingDespacho;
+
+      }
+
+      this.logger.error(`Error al guardar despacho en BD: ${error.message}`, error.stack);
+
+      throw error;
+
+    }
+
+  }
+
+
+
+  /**
+
+   * Obtiene un registro de abastecimiento por su índice usando el Comando 08.
+
+   * @param recordIndex El índice del registro (NNNNNN, 6 caracteres decimal).
+
+   * @returns Una promesa que resuelve con el objeto AbastecimientoExtend o null si falla o es un registro vacío.
+
+   */
+
+  async readAbastecimientoByIndex(recordIndex: number): Promise<AbastecimientoExtend | null> {
+
+    const cmd = this.buildReadAbastecimientoExtendCmd(recordIndex);
+
+    try {
+
+      const asciiResponse = await this.hrs.exec(cmd);
+
+      return this.parseAbastecimientoResponse(asciiResponse);
+
+    } catch (error) {
+
+      this.logger.error(`[AbastecimientoService] Error al leer abastecimiento del índice ${recordIndex}: ${error.message}`);
+
+      return null;
+
+    }
+
+  }
+
+
+
+  /**
+
+   * Lee el siguiente abastecimiento disponible usando el Comando 02.
+
+   * @returns Una promesa que resuelve con el objeto AbastecimientoExtend o null si no hay más.
+
+   */
+
+  async readNextAbastecimientoSequential(): Promise<AbastecimientoExtend | null> {
+
+    const cmd = this.buildReadAbastecimientoSequentialCmd();
+
+    try {
+
+      const asciiResponse = await this.hrs.exec(cmd);
+
+      return this.parseAbastecimientoResponse(asciiResponse);
+
+    } catch (error) {
+
+      this.logger.error(`[AbastecimientoService] Error al leer siguiente abastecimiento secuencial (Comando 02): ${error.message}`);
+
+      return null;
+
+    }
+
+  }
+
+
+
+  /**
+
+   * Obtiene el estado de los punteros (actual y último registro) usando el Comando 06.
+
+   * @returns { currentPointer: number, lastRecordPointer: number } | null
+
+   */
+
+  async getPointerStatus(): Promise<{ currentPointer: number, lastRecordPointer: number } | null> {
+
+    const cmd = this.buildGetPointerStatusCmd();
+
+    try {
+
+      const asciiResponse = await this.hrs.exec(cmd);
+
+      const cleanedResponse = asciiResponse.trim();
+
+
+
+      const regex = /^>!000E06(\d{6})(\d{6})([0-9A-F]{2})$/; // nnnnnn NNNNNN
+
+      const match = cleanedResponse.match(regex);
+
+
+
+      if (!match) {
+
+        this.logger.error(`[AbastecimientoService] No se pudo parsear el estado del puntero: ${cleanedResponse}`);
+
+        return null;
+
+      }
+
+
+
+      const [, currentPointerStr, lastRecordPointerStr, receivedChecksum] = match;
+
+
+
+      const expectedChecksum = this.checksum(cleanedResponse.substring(1, cleanedResponse.length - 2));
+
+      const checksumValid = expectedChecksum === receivedChecksum;
+
+      if (!checksumValid) {
+
+        this.logger.warn(`[AbastecimientoService] Checksum inválido para estado de puntero: ${cleanedResponse}. Esperado: ${expectedChecksum}, Recibido: ${receivedChecksum}`);
+
+      }
+
+
+
+      const currentPointer = parseInt(currentPointerStr, 10);
+
+      const lastRecordPointer = parseInt(lastRecordPointerStr, 10);
+
+
+
+      this.logger.log(`[AbastecimientoService] Estado de puntero - Actual (nnnnnn): ${currentPointer}, Último Registro (NNNNNN): ${lastRecordPointer}`);
+
+      return { currentPointer, lastRecordPointer };
+
+    } catch (error) {
+
+      this.logger.error(`[AbastecimientoService] Error al obtener estado del puntero (Comando 06): ${error.message}`);
+
+      return null;
+
+    }
+
+  }
+
+
+
+  /**
+
+   * Sincroniza todos los abastecimientos disponibles en la memoria de Horustech
+
+   * desde el índice 0 hasta 9999, e inserta solo los que sean válidos y nuevos en la BD.
+
+   * Se detiene si se encuentran 10 registros vacíos consecutivos.
+
+   * Esta API NUNCA debe afectar el puntero de lectura de Horustech.
+
+   *
+
+   * @returns El número de registros sincronizados.
+
+   */
+
+  async synchronizeHistoricalAbastecimientos(): Promise<number> {
+
+    this.logger.log('[AbastecimientoService] Iniciando sincronización histórica COMPLETA de abastecimientos (desde 0 hasta 9999)...');
+
+    let syncedCount = 0;
+
+    let consecutiveEmptyRecords = 0;
+
+    const MAX_CONSECUTIVE_EMPTY = 10; // Límite de registros vacíos consecutivos para detener el proceso
+
+
+
+    // Iterar desde el índice 0 hasta MAX_HORUSTECH_RECORDS - 1 (es decir, 9999)
+
+    for (let i = 0; i < this.MAX_HORUSTECH_RECORDS; i++) {
+
+      this.logger.debug(`[Histórico Completo] Intentando leer índice ${i} de Horustech (Comando 08)...`);
+
+      let abastecimiento: AbastecimientoExtend | null = null;
+
+      try {
+
+        abastecimiento = await this.readAbastecimientoByIndex(i);
+
+      } catch (error) {
+
+        this.logger.error(`[Histórico Completo] Error de comunicación al leer índice ${i}: ${error.message}. Incrementando contador de vacíos.`);
+
+        consecutiveEmptyRecords++; // Contar como vacío si hay error de comunicación.
+
+        // Podrías añadir un delay aquí para evitar saturar el dispositivo o la red si los errores son rápidos.
+
+        // await new Promise(resolve => setTimeout(resolve, 100)); // Ejemplo: espera 100ms
+
+      }
+
+
+
+      if (abastecimiento) {
+
+        consecutiveEmptyRecords = 0; // Reiniciar contador si se encuentra un registro válido
+
+
+
+        // Verificar si el registro ya existe en la base de datos para evitar duplicados.
+
+        const existingDespacho = await this.prisma.despachos.findUnique({
+
+          where: {
+
+            id_hrs_fecha_hora: { // Acceso a la clave compuesta en Prisma
+
+              id_hrs: abastecimiento.recordIndex,
+
+              fecha_hora: abastecimiento.date,
+
+            },
+
+          },
+
+        });
+
+
+
+        if (!existingDespacho) {
+
+          // Registro válido y no existente en la BD, intentar guardar
+
+          const saved = await this.saveAbastecimiento(abastecimiento);
+
+          if (saved) {
+
+            syncedCount++;
+
+            this.logger.debug(`[Histórico Completo] Registro ${abastecimiento.recordIndex} guardado. Total sincronizados: ${syncedCount}`);
+
+          }
+
+        } else {
+
+          this.logger.debug(`[Histórico Completo] Registro ${abastecimiento.recordIndex} ya existe en la BD. Saltando.`);
+
+        }
+
+      } else {
+
+        // Registro vacío (EMPTY_RECORD_RESPONSE) o error de parsing/comunicación.
+
+        this.logger.debug(`[Histórico Completo] Registro vacío o inválido encontrado en el índice ${i}.`);
+
+        consecutiveEmptyRecords++;
+
+      }
+
+
+
+      // Detener el proceso si se excede el número máximo de registros vacíos consecutivos
+
+      if (consecutiveEmptyRecords >= MAX_CONSECUTIVE_EMPTY) {
+
+        this.logger.log(`[Histórico Completo] Se encontraron ${MAX_CONSECUTIVE_EMPTY} registros vacíos/inválidos consecutivos. Deteniendo sincronización histórica.`);
+
+        break;
+
+      }
+
+    }
+
+
+
+    this.logger.log(`Sincronización histórica COMPLETA finalizada. Se sincronizaron ${syncedCount} registros nuevos.`);
+
+    return syncedCount;
+
+  }
+
+
+
+  /**
+
+   * Sincroniza los abastecimientos pendientes usando la lectura secuencial (Comando 02)
+
+   * y avanzando el puntero de lectura (mediante la propia lectura exitosa del Comando 02).
+
+   * Se detiene si el puntero actual de Horustech es igual al último registro disponible.
+
+   *
+
+   * @returns El número de registros sincronizados.
+
+   */
+
+  async synchronizePendingAbastecimientos(): Promise<number> {
+
+    this.logger.log('[AbastecimientoService] Iniciando sincronización de abastecimientos pendientes...');
+
+    let syncedCount = 0;
+
+    let keepReading = true;
+
+
+
+    while (keepReading) {
+
+      const pointerStatus = await this.getPointerStatus();
+
+      if (!pointerStatus) {
+
+        this.logger.error('No se pudo obtener el estado de los punteros de Horustech. Deteniendo sincronización de pendientes.');
+
+        return syncedCount;
+
+      }
+
+
+
+      const { currentPointer, lastRecordPointer } = pointerStatus;
+
+      this.logger.log(`Puntero Horustech - Actual (nnnnnn): ${currentPointer}, Último Registro (NNNNNN): ${lastRecordPointer}`);
+
+
+
+      if (currentPointer === lastRecordPointer) {
+
+        this.logger.log('Puntero Horustech al día (nnnnnn = NNNNNN). No hay más registros pendientes para leer. Deteniendo sincronización.');
+
+        keepReading = false;
+
+        break;
+
+      }
+
+
+
+      this.logger.debug('Intentando leer siguiente abastecimiento secuencial (Comando 02)...');
+
+      const abastecimiento = await this.readNextAbastecimientoSequential();
+
+
+
+      if (abastecimiento) {
+
+        const saved = await this.saveAbastecimiento(abastecimiento);
+
+        if (saved) {
+
+          syncedCount++;
+
+          this.logger.debug(`Abastecimiento ${abastecimiento.recordIndex} leído y guardado. Puntero Horustech avanzado automáticamente.`);
+
+        } else {
+
+          this.logger.warn(`Abastecimiento ${abastecimiento.recordIndex} ya existe o no se pudo guardar. Puntero Horustech avanzado automáticamente.`);
+
+        }
+
+      } else {
+
+        this.logger.log('No hay más abastecimientos pendientes para leer con el Comando 02 (respuesta de registro vacío). Deteniendo sincronización.');
+
+        keepReading = false;
+
+      }
+
+    }
+
+
+
+    this.logger.log(`Sincronización de pendientes completada. Se sincronizaron ${syncedCount} registros.`);
+
+    return syncedCount;
+
+  }
+
+
+
+  /**
+
+   * Inserta un registro de abastecimiento específico por su índice en la base de datos.
+
+   * @param recordIndex El índice del registro (NNNNNN, 6 caracteres decimal).
+
+   * @returns El registro de Despachos creado o null si falla.
+
+   */
+
+  async insertAbastecimientoByIndex(recordIndex: number): Promise<Despachos | null> {
+
+    this.logger.log(`[AbastecimientoService] Intentando insertar abastecimiento del índice ${recordIndex} en la BD.`);
+
+    const abastecimiento = await this.readAbastecimientoByIndex(recordIndex);
+
+    if (abastecimiento) {
+
+      return await this.saveAbastecimiento(abastecimiento);
+
+    } else {
+
+      this.logger.warn(`No se pudo leer abastecimiento del índice ${recordIndex} de Horustech para insertar (posiblemente vacío o error de comunicación).`);
+
+      return null;
+
+    }
+
+  }
+
+
+
+  /**
+
+   * Obtiene la última carga de un pico específico después de sincronizar pendientes.
+
+   * @param pico El número de pico a consultar.
+
+   * @returns El último despacho para ese pico o null.
+
+   */
+
+  async getUltimaCargaByPico(pico: number): Promise<Despachos | null> {
+
+    this.logger.log(`Solicitando la última carga para el pico: ${pico}.`);
+
+
+
+    await this.synchronizePendingAbastecimientos();
+
+
+
+    const ultimaCarga = await this.prisma.despachos.findFirst({
+
+      where: {
+
+        pico: pico,
+
+      },
+
+      orderBy: {
+
+        fecha_hora: 'desc',
+
+      },
+
+    });
+
+
+
+    if (ultimaCarga) {
+
+      this.logger.log(`Última carga para el pico ${pico} encontrada: ${ultimaCarga.id_hrs} en ${ultimaCarga.fecha_hora}`);
+
+    } else {
+
+      this.logger.warn(`No se encontró ninguna carga para el pico ${pico} en la base de datos.`);
+
+    }
+
+
+
+    return ultimaCarga;
+
+  }
+
+
+
+  /**
+
+   * [Método de ejemplo] Obtiene los últimos X abastecimientos extendidos.
+
+   * @param startIndex El índice desde donde empezar a buscar.
+
+   * @param count La cantidad de registros a obtener.
+
+   * @returns Un array de AbastecimientoExtend.
+
+   */
+
+  async getLatestAbastecimientosExtend(startIndex: number, count: number): Promise<AbastecimientoExtend[]> {
+
+    const records: AbastecimientoExtend[] = [];
+
+    for (let i = 0; i < count; i++) {
+
+      const recordIndex = startIndex + i;
+
+      if (recordIndex >= this.MAX_HORUSTECH_RECORDS) {
+
+        this.logger.warn(`El índice ${recordIndex} excede el tamaño máximo de registros de Horustech. Deteniendo la lectura.`);
+
+        break;
+
+      }
+
+      const abastecimiento = await this.readAbastecimientoByIndex(recordIndex);
+
+      if (abastecimiento) {
+
+        records.push(abastecimiento);
+
+      } else {
+
+        this.logger.warn(`No se pudo obtener el abastecimiento para el índice ${recordIndex}.`);
+
+        break;
+
+      }
+
+    }
+
+    return records;
+
+  }
+
+}
+
+
+# --- src\backend\auth\auth.service.ts ---
+
+import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcrypt';
+import { PrismaService } from '../../prisma/prisma.service';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) { }
+
+  async validateUser(cedula: number, clave: string) {
+    const user = await this.prisma.usuariosApp.findUnique({
+      where: { cedula },
+      include: { Personas: true },
+    });
+
+    // 🟡 Mensaje más específico y legible
+    if (!user) {
+      throw new NotFoundException('Cédula no registrada');
+    }
+
+    const claveValida = await bcrypt.compare(clave, user.clave);
+    if (!claveValida) {
+      throw new UnauthorizedException('La contraseña es incorrecta');
+    }
+
+    return user;
+  }
+
+
+  async login(cedula: number, clave: string) {
+    const user = await this.validateUser(cedula, clave);
+
+    const payload = {
+      sub: user.cedula,
+      nombre: user.Personas.nombre_apellido,
+      tipo: 'app', // 👈 AÑADIR
+    };
+
+    return {
+      message: 'Login exitoso',
+      token: this.jwtService.sign(payload),
+      name: user.Personas.nombre_apellido, // 👈 Añadir el nombre aquí
+    };
+  }
+
+}
+
+
+# --- src\backend\autorizar\autorizar.service.ts ---
+
+import { Injectable, Logger } from '@nestjs/common';
+import { HrsService } from '../horustech/hrs.service';
+import { StatusService } from '../status/status.service';
+import { AbastecimientoService } from '../abastecimiento/abastecimiento.service';
+import { PrismaService } from '../../prisma/prisma.service'; // Importa PrismaService
+import * as path from 'path';
+import { readFile } from 'fs/promises';
+
+@Injectable()
+export class AutorizarService {
+    private readonly logger = new Logger(AutorizarService.name);
+    constructor(private hrs: HrsService,
+        private abastecimientoService: AbastecimientoService,
+        private prisma: PrismaService, // Inyecta PrismaService
+        private status: StatusService) { }
+
+    /* ---------- helpers ---------- */
+    private checksum(body: string) {
+        return ([...body].reduce((s, c) => s + c.charCodeAt(0), 0) & 0xff)
+            .toString(16)
+            .toUpperCase()
+            .padStart(2, '0');
+    }
+
+    private buildCmd(pico: number, modo: number) {
+        const data = `13${String(pico).padStart(2, '0')}${String(modo).padStart(2, '0')}`; // 13BBMM
+        const body = `?0006${data}`;            // ? + len + data
+        return Buffer.from(`>${body}${this.checksum(body)}`, 'ascii');
+    }
+
+    /**
+     * Envía el comando de autorización.
+     * @param pico  Número de pico (1-99)
+     * @param modo  01 = libre permanente, 02 = un solo abastecimiento, 03 = bloqueo, etc.
+     */
+    // async autorizar(pico: number) {
+    //     let idUltimaCarga: number | null = null;
+    //     const ultimaCargaHorustech =
+    //         await this.abastecimientoService.getUltimaCargaByPico(pico);
+
+    //     if (ultimaCargaHorustech) {
+    //         // El 'total_litros' de la última carga de Horustech debería ser el volumen despachado.
+    //         // Asegúrate que tu interfaz AbastecimientoExtend y el parseo manejen esto correctamente.
+    //         // En AbastecimientoExtend tenemos 'totalVolume' como string, se debería convertir a number.
+    //         //volumenDespachado = parseFloat(ultimaCargaHorustech.volumen_ml);
+    //         // 1. Convierte el bigint a un número directamente
+    //         //const idUltimaCarga: number = Number(ultimaCargaHorustech.id);
+    //         idUltimaCarga = Number(ultimaCargaHorustech.id);
+    //         //volumenDespachado = parseFloat((volumenDespachadoEnML / 100).toFixed(2));
+
+    //         this.logger.log(
+    //             `Ultima carga id: ${idUltimaCarga} desde base de datos para pico ${pico}`,
+    //         );
+    //     } else {
+    //         // Si no se encontró en Horustech para ese pico específico, consultar la tabla Despachos.
+    //         this.logger.warn(
+    //             `No se encontró la última carga de Horustech para el pico ${pico}. Consultando la tabla Despachos...`,
+    //         );
+    //         idUltimaCarga = 0; // Asignar un valor por defecto si no se encuentra
+    //     }
+
+    //     const ascii = await this.hrs.exec(this.buildCmd(pico, 2));
+    //     // respuesta típica: >!00041300A9  (OK)
+    //     if (!ascii.startsWith('>!00041300')) {
+    //         throw new Error(`Respuesta inesperada: ${ascii}`);
+    //     }
+
+    //     console.log(`⏳ Esperando 2 segundos antes de verificar el estado del pico ${pico}...`);
+
+    //     // Esperar 2 segundos de forma bloqueante
+    //     await new Promise(resolve => setTimeout(resolve, 1500));
+
+    //     let estado = '';
+    //     let intentos = 0;
+
+    //     while (estado !== 'A' && estado !== 'B') {
+
+    //         const res = await this.status.getNozzleState(pico);
+    //         estado = res.estado;
+    //         console.log('RES:', res);
+
+    //         // Log de cada intento
+    //         console.log(`🔁 Intento ${++intentos}: estado actual del pico ${pico} => ${estado}`);
+
+    //         // (opcional) evitar bucle ajustado
+    //         await new Promise(resolve => setTimeout(resolve, 750)); // espera 0.8s entre intentos
+    //     }
+
+    //     if (estado === 'A') {
+    //         return { pico, idUltimaCarga, respuesta: 'Cargando' };
+    //     } else if (estado === 'B') {
+    //         return { pico, idUltimaCarga, respuesta: 'NoCargo' };
+    //     } else {
+    //         throw new Error(`Estado no reconocido: ${estado}`);
+    //     }
+    //     // Actualiza el estado del pico
+    //     //
+    //     //return { pico, modo, respuesta: 'OK' };
+    // }
+
+    //AUTORIZAR TEST 
+    async autorizar(pico: number): Promise<any> {
+        const filePath = path.resolve(__dirname, '../test/autorizar.json');
+        let jsonData: any = null;
+
+        while (!jsonData) {
+            try {
+                const fileContent = await readFile(filePath, 'utf8');
+
+                if (fileContent.trim().length > 0) {
+                    const parsed = JSON.parse(fileContent);
+                    if (Object.keys(parsed).length > 0) {
+                        console.log('✅ Archivo con contenido:', parsed);
+                        jsonData = parsed;
+                    } else {
+                        console.log('⏳ Archivo JSON está vacío. Reintentando...');
+                    }
+                } else {
+                    console.log('⏳ Archivo está vacío. Reintentando...');
+                }
+            } catch (err) {
+                console.error('⚠️ Error al leer el archivo (quizás aún no existe):', err.message);
+            }
+
+            if (!jsonData) {
+                await new Promise(resolve => setTimeout(resolve, 3000)); // espera 3 segundos
+            }
+        }
+
+        return jsonData;
+    }
+
+}
+
+
+# --- src\backend\bodega\bodega.service.ts ---
+
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CreateBodegaDto } from './dto/create-bodega.dto';
+import { UpdateBodegaDto } from './dto/update-bodega.dto';
+
+@Injectable()
+export class BodegaService {
+  constructor(private prisma: PrismaService) { }
+
+  async create(data: CreateBodegaDto) {
+    const { id_bodega, descripcion_bodega, id_sucursal } = data;
+
+    // (Opcional) Verificar que la sucursal exista
+    const sucursal = await this.prisma.sucursales.findUnique({
+      where: { id_sucursal },
+    });
+
+    if (!sucursal) {
+      throw new NotFoundException(`Sucursal con ID ${id_sucursal} no encontrada, es necesario que sucursal exista para crear la bodega`);
+    }
+
+    const nuevaBodega = await this.prisma.bodegas.create({
+      data: {
+        id_bodega,
+        descripcion_bodega,
+        id_sucursal,
+      },
+      include: {
+        Sucursales: {
+          select: {
+            descripcion_sucursal: true,
+          },
+        },
+      },
+    });
+
+    return {
+      message: `Bodega creada correctamente`
+    };
+  }
+
+  async findAll() {
+    const bodegas = await this.prisma.bodegas.findMany({
+      where: {
+        trapaso: false, // ← filtro para que solo devuelva las bodegas fijas
+        Tanques: {
+          some: {}, // Esto asegura que solo se incluyan bodegas que tienen al menos un tanque
+        },
+      },
+      include: {
+        Sucursales: {
+          select: {
+            id_sucursal: true,
+            descripcion_sucursal: true,
+          },
+        },
+      },
+    });
+
+    // Agrupar por sucursal
+    const agrupado = bodegas.reduce((acc, bodega) => {
+      const idSucursal = bodega.id_sucursal;
+      const descripcionSucursal = bodega.Sucursales.descripcion_sucursal;
+
+      if (!acc[idSucursal]) {
+        acc[idSucursal] = {
+          id_sucursal: idSucursal,
+          descripcion_sucursal: descripcionSucursal,
+          totalBodegas: 0,
+          bodegas: [],
+        };
+      }
+
+      acc[idSucursal].bodegas.push({
+        id_bodega: bodega.id_bodega,
+        descripcion_bodega: bodega.descripcion_bodega,
+      });
+
+      acc[idSucursal].totalBodegas++;
+
+      return acc;
+    }, {} as Record<number, any>);
+
+    return Object.values(agrupado);
+  }
+
+  async findBodegasFijasPorSucursal(id_sucursal: number) {
+    const bodegas = await this.prisma.bodegas.findMany({
+      where: {
+        trapaso: false,
+        id_sucursal: id_sucursal,
+        Tanques: {
+          some: {}, // solo bodegas con al menos un tanque
+        },
+      },
+      include: {
+        Sucursales: {
+          select: {
+            descripcion_sucursal: true,
+          },
+        },
+      },
+    });
+
+    if (bodegas.length === 0) {
+      return {
+        id_sucursal,
+        descripcion_sucursal: null,
+        totalBodegas: 0,
+        bodegas: [],
+      };
+    }
+
+    const descripcionSucursal = bodegas[0].Sucursales.descripcion_sucursal;
+
+    return {
+      id_sucursal,
+      descripcion_sucursal: descripcionSucursal,
+      totalBodegas: bodegas.length,
+      bodegas: bodegas.map(b => ({
+        id_bodega: b.id_bodega,
+        descripcion_bodega: b.descripcion_bodega,
+      })),
+    };
+  }
+
+  async findBodegasTraspasoPorSucursal(id_sucursal: number) {
+    const bodegas = await this.prisma.bodegas.findMany({
+      where: {
+        trapaso: true,
+        id_sucursal: id_sucursal,
+      },
+      include: {
+        Sucursales: {
+          select: {
+            descripcion_sucursal: true,
+          },
+        },
+      },
+    });
+
+    if (bodegas.length === 0) {
+      return {
+        id_sucursal,
+        totalBodegasMoviles: 0,
+        bodegas: [],
+      };
+    }
+
+    //const descripcionSucursal = bodegas[0].Sucursales.descripcion_sucursal;
+
+    return {
+      id_sucursal,
+      totalBodegasMoviles: bodegas.length,
+      bodegas: bodegas.map((b) => ({
+        id_bodega: b.id_bodega,
+        descripcion_bodega: b.descripcion_bodega,
+      })),
+    };
+  }
+
+  async findOne(id_bodega: number) {
+    const bodega = await this.prisma.bodegas.findUnique({
+      where: { id_bodega },
+      select: {
+        id_bodega: true,
+        descripcion_bodega: true,
+      },
+    });
+
+    if (!bodega) {
+      throw new NotFoundException(`No se encontró una bodega con ID ${id_bodega}`);
+    }
+
+    return bodega;
+  }
+
+  async update(id_bodega: number, data: UpdateBodegaDto) {
+    const existe = await this.prisma.bodegas.findUnique({ where: { id_bodega: id_bodega } });
+
+    if (!existe) {
+      throw new NotFoundException(`No existe la bodega con ID ${id_bodega}`);
+    }
+
+    // Si se cambia el id_sucursal, validamos que exista
+    if (data.id_sucursal) {
+      const sucursal = await this.prisma.sucursales.findUnique({
+        where: { id_sucursal: data.id_sucursal },
+      });
+
+      if (!sucursal) {
+        throw new NotFoundException(`Sucursal con ID ${data.id_sucursal} no encontrada`);
+      }
+    }
+
+    const updated = await this.prisma.bodegas.update({
+      where: { id_bodega: id_bodega },
+      data,
+      include: {
+        Sucursales: {
+          select: { descripcion_sucursal: true },
+        },
+      },
+    });
+
+    return {
+      message: 'Bodega actualizada correctamente',
+    };
+  }
+
+
+  // remove(id: number) {
+  //   return `This action removes a #${id} bodega`;
+  // }
+}
+
+
+# --- src\backend\calibracion\calibracion.service.ts ---
+
+import { Injectable, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CreateCalibracionDto } from './dto/create-calibracion.dto';
+//import { UpdateCalibracionDto } from './dto/update-calibracion.dto';
+
+@Injectable()
+export class CalibracionService {
+  constructor(private prisma: PrismaService) { }
+
+  async crearCalibracion(dto: CreateCalibracionDto) {
+    const fechaCompleta = new Date(dto.json.fecha_hora);
+    const [hh, mm, ss] = dto.json.hora.split(':').map(Number);
+    const hora = new Date(fechaCompleta);
+    hora.setHours(hh, mm, ss, 0);
+
+    const {
+      bodega,
+      pico,
+      tipo_operacion,
+      nro_precinto_retirado,
+      nro_precinto_colocado,
+      foto_precinto_retirado,
+      foto_precinto_colocado,
+    } = dto.json;
+
+    // Validación entidades relacionadas
+    const [bodegaData, picoData] = await Promise.all([
+      this.prisma.bodegas.findUnique({ where: { id_bodega: bodega } }),
+      this.prisma.picos.findUnique({ where: { id_pico: pico } }),
+    ]);
+
+    if (!bodegaData) throw new BadRequestException(`Bodega ID ${bodega} no existe`);
+    if (!picoData) throw new BadRequestException(`Pico ID ${pico} no existe`);
+
+    // Validación condicional si es CALIBRACION
+    if (tipo_operacion === 'CALIBRACION') {
+      if (!nro_precinto_retirado?.trim())
+        throw new BadRequestException('Número de precinto retirado es requerido en calibración');
+      if (!nro_precinto_colocado?.trim())
+        throw new BadRequestException('Número de precinto colocado es requerido en calibración');
+      if (!foto_precinto_retirado?.trim())
+        throw new BadRequestException('Foto de precinto retirado es requerida en calibración');
+      if (!foto_precinto_colocado?.trim())
+        throw new BadRequestException('Foto de precinto colocado es requerida en calibración');
+    }
+
+    const jsonCalibracion = {
+      ...dto.json,
+      obs_gral: dto.json.obs_gral || '',
+      nro_precinto_retirado: nro_precinto_retirado || '',
+      nro_precinto_colocado: nro_precinto_colocado || '',
+      foto_precinto_retirado: foto_precinto_retirado || '',
+      foto_precinto_colocado: foto_precinto_colocado || '',
+    };
+
+    await this.prisma.calibraciones.create({
+      data: {
+        tipo: 'CALIBRACION',
+        json: JSON.stringify(jsonCalibracion),
+        fecha: fechaCompleta,
+        hora,
+        sync: 0,
+      },
+    });
+
+    return {
+      message: 'Calibración registrada correctamente',
+    };
+  }
+
+}
+
+
+# --- src\backend\cliente\cliente.service.ts ---
+
+import { Injectable, ConflictException } from '@nestjs/common';
+import { CreateClienteDto } from './dto/create-cliente.dto';
+import { UpdateClienteDto } from './dto/update-cliente.dto';
+import { PrismaService } from '../../prisma/prisma.service';
+
+@Injectable()
+export class ClienteService {
+  constructor(private readonly prisma: PrismaService) { }
+
+  async create(data: CreateClienteDto) {
+    const existente = await this.findOne(data.ruc);
+
+    if (existente) {
+      throw new ConflictException(`El cliente con RUC ${data.ruc} ya existe.`);
+    }
+
+    const cliente = await this.prisma.clientes.create({
+      data: {
+        ...data,
+        timestamp: data.timestamp ? BigInt(data.timestamp) : BigInt(Date.now()),
+        sync: data.sync ?? 0,
+      },
+    });
+
+    return {
+      ...cliente,
+      timestamp: Number(cliente.timestamp),
+    };
+  }
+
+
+  async findAll() {
+    const clientes = await this.prisma.clientes.findMany({
+      orderBy: {
+        descripcion_cliente: 'asc', // 👈 orden alfabético A–Z
+      },
+    });
+
+    return clientes.map(cliente => ({
+      ...cliente,
+      timestamp: cliente.timestamp ? Number(cliente.timestamp) : null,
+    }));
+  }
+
+  async findAllNew(query: { filter?: string; page?: number; limit?: number }) {
+    const page = query.page ?? 1;
+
+    // Aplica límite máximo de 20
+    const rawLimit = query.limit ?? 15;
+    const limit = rawLimit > 20 ? 20 : rawLimit;
+    const offset = (page - 1) * limit;
+
+    const filter = query.filter?.trim() ?? '';
+
+    let whereSql = '';
+    const params: string[] = [];
+
+    if (filter) {
+      const esNumero = /^\d+$/.test(filter);
+      const likeParam = `%${filter}%`;
+
+      if (esNumero) {
+        whereSql = `WHERE CAST(c.ruc AS CHAR) LIKE ?`;
+        params.push(likeParam);
+      } else {
+        whereSql = `WHERE UPPER(c.descripcion_cliente) LIKE ?`;
+        params.push(likeParam.toUpperCase());
+      }
+    }
+
+    // Consulta principal paginada
+    const data: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT c.ruc, c.descripcion_cliente, c.timestamp
+     FROM Clientes c
+     ${whereSql}
+     ORDER BY c.descripcion_cliente ASC
+     LIMIT ${limit} OFFSET ${offset}`,
+      ...params
+    );
+
+    // Total de registros para paginación
+    const totalResult: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT COUNT(*) AS total
+     FROM Clientes c
+     ${whereSql}`,
+      ...params
+    );
+
+    return {
+      total: totalResult[0]?.total ?? 0,
+      page,
+      limit,
+      clientes: data.map(c => ({
+        ruc: c.ruc,
+        descripcion_cliente: c.descripcion_cliente,
+        timestamp: c.timestamp ? Number(c.timestamp) : null,
+      })),
+    };
+  }
+
+
+
+
+  async findOne(ruc: string) {
+    const cliente = await this.prisma.clientes.findUnique({
+      where: { ruc },
+    });
+
+    if (!cliente) return null;
+
+    return {
+      ...cliente,
+      timestamp: cliente.timestamp ? Number(cliente.timestamp) : null,
+    };
+  }
+
+
+  async update(ruc: string, data: UpdateClienteDto) {
+    const updated = await this.prisma.clientes.update({
+      where: { ruc },
+      data: {
+        ...data,
+        ...(data.timestamp !== undefined && { timestamp: BigInt(data.timestamp) }),
+      },
+    });
+
+    return {
+      ...updated,
+      timestamp: updated.timestamp ? Number(updated.timestamp) : null,
+    };
+  }
+
+
+  // remove(ruc: string) {
+  //   return this.prisma.clientes.delete({
+  //     where: { ruc },
+  //   });
+  // }
+}
+
+
+# --- src\backend\persona\persona.service.ts ---
+
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { CreatePersonaDto } from './dto/create-persona.dto';
+import { UpdatePersonaDto } from './dto/update-persona.dto';
+import { PrismaService } from '../../prisma/prisma.service';
+
+@Injectable()
+export class PersonaService {
+  constructor(private prisma: PrismaService) { }
+
+  async create(data: CreatePersonaDto) {
+    const existente = await this.prisma.personas.findUnique({
+      where: { cedula: data.cedula },
+    });
+
+    if (existente) {
+      throw new ConflictException();
+
+    }
+
+    const persona = await this.prisma.personas.create({
+      data: {
+        cedula: data.cedula,
+        nombre_apellido: data.nombre_apellido,
+        timestamp: data.timestamp ? BigInt(data.timestamp) : BigInt(Date.now()),
+        sync: 0,
+      },
+    });
+
+    return {
+      ...persona,
+      timestamp: persona.timestamp ? Number(persona.timestamp) : null,
+    };
+  }
+ 
+  async findAll() {
+    const personas = await this.prisma.personas.findMany({
+      orderBy: {
+        nombre_apellido: 'asc', // 👈 Ordena de forma ascendente (A–Z)
+      },
+      select: {
+        cedula: true,
+        nombre_apellido: true,
+        timestamp: true,
+        UsuariosApp: {
+          select: {
+            cedula: true,
+          },
+        },
+      },
+    });
+
+    return personas.map(p => ({
+      ...p,
+      timestamp: p.timestamp ? Number(p.timestamp) : null,
+    }));
+  }
+
+  async findOne(cedula: number) {
+    const persona = await this.prisma.personas.findUnique({
+      where: { cedula },
+      select: {
+        cedula: true,
+        nombre_apellido: true,
+        timestamp: true,
+        UsuariosApp: {
+          select: {
+            cedula: true
+            // No incluyas 'clave' aquí
+          },
+        },
+      },
+    });
+    if (!persona) throw new NotFoundException('Persona no encontrada');
+    return persona;
+  }
+
+  async update(cedula: number, data: UpdatePersonaDto) {
+    await this.findOne(cedula); // Valida existencia
+
+    // 🔒 Excluir manualmente la cédula del objeto de actualización
+    //const { cedula: _, sync: __, ...resto } = data;
+
+    const updateData = {
+      ...data,
+      timestamp: data.timestamp !== undefined ? BigInt(data.timestamp) : undefined,
+    };
+
+    const updated = await this.prisma.personas.update({
+      where: { cedula },
+      data: updateData,
+    });
+
+    return {
+      ...updated,
+      timestamp: updated.timestamp ? Number(updated.timestamp) : null,
+    };
+  }
+
+  async findAllNew(query: { filter?: string; page?: number; limit?: number }) {
+    const page = query.page ?? 1;
+
+    // Aplica regla de máximo 20
+    const rawLimit = query.limit ?? 15;
+    const limit = rawLimit > 20 ? 20 : rawLimit;
+
+    const offset = (page - 1) * limit;
+    const filter = query.filter?.trim() ?? '';
+
+    let whereSql = '';
+    let params: string[] = [];
+
+    if (filter) {
+      const esNumero = /^\d+$/.test(filter);
+      const likeParam = `%${filter}%`;
+
+      if (esNumero) {
+        whereSql = `WHERE CAST(p.cedula AS CHAR) LIKE ?`;
+        params.push(likeParam);
+      } else {
+        whereSql = `WHERE p.nombre_apellido LIKE ?`;
+        params.push(likeParam.toUpperCase());
+      }
+    }
+
+    const data: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT p.cedula, p.nombre_apellido, p.timestamp, u.cedula AS usuario_cedula
+    FROM Personas p
+    LEFT JOIN UsuariosApp u ON u.cedula = p.cedula
+    ${whereSql}
+    ORDER BY p.nombre_apellido
+    LIMIT ${limit} OFFSET ${offset}`,
+      ...params
+    );
+
+    const totalResult: any[] = await this.prisma.$queryRawUnsafe(
+      `SELECT COUNT(*) as total
+    FROM Personas p
+    LEFT JOIN UsuariosApp u ON u.cedula = p.cedula
+    ${whereSql}`,
+      ...params
+    );
+
+    return {
+      total: totalResult[0]?.total ?? 0,
+      page,
+      limit,
+      personas: data.map(p => ({
+        cedula: p.cedula,
+        nombre_apellido: p.nombre_apellido,
+        timestamp: p.timestamp,
+        UsuariosApp: p.usuario_cedula ? { cedula: p.usuario_cedula } : null,
+      })),
+    };
+  }
+
+
+
+
+
+}
+
+
+# --- src\backend\pico\pico.service.ts ---
+
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CreatePicoDto } from './dto/create-pico.dto';
+import { UpdatePicoDto } from './dto/update-pico.dto';
+
+@Injectable()
+export class PicoService {
+  constructor(private prisma: PrismaService) { }
+
+  async create(dto: CreatePicoDto) {
+    const bodega = await this.prisma.bodegas.findUnique({
+      where: { id_bodega: dto.id_bodega },
+    });
+
+    if (!bodega) {
+      throw new NotFoundException(
+        `La bodega con ID ${dto.id_bodega} no existe en la tabla bodegas`,
+      );
+    }
+
+    const nuevoPico = await this.prisma.picos.create({
+      data: {
+        id_pico: dto.id_pico,
+        descripcion_pico: dto.descripcion_pico,
+        id_bodega: dto.id_bodega,
+        id_pico_surtidor: dto.id_pico_surtidor,
+      },
+    });
+
+    return {
+      message: 'Pico creado correctamente',
+    };
+  }
+
+  async findBySucursal(id_sucursal: number) {
+    const bodegas = await this.prisma.bodegas.findMany({
+      where: { id_sucursal },
+      include: { Picos: true },
+    });
+
+    if (bodegas.length === 0) {
+      throw new NotFoundException(`No se encontraron picos para la sucursal con ID ${id_sucursal}`);
+    }
+
+    const picosList = bodegas.flatMap(bodega => bodega.Picos);
+
+    return {
+      id_sucursal,
+      totalPicos: picosList.length,
+      picos: picosList.map(p => ({
+        id_pico: p.id_pico,
+        id_pico_surtidor: p.id_pico_surtidor,
+        id_bodega: p.id_bodega,
+        descripcion_pico: p.descripcion_pico,
+      })),
+    };
+  }
+
+  async findAll(id_bodega?: number) {
+    const picos = await this.prisma.picos.findMany({
+      where: id_bodega ? { id_bodega } : undefined,
+      include: { Bodegas: true },
+    });
+
+    if (id_bodega && picos.length > 0) {
+      const { Bodegas } = picos[0]; // todos los picos tienen la misma bodega si se filtra por id_bodega
+
+      const picoList = picos.map(p => ({
+        id_pico: p.id_pico,
+        id_pico_surtidor: p.id_pico_surtidor,
+        descripcion_pico: p.descripcion_pico,
+      }));
+
+      return {
+        id_bodega: Bodegas.id_bodega,
+        descripcion_bodega: Bodegas.descripcion_bodega,
+        id_sucursal: Bodegas.id_sucursal,
+        totalPicos: picoList.length,
+        picos: picoList,
+      };
+    }
+
+    return {
+      message: 'No se encontraron picos para la bodega especificada',
+      totalPicos: 0,
+      picos: [],
+    };
+  }
+
+
+  async findOne(id: number) {
+    const pico = await this.prisma.picos.findUnique({
+      where: { id_pico: id },
+      include: { Bodegas: true },
+    });
+
+    if (!pico) {
+      throw new NotFoundException(`No se encontró el pico con ID ${id}`);
+    }
+
+    return {
+      data: pico,
+    };
+  }
+
+  async update(id: number, dto: UpdatePicoDto) {
+    const picoExistente = await this.prisma.picos.findUnique({
+      where: { id_pico: id },
+    });
+
+    if (!picoExistente) {
+      throw new NotFoundException(`No se puede actualizar. Pico ID ${id} no existe`);
+    }
+
+    const actualizado = await this.prisma.picos.update({
+      where: { id_pico: id },
+      data: dto,
+    });
+
+    return {
+      message: `Pico actualizado correctamente`,
+    };
+  }
+
+  // remove(id: number) {
+  //   return `This action removes a #${id} pico`;
+  // }
+}
+
+
+# --- src\backend\db\prisma-compat.ts ---
+
+// src/backend/db/prisma-compat.ts
+import { db } from "./client";
+import * as schema from "./schema";
+import { eq, and, like, or, asc, desc } from "drizzle-orm";
+
+// Mapeo de nombre Prisma → tabla Drizzle
+const tableMap = {
+  sucursales:   schema.sucursales,
+  bodegas:      schema.bodegas,
+  usuariosApp:  schema.usuariosApp,
+  picos:        schema.picos,
+  vehiculos:    schema.vehiculos,
+  clientes:     schema.clientes,
+  turnos:       schema.turnos,
+  tickets:      schema.tickets,
+  trapasos:     schema.trapasos,
+  calibraciones: schema.calibraciones,
+  abastecimientos: schema.abastecimientos,
+  despachos:    schema.despachos,
+  personas:     schema.personas,
+  syncs:        schema.syncs,
+  usuariosAdmin: schema.usuariosAdmin,
+} as const;
+
+type TableName = keyof typeof tableMap;
+
+// Construye la condición WHERE a partir del objeto { campo: valor } de Prisma
+function buildWhere(table: any, where: Record<string, any>) {
+  const conditions = Object.entries(where).map(([col, val]) => {
+    const tableCol = table[col];
+    if (!tableCol) throw new Error(`Columna '${col}' no existe en la tabla`);
+    return eq(tableCol, val);
+  });
+  return conditions.length === 1 ? conditions[0] : and(...conditions);
+}
+
+// Construye ORDER BY a partir de { campo: 'asc' | 'desc' }
+function buildOrderBy(table: any, orderBy: Record<string, string>) {
+  return Object.entries(orderBy).map(([col, dir]) =>
+    dir === "desc" ? desc(table[col]) : asc(table[col])
+  );
+}
+
+function makeTableProxy(tableName: TableName) {
+  const table = tableMap[tableName] as any;
+
+  return {
+    async findUnique({ where, select }: { where: Record<string, any>; select?: any }) {
+      const result = await db.select().from(table).where(buildWhere(table, where)).limit(1);
+      return result[0] ?? null;
+    },
+
+    async findFirst({ where, select, orderBy }: { where?: Record<string, any>; select?: any; orderBy?: any }) {
+      let q = db.select().from(table) as any;
+      if (where) q = q.where(buildWhere(table, where));
+      if (orderBy) q = q.orderBy(...buildOrderBy(table, orderBy));
+      const result = await q.limit(1);
+      return result[0] ?? null;
+    },
+
+    async findMany({ where, select, orderBy, take, skip }: {
+      where?: Record<string, any>;
+      select?: any;
+      orderBy?: Record<string, string>;
+      take?: number;
+      skip?: number;
+    } = {}) {
+      let q = db.select().from(table) as any;
+      if (where) q = q.where(buildWhere(table, where));
+      if (orderBy) q = q.orderBy(...buildOrderBy(table, orderBy));
+      if (take)   q = q.limit(take);
+      if (skip)   q = q.offset(skip);
+      return q;
+    },
+
+    async create({ data }: { data: Record<string, any> }) {
+      const result = await db.insert(table).values(data).returning();
+      return result[0];
+    },
+
+    async update({ where, data }: { where: Record<string, any>; data: Record<string, any> }) {
+      const result = await db.update(table).set(data).where(buildWhere(table, where)).returning();
+      return result[0];
+    },
+
+    async upsert({ where, create, update }: {
+      where: Record<string, any>;
+      create: Record<string, any>;
+      update: Record<string, any>;
+    }) {
+      const existing = await db.select().from(table).where(buildWhere(table, where)).limit(1);
+      if (existing[0]) {
+        const result = await db.update(table).set(update).where(buildWhere(table, where)).returning();
+        return result[0];
+      } else {
+        const result = await db.insert(table).values(create).returning();
+        return result[0];
+      }
+    },
+
+    async delete({ where }: { where: Record<string, any> }) {
+      const result = await db.delete(table).where(buildWhere(table, where)).returning();
+      return result[0];
+    },
+
+    async count({ where }: { where?: Record<string, any> } = {}) {
+      // Drizzle no tiene .count() directo en expo-sqlite, usamos select + length
+      let q = db.select().from(table) as any;
+      if (where) q = q.where(buildWhere(table, where));
+      const result = await q;
+      return result.length;
+    },
+  };
+}
+
+// Raw SQL — equivalente a $queryRawUnsafe de Prisma
+async function $queryRawUnsafe(sql: string, ...params: any[]) {
+  return db.run({ sql, args: params } as any);
+}
+
+// El objeto que reemplaza a PrismaService
+export const prismaService = {
+  sucursales:      makeTableProxy("sucursales"),
+  bodegas:         makeTableProxy("bodegas"),
+  usuariosApp:     makeTableProxy("usuariosApp"),
+  picos:           makeTableProxy("picos"),
+  vehiculos:       makeTableProxy("vehiculos"),
+  clientes:        makeTableProxy("clientes"),
+  turnos:          makeTableProxy("turnos"),
+  tickets:         makeTableProxy("tickets"),
+  trapasos:        makeTableProxy("trapasos"),
+  calibraciones:   makeTableProxy("calibraciones"),
+  abastecimientos: makeTableProxy("abastecimientos"),
+  despachos:       makeTableProxy("despachos"),
+  personas:        makeTableProxy("personas"),
+  syncs:           makeTableProxy("syncs"),
+  usuariosAdmin:   makeTableProxy("usuariosAdmin"),
+  $queryRawUnsafe,
+};
+
+export type PrismaCompatService = typeof prismaService;
+
+
+# --- src\backend\inicioTurno\registro.service.ts ---
+
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { CreateRegistroDto } from './dto/create-registro.dto';
+//import { UpdateRegistroDto } from './dto/update-registro.dto';
+import { PrismaService } from '../../prisma/prisma.service';
+
+@Injectable()
+export class RegistroService {
+  constructor(private prisma: PrismaService) { }
+
+  private async crearTurnoRegistro(tipo: string, dto: CreateRegistroDto, fecha: Date) {
+    const horaString = dto.json.hora;
+    const [hh, mm, ss] = horaString.split(':').map(Number);
+
+    const hora = new Date(fecha);
+    hora.setHours(hh, mm, ss, 0);
+
+    const turno = await this.prisma.turnos.create({
+      data: {
+        tipo,
+        id_bodega: dto.json.id_bod, // 👈 nuevo campo
+        json: JSON.stringify(dto.json),
+        fecha,
+        hora,
+        sync: 0,
+        estado: 1,
+        observacion_anulacion: null,
+      },
+    });
+
+    return {
+      message: `Turno ${tipo} creado correctamente`,
+      // puedes devolver más datos si querés
+    };
+  }
+
+  async crearTurno(tipo: 'INICIO-TURNO' | 'FIN-TURNO', dto: CreateRegistroDto) {
+    const fechaTurno = new Date(dto.json.fecha);
+    const { id_suc, id_bod, ci_playero } = dto.json;
+    const tanques = dto.json.med_tanques.map(t => t.id_tanque);
+    const picos = dto.json.med_picos.map(p => p.id_pico);
+
+    // Validar existencia de sucursal, bodega y persona
+    const [sucursal, bodega, persona] = await Promise.all([
+      this.prisma.sucursales.findUnique({ where: { id_sucursal: id_suc } }),
+      this.prisma.bodegas.findUnique({ where: { id_bodega: id_bod } }),
+      this.prisma.personas.findUnique({ where: { cedula: ci_playero } }),
+    ]);
+
+    if (!sucursal) throw new BadRequestException(`Sucursal ID ${id_suc} no existe`);
+    if (!bodega) throw new BadRequestException(`Bodega ID ${id_bod} no existe`);
+    if (!persona) throw new BadRequestException(`Usuario playero con CI ${ci_playero} no existe`);
+
+    // Validar tanques
+    for (const id of tanques) {
+      const existe = await this.prisma.tanques.findUnique({ where: { id_tanque: id } });
+      if (!existe) throw new BadRequestException(`Tanque ID ${id} no existe`);
+    }
+
+    // Validar picos
+    for (const id of picos) {
+      const existe = await this.prisma.picos.findUnique({ where: { id_pico: id } });
+      if (!existe) throw new BadRequestException(`Pico ID ${id} no existe`);
+    }
+
+    // Validación especial si es FIN-TURNO: debe existir un INICIO-TURNO en esa bodega y fecha
+    // if (tipo === 'FIN-TURNO') {
+    //   const inicio = await this.prisma.turnos.findFirst({
+    //     where: {
+    //       tipo: 'INICIO-TURNO',
+    //       fecha: fechaTurno,
+    //       id_bodega: id_bod,
+    //     },
+    //   });
+
+    //   if (!inicio) {
+    //     throw new ConflictException(
+    //       `Debe existir un INICIO-TURNO para la fecha ${dto.json.fecha} en la bodega ${id_bod}`
+    //     );
+    //   }
+    // }
+
+    // Validar que no exista ya un turno de ese tipo para esa bodega y fecha
+    const existente = await this.prisma.turnos.findFirst({
+      where: {
+        tipo,
+        fecha: fechaTurno,
+        id_bodega: id_bod,
+        estado: 1, // solo importa si está activo
+      },
+    });
+
+    if (existente) {
+      throw new BadRequestException(
+        `Ya existe un ${tipo} registrado para la fecha ${dto.json.fecha} en la bodega ${id_bod}`
+      );
+    }
+
+    // Crear el nuevo turno
+    return this.crearTurnoRegistro(tipo, dto, fechaTurno);
+  }
+
+  // async anularRegistro(id_registro: number, observacion: string) {
+  //   return this.prisma.registros.update({
+  //     where: { id_registro },
+  //     data: {
+  //       estado: 0,
+  //       observacion_anulacion: observacion,
+  //     },
+  //   });
+  // }
+
+  async estadoTurnoSucursal(id_sucursal: number, fechaParam?: string) {
+    const sucursal = await this.prisma.sucursales.findUnique({ where: { id_sucursal } });
+    if (!sucursal) throw new BadRequestException(`Sucursal con ID ${id_sucursal} no existe`);
+
+    const hoy = new Date();
+    const fecha = fechaParam
+      ? new Date(new Date(fechaParam).toISOString().split('T')[0])
+      : new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+
+    const bodegas = await this.prisma.bodegas.findMany({
+      where: { id_sucursal, trapaso: false },
+      select: { id_bodega: true }
+    });
+    const idsBodegas = bodegas.map(b => b.id_bodega);
+
+    // Obtener turnos de la fecha actual
+    const turnosHoy = await this.prisma.turnos.findMany({
+      where: { id_bodega: { in: idsBodegas }, fecha },
+      select: { id_bodega: true, tipo: true, estado: true }
+    });
+
+    const inicioHoy = new Set(turnosHoy.filter(t => t.tipo === 'INICIO-TURNO' && t.estado === 1).map(t => t.id_bodega));
+    const cierreHoyOK = new Set(turnosHoy.filter(t => t.tipo === 'FIN-TURNO' && t.estado === 1).map(t => t.id_bodega));
+    const cierreHoyAnulados = new Set(turnosHoy.filter(t => t.tipo === 'FIN-TURNO' && t.estado === 0).map(t => t.id_bodega));
+
+    const faltanInicio = idsBodegas.filter(id => !inicioHoy.has(id));
+    const finAnulados = idsBodegas.filter(
+      id => cierreHoyAnulados.has(id) && !cierreHoyOK.has(id)
+    );
+
+    const sinCierre = idsBodegas.filter(id => !cierreHoyOK.has(id) && !cierreHoyAnulados.has(id));
+
+    const inicioTurnoOK = faltanInicio.length === 0;
+    const finTurnoHoyOK = sinCierre.length === 0;
+
+    // Buscar la última fecha anterior con actividad
+    const ultimaFechaAnterior = await this.prisma.turnos.findFirst({
+      where: {
+        id_bodega: { in: idsBodegas },
+        fecha: { lt: fecha }
+      },
+      orderBy: { fecha: 'desc' },
+      select: { fecha: true }
+    });
+
+    let finTurnoAnteriorFaltantes: number[] = [];
+    if (ultimaFechaAnterior) {
+      const turnosPrevios = await this.prisma.turnos.findMany({
+        where: {
+          id_bodega: { in: idsBodegas },
+          fecha: ultimaFechaAnterior.fecha,
+          tipo: 'FIN-TURNO'
+        },
+        select: { id_bodega: true, estado: true }
+      });
+
+      const cierrePrevioOK = new Set(turnosPrevios.filter(t => t.estado === 1).map(t => t.id_bodega));
+      finTurnoAnteriorFaltantes = idsBodegas.filter(id => !cierrePrevioOK.has(id));
+    }
+
+    // DETERMINAR STATUS
+    let status: 'falta_anterior' | 'normal' | 'iniciado' | 'cerrado' | 'falta_cerrar';
+
+    if (finTurnoAnteriorFaltantes.length > 0 && !inicioTurnoOK) {
+      status = 'falta_anterior';
+    } else if (inicioTurnoOK && finAnulados.length > 0) {
+      status = 'falta_cerrar';
+    } else if (inicioTurnoOK && !finTurnoHoyOK) {
+      status = 'iniciado';
+    } else if (inicioTurnoOK && finTurnoHoyOK) {
+      status = 'cerrado';
+    } else {
+      status = 'normal';
+    }
+
+    return {
+      status,
+      Inicio_turno: { ok: inicioTurnoOK, falta: faltanInicio },
+      Fin_turno: { ok: finTurnoHoyOK, falta: [...sinCierre, ...finAnulados] },
+      Fin_turno_anterior: {
+        ok: finTurnoAnteriorFaltantes.length === 0,
+        falta: finTurnoAnteriorFaltantes
+      }
+    };
+  }
+
+
+  async getAllByTipo(tipo: string) {
+    return this.prisma.turnos.findMany({
+      where: { tipo },
+      orderBy: { id_turno: 'desc' },
+    });
+  }
+
+  async getByIdAndTipo(id: number, tipo: string) {
+    const registro = await this.prisma.turnos.findFirst({
+      where: {
+        AND: [
+          { id_turno: id },
+          { tipo },
+        ],
+      },
+    });
+
+    if (!registro) throw new NotFoundException('Registro no encontrado');
+    return registro;
+  }
+
+
+}
+
+
+# --- src\backend\db\schema.ts ---
+
+// src/backend/db/schema.ts
+import { sqliteTable, integer, text, real } from "drizzle-orm/sqlite-core";
+import { relations } from "drizzle-orm";
+
+export const personas = sqliteTable("personas", {
+  cedula: integer("cedula").primaryKey(),
+  nombreApellido: text("nombre_apellido").notNull(),
+  timestamp: integer("timestamp"),
+  sync: integer("sync").notNull().default(0),
+});
+
+export const usuariosApp = sqliteTable("usuarios_app", {
+  cedula: integer("cedula").primaryKey(),   // FK → personas.cedula
+  clave: text("clave").notNull(),
+  refreshToken: text("refresh_token"),
+  salt: text("salt"),
+});
+
+export const clientes = sqliteTable("clientes", {
+  ruc: text("ruc").primaryKey(),
+  descripcionCliente: text("descripcion_cliente").notNull(),
+  timestamp: integer("timestamp"),
+  sync: integer("sync").notNull().default(0),
+});
+
+export const vehiculos = sqliteTable("vehiculos", {
+  idVehiculo: text("id_vehiculo").primaryKey(),
+  descripcionVehiculo: text("descripcion_vehiculo").notNull(),
+  ruc: text("ruc").notNull(),              // FK → clientes.ruc
+  timestamp: integer("timestamp"),
+  sync: integer("sync").notNull().default(0),
+});
+
+export const sucursales = sqliteTable("sucursales", {
+  idSucursal: integer("id_sucursal").primaryKey(),
+  descripcionSucursal: text("descripcion_sucursal").notNull(),
+});
+
+export const bodegas = sqliteTable("bodegas", {
+  idBodega: integer("id_bodega").primaryKey(),
+  descripcionBodega: text("descripcion_bodega").notNull(),
+  idSucursal: integer("id_sucursal").notNull(), // FK → sucursales.id_sucursal
+  trapaso: integer("trapaso", { mode: "boolean" }).notNull().default(false),
+});
+
+export const picos = sqliteTable("picos", {
+  idPico: integer("id_pico").primaryKey(),
+  descripcionPico: text("descripcion_pico").notNull(),
+  idBodega: integer("id_bodega").notNull(),     // FK → bodegas.id_bodega
+  idPicoSurtidor: integer("id_pico_surtidor").notNull(),
+});
+
+export const tanques = sqliteTable("tanques", {
+  idTanque: integer("id_tanque").primaryKey(),
+  descripcionTanque: text("descripcion_tanque").notNull(),
+  idBodega: integer("id_bodega").notNull(),     // FK → bodegas.id_bodega
+  capacidadLitros: real("capacidad_litros"),
+});
+
+export const turnos = sqliteTable("turnos", {
+  idTurno: integer("id_turno").primaryKey({ autoIncrement: true }),
+  idBodega: integer("id_bodega").notNull(),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+  estado: integer("estado").notNull().default(1),
+  observacionAnulacion: text("observacion_anulacion"),
+});
+
+export const tickets = sqliteTable("tickets", {
+  idTicket: integer("id_ticket").primaryKey({ autoIncrement: true }),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+  estado: integer("estado").notNull().default(1),
+});
+
+export const trapasos = sqliteTable("trapasos", {
+  idTrapaso: integer("id_trapaso").primaryKey({ autoIncrement: true }),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+  estado: integer("estado").notNull().default(1),
+});
+
+export const calibraciones = sqliteTable("calibraciones", {
+  idCalibracion: integer("id_calibracion").primaryKey({ autoIncrement: true }),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+});
+
+export const abastecimientos = sqliteTable("abastecimientos", {
+  idAbastecimiento: integer("id_abastecimiento").primaryKey({ autoIncrement: true }),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+});
+
+export const despachos = sqliteTable("despachos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  idHrs: integer("id_hrs").notNull(),
+  pico: integer("pico").notNull(),
+  combustible: integer("combustible").notNull(),
+  tanque: integer("tanque").notNull(),
+  totalCtvs: integer("total_ctvs").notNull(),
+  volumenMl: integer("volumen_ml").notNull(),
+  precioCvl: integer("precio_cvl").notNull(),
+  decTotal: integer("dec_total").notNull(),
+  decVolumen: integer("dec_volumen").notNull(),
+  decPrecio: integer("dec_precio").notNull(),
+  tiempoSeg: integer("tiempo_seg"),
+  fechaHora: integer("fecha_hora").notNull(),
+  totalIni: integer("total_ini"),
+  totalFin: integer("total_fin"),
+  frentistaId: text("frentista_id"),
+  clienteId: text("cliente_id"),
+  volTanqueMl: integer("vol_tanque_ml"),
+  creadoEn: integer("creado_en").notNull().$defaultFn(() => Date.now()),
+  sync: integer("sync", { mode: "boolean" }),
+  proces: integer("proces", { mode: "boolean" }),
+});
+
+export const syncs = sqliteTable("syncs", {
+  idSync: integer("id_sync").primaryKey({ autoIncrement: true }),
+  tipo: text("tipo").notNull().unique(),
+  fecha: integer("fecha").notNull(),
+});
+
+export const usuariosAdmin = sqliteTable("usuarios_admin", {
+  correo: text("correo").primaryKey(),
+  nombre: text("nombre").notNull(),
+  salt: text("salt").notNull(),
+  clave: text("clave").notNull(),
+  refreshToken: text("refresh_token"),
+  timestamp: integer("timestamp"),
+});
+
+// ==================== RELACIONES ====================
+
+export const personasRelations = relations(personas, ({ one }) => ({
+  usuarioApp: one(usuariosApp, {
+    fields: [personas.cedula],
+    references: [usuariosApp.cedula],
+  }),
+}));
+
+export const vehiculosRelations = relations(vehiculos, ({ one }) => ({
+  cliente: one(clientes, {
+    fields: [vehiculos.ruc],
+    references: [clientes.ruc],
+  }),
+}));
+
+export const bodegasRelations = relations(bodegas, ({ one, many }) => ({
+  sucursal: one(sucursales, {
+    fields: [bodegas.idSucursal],
+    references: [sucursales.idSucursal],
+  }),
+  picos: many(picos),
+  tanques: many(tanques),
+}));
+
+
+# --- src\backend\status\status.service.ts ---
+
+import { Injectable } from '@nestjs/common';
+import { HrsService } from '../horustech/hrs.service';
+
+@Injectable()
+export class StatusService {
+    constructor(private hrs: HrsService) { }
+
+    /* checksum Horustech */
+    private checksum(body: string) {
+        return ([...body].reduce((s, c) => s + c.charCodeAt(0), 0) & 0xff)
+            .toString(16)
+            .toUpperCase()
+            .padStart(2, '0');
+    }
+
+    private buildCmd() {
+        const body = '?000201';            // ? + len(0002) + índice 01
+        return Buffer.from(`>${body}${this.checksum(body)}`, 'ascii');
+    }
+
+
+
+    async getNozzleState(nozzle: number) {
+        const ascii = await this.hrs.exec(this.buildCmd());   // p. ej. >!000A01AALB P AKK
+        const body = ascii.slice(0, -2);                     // elimina el checksum KK
+        const m = body.match(/^>![0-9A-F]{4}01(.+)/);         // captura SOLO los estados
+        if (!m) throw new Error('Respuesta no reconocida');
+
+        const estados = m[1];                     // "AALB P A" en el ejemplo
+        const estado = estados[nozzle - 1] ?? ' ';
+        return { pico: nozzle, estado };          // { pico: 3, estado: 'L' }
+    }
+
+
+    //   async getNozzleState(nozzle: number) {
+    //     const ascii = await this.hrs.exec(this.buildCmd()); // >!CCCC01FF…
+    //     const match = ascii.match(/^>![0-9A-F]{4}01(.+)/);
+    //     if (!match) throw new Error('Respuesta no reconocida');
+    //     const estados = match[1];           // cadena con 1 char por pico
+    //     const estado = estados[nozzle - 1] ?? ' ';
+    //     return { pico: nozzle, estado };    // ej. { pico: 1, estado: 'B' }
+    //   }
+}
+
+
+# --- src\backend\sucursal\sucursal.service.ts ---
+
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { CreateSucursalDto } from './dto/create-sucursal.dto';
+import { UpdateSucursalDto } from './dto/update-sucursal.dto';
+import { PrismaService } from '../../prisma/prisma.service';
+
+@Injectable()
+export class SucursalService {
+  constructor(private prisma: PrismaService) { }
+
+  create(data: CreateSucursalDto) {
+    return this.prisma.sucursales.create({ data });
+  }
+
+  findAll() {
+    return this.prisma.sucursales.findMany();
+  }
+
+  async findOne(id_sucursal: number) {
+    const sucursal = await this.prisma.sucursales.findUnique({
+      where: { id_sucursal },
+    });
+
+    if (!sucursal) {
+      throw new NotFoundException(`Sucursal con ID ${id_sucursal} no encontrada`);
+    }
+
+    return sucursal;
+  }
+
+  async update(id_sucursal: number, data: UpdateSucursalDto) {
+    // Validar existencia primero
+    const existing = await this.prisma.sucursales.findUnique({ where: { id_sucursal } });
+    if (!existing) {
+      throw new NotFoundException(`No se puede actualizar. Sucursal ID ${id_sucursal} no existe`);
+    }
+  
+    return this.prisma.sucursales.update({
+      where: { id_sucursal },
+      data,
+    });
+  }
+
+  // remove(id: number) {
+  //   return `This action removes a #${id} sucursal`;
+  // }
+}
+
+
+# --- src\backend\tanque\tanque.service.ts ---
+
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CreateTanqueDto } from './dto/create-tanque.dto';
+import { UpdateTanqueDto } from './dto/update-tanque.dto';
+
+@Injectable()
+export class TanqueService {
+  constructor(private prisma: PrismaService) { }
+
+
+  async create(dto: CreateTanqueDto) {
+    const bodega = await this.prisma.bodegas.findUnique({
+      where: { id_bodega: dto.id_bodega },
+    });
+
+    if (!bodega) {
+      throw new NotFoundException(
+        `La bodega con ID ${dto.id_bodega} no existe`,
+      );
+    }
+
+    const nuevoTanque = await this.prisma.tanques.create({
+      data: {
+        id_tanque: dto.id_tanque,
+        descripcion_tanque: dto.descripcion_tanque,
+        id_bodega: dto.id_bodega,
+        capacidad_litros: dto.capacidad_litros ?? null, // Si no se proporciona, se guarda como null
+      },
+    });
+
+    return {
+      message: 'Tanque creado correctamente'
+    };
+  }
+
+  async findAll(id_bodega?: number) {
+    const tanques = await this.prisma.tanques.findMany({
+      where: id_bodega ? { id_bodega } : undefined,
+      include: { Bodegas: true },
+    });
+
+    if (id_bodega && tanques.length > 0) {
+      const { Bodegas } = tanques[0]; // todas las entradas tendrán la misma bodega
+      const tanqueList = tanques.map(t => ({
+        id_tanque: t.id_tanque,
+        descripcion_tanque: t.descripcion_tanque,
+        capacidad_litros: t.capacidad_litros ? Number(t.capacidad_litros) : 0
+      }));
+
+      const totalLitrosBodega = tanqueList.reduce(
+        (sum, t) => sum + t.capacidad_litros,
+        0
+      );
+
+      return {
+        id_bodega: Bodegas.id_bodega,
+        descripcion_bodega: Bodegas.descripcion_bodega,
+        id_sucursal: Bodegas.id_sucursal,
+        totalTanques: tanqueList.length,
+        totalLitrosBodega,
+        tanques: tanqueList,
+      };
+    }
+
+    // Si no hay filtro o no se encontraron tanques, puedes retornar vacíos o todos agrupados por bodega (según lo necesites)
+    return {
+      //message: 'No se encontraron tanques para la bodega especificada',
+      totalTanques: 0,
+      totalLitrosBodega: 0,
+      tanques: [],
+    };
+  }
+
+
+
+  async findOne(id: number) {
+    const tanque = await this.prisma.tanques.findUnique({
+      where: { id_tanque: id },
+      include: { Bodegas: true },
+    });
+
+    if (!tanque) {
+      throw new NotFoundException(`Tanque con ID ${id} no encontrado`);
+    }
+
+    return {
+      data: tanque,
+    };
+  }
+
+  async update(id: number, dto: UpdateTanqueDto) {
+    const existe = await this.prisma.tanques.findUnique({
+      where: { id_tanque: id },
+    });
+
+    if (!existe) {
+      throw new NotFoundException(`Tanque con ID ${id} no existe`);
+    }
+
+    const actualizado = await this.prisma.tanques.update({
+      where: { id_tanque: id },
+      data: dto,
+    });
+
+    return {
+      message: `Tanque actualizado correctamente`,
+    };
+  }
+
+  // 🔒 Operación delete ignorada como pediste
+  // remove(id: number) {
+  //   return `This action removes a #${id} tanque`;
+  // }
+}
+
+
+# --- src\backend\ticket\ticket.service.ts ---
+
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { CreateTicketDto } from './dto/create-ticket.dto';
+import { UpdateTicketDto } from './dto/update-ticket.dto';
+import { PrismaService } from '../../prisma/prisma.service';
+
+@Injectable()
+export class TicketService {
+  constructor(private prisma: PrismaService) { }
+
+  async crearTicket(dto: CreateTicketDto) {
+    const fechaTicket = new Date(dto.json.fecha);
+    const horaString = dto.json.hora; // '12:30:00'
+    const [hh, mm, ss] = horaString.split(':').map(Number);
+    const hora = new Date(fechaTicket);
+    hora.setHours(hh, mm, ss, 0);
+
+    // Normalizar ruc_cliente
+    dto.json.ruc_cliente = dto.json.ruc_cliente?.trim() ?? '';
+
+    const {
+      id_suc,
+      id_bod,
+      id_pico,
+      id_playero,
+      id_operador,
+      id_vehiculo,
+      ruc_cliente
+    } = dto.json;
+
+    // Validaciones básicas (opcional, según tu necesidad)
+    const [sucursal, bodega, pico, vehiculo, playero, operador] = await Promise.all([
+      this.prisma.sucursales.findUnique({ where: { id_sucursal: id_suc } }),
+      this.prisma.bodegas.findUnique({ where: { id_bodega: id_bod } }),
+      this.prisma.picos.findUnique({ where: { id_pico: id_pico } }),
+      this.prisma.vehiculos.findUnique({ where: { id_vehiculo: id_vehiculo } }),
+      this.prisma.usuariosApp.findUnique({ where: { cedula: id_playero } }),
+      this.prisma.personas.findUnique({ where: { cedula: id_operador } }),
+      //this.prisma.clientes.findUnique({ where: { ruc: ruc_cliente } }),
+    ]);
+
+    if (!sucursal) throw new BadRequestException(`Sucursal con ID ${id_suc} no existe`);
+    if (!bodega) throw new BadRequestException(`Bodega con ID ${id_bod} no existe`);
+    if (!pico) throw new BadRequestException(`Pico con ID ${id_pico} no existe`);
+    if (!vehiculo) throw new BadRequestException(`Vehiculo ${id_vehiculo} no existe`);
+    if (!playero) throw new BadRequestException(`Playero con CI ${id_playero} no existe`);
+    if (!operador) throw new BadRequestException(`Operador con CI ${id_operador} no existe`);
+    //if (!cliente) throw new BadRequestException(`Cliente con RUC ${ruc_cliente} no existe`);
+
+    if (ruc_cliente !== '') {
+      const cliente = await this.prisma.clientes.findUnique({ where: { ruc: ruc_cliente } });
+      if (!cliente) throw new BadRequestException(`Cliente con RUC ${ruc_cliente} no existe`);
+    }
+
+    const ticket = await this.prisma.tickets.create({
+      data: {
+        tipo: 'TICKET-SALIDA',
+        json: JSON.stringify(dto.json),
+        fecha: fechaTicket,
+        hora: hora,
+        sync: 0,
+        estado: 1
+      },
+    });
+
+    return {
+      message: `Ticket creado correctamente`
+      //id: registro.id_registro,
+    };
+  }
+
+  async crearTicketExcepcional(dto: CreateTicketDto) {
+    const fechaTicket = new Date(dto.json.fecha);
+    const idPico = dto.json.id_pico;
+
+    // 1. Buscar el id_bodega relacionado al pico
+    const pico = await this.prisma.picos.findUnique({
+      where: { id_pico: idPico },
+      select: { id_bodega: true },
+    });
+
+    if (!pico) throw new BadRequestException(`Pico con ID ${idPico} no existe`);
+
+    const idBodega = pico.id_bodega;
+
+    // 2. Anular FIN-TURNO activo (si existe)
+    const finTurnoActivo = await this.prisma.turnos.findFirst({
+      where: {
+        tipo: 'FIN-TURNO',
+        fecha: fechaTicket,
+        id_bodega: idBodega,
+        estado: 1,
+      },
+    });
+
+    if (finTurnoActivo) {
+      await this.prisma.turnos.update({
+        where: { id_turno: finTurnoActivo.id_turno },
+        data: { estado: 0 },
+      });
+    }
+
+    // 3. Crear el ticket normalmente
+    return this.crearTicket(dto);
+  }
+
+}
+
+
+# --- src\backend\totalizador\totalizador.service.ts ---
+
+import { Injectable } from '@nestjs/common';
+import { HrsService } from '../horustech/hrs.service';
+
+@Injectable()
+export class TotalizadorService {
+    constructor(private hrs: HrsService) { }
+
+    /** Calcula checksum Horustech */
+    private checksum(str: string) {
+        return (
+            ([...str].reduce((s, c) => s + c.charCodeAt(0), 0) & 0xff)
+                .toString(16)
+                .toUpperCase()
+                .padStart(2, '0')
+        );
+    }
+
+    private buildCmd(nozzle: number, tipo = 1) {
+        const len = '0006';
+        const data =
+            '05' +
+            String(nozzle).padStart(2, '0') +
+            String(tipo).padStart(2, '0');
+        const body = `?${len}${data}`;
+        return Buffer.from(`>${body}${this.checksum(body)}`, 'ascii');
+    }
+
+    /** Devuelve totalizador en litros para un pico dado */
+    async getTotalizer(nozzle: number): Promise<number> {
+        const cmd = this.buildCmd(nozzle);
+        const ascii = await this.hrs.exec(cmd);
+
+        // Esperamos: >!XXXX05BBTTLLLLLLLLLLKK
+        const m = ascii.match(/^>![0-9A-F]{4}05(\d{2})(\d{2})(\d{10})/);
+        if (!m) throw new Error('Respuesta no reconocida');
+
+        // Ajusta divisor si tu consola usa 2 ó 3 decimales
+        return parseInt(m[3], 10) / 100; // /100 → 2 decimales; /1000 → 3
+    }
+}
+
+
+# --- src\backend\traspaso\traspaso.service.ts ---
+
+import {
+  Injectable,
+  BadRequestException,
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CreateTraspasoDto } from './dto/create-traspaso.dto';
+
+@Injectable()
+export class TraspasoService {
+  constructor(private prisma: PrismaService) { }
+
+  async crearTraspaso(dto: CreateTraspasoDto) {
+    const fechaTraspaso = new Date(dto.json.fecha);
+    const [hh, mm, ss] = dto.json.hora.split(':').map(Number);
+    const hora = new Date(fechaTraspaso);
+    hora.setHours(hh, mm, ss, 0);
+
+    const {
+      bod_origen,
+      bod_destino,
+      id_tanque_destino,
+      id_pico,
+      id_playero,
+      id_encargado_receptor,
+    } = dto.json;
+
+    // Validaciones de existencia
+    const [bodegaOrigen, bodegaDestino, tanqueDestino, pico, playero, encargado] = await Promise.all([
+      this.prisma.bodegas.findUnique({ where: { id_bodega: bod_origen } }),
+      this.prisma.bodegas.findUnique({ where: { id_bodega: bod_destino } }),
+      this.prisma.tanques.findUnique({ where: { id_tanque: id_tanque_destino } }),
+      this.prisma.picos.findUnique({ where: { id_pico } }),
+      this.prisma.usuariosApp.findUnique({ where: { cedula: id_playero } }),
+      this.prisma.personas.findUnique({ where: { cedula: id_encargado_receptor } }),
+    ]);
+
+    if (!bodegaOrigen) throw new BadRequestException(`Bodega origen ID ${bod_origen} no existe`);
+    if (!bodegaDestino) throw new BadRequestException(`Bodega destino ID ${bod_destino} no existe`);
+    if (!tanqueDestino) throw new BadRequestException(`Tanque destino ID ${id_tanque_destino} no existe`);
+    if (!pico) throw new BadRequestException(`Pico ID ${id_pico} no existe`);
+    if (!playero) throw new BadRequestException(`Playero CI ${id_playero} no existe`);
+    if (!encargado) throw new BadRequestException(`Encargado receptor CI ${id_encargado_receptor} no existe`);
+
+    // Crear registro tipo TRASPASO
+    await this.prisma.trapasos.create({
+      data: {
+        tipo: 'TRASPASO',
+        json: JSON.stringify(dto.json),
+        fecha: fechaTraspaso,
+        hora,
+        sync: 0,
+        estado: 1
+      },
+    });
+
+    return {
+      message: 'Traspaso registrado correctamente',
+    };
+  }
+}
+
+
+# --- src\backend\usuario\usuario.service.ts ---
+
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import { UpdateUsuarioDto } from './dto/update-usuario.dto';
+import * as bcrypt from 'bcrypt';
+
+@Injectable()
+export class UsuarioService {
+  constructor(private prisma: PrismaService) {}
+
+  async create(data: CreateUsuarioDto) {
+    const persona = await this.prisma.personas.findUnique({
+      where: { cedula: data.cedula },
+    });
+
+    if (!persona) {
+      throw new NotFoundException('La persona no está registrada');
+    }
+
+    const usuarioExistente = await this.prisma.usuariosApp.findUnique({
+      where: { cedula: data.cedula },
+    });
+
+    if (usuarioExistente) {
+      throw new BadRequestException('El usuario ya existe');
+    }
+
+    const salt = await bcrypt.genSalt();
+    const hashedPassword = await bcrypt.hash(data.clave, salt);
+
+    const usuario = await this.prisma.usuariosApp.create({
+      data: {
+        cedula: data.cedula,
+        salt,
+        clave: hashedPassword,
+      },
+    });
+
+    return {
+      message: 'Usuario creado correctamente'
+    };
+  }
+
+  async findAll() {
+    return this.prisma.usuariosApp.findMany({
+      select: {
+        cedula: true,
+        Personas: true,
+      },
+    });
+  }
+
+  async findOne(cedula: number) {
+    const usuario = await this.prisma.usuariosApp.findUnique({
+      where: { cedula },
+      select: {
+        cedula: true,
+        Personas: true,
+      },
+    });
+
+    if (!usuario) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    return usuario;
+  }
+
+  async update(cedula: number, dto: UpdateUsuarioDto) {
+    const data = { ...dto } as any;
+    if (dto.clave) {
+      const salt = await bcrypt.genSalt();
+      data.salt = salt;
+      data.clave = await bcrypt.hash(dto.clave, salt);
+    }
+
+    return this.prisma.usuariosApp.update({
+      where: { cedula },
+      data,
+    });
+  }
+}
+
+
+
+# --- src\backend\vehiculo\vehiculo.service.ts ---
+
+import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { CreateVehiculoDto } from './dto/create-vehiculo.dto';
+import { UpdateVehiculoDto } from './dto/update-vehiculo.dto';
+import { IVehiculoRepository } from './interfaces/vehiculo-repository.interface';
+
+@Injectable()
+export class VehiculoService {
+  constructor(
+    @Inject('IVehiculoRepository')  // 👈 agregá esta línea
+    private readonly vehiculoRepository: IVehiculoRepository,
+  ) { }
+
+  async create(data: CreateVehiculoDto) {
+    return await this.vehiculoRepository.create(data);
+  }
+
+
+  async findAll() {
+    try {
+      return await this.vehiculoRepository.findAll();
+    } catch (error) {
+      throw new BadRequestException('Error al obtener los vehículos');
+    }
+  }
+
+  // vehiculo.service.ts
+  async findAllNew(query: { filter?: string; page?: number; limit?: number }) {
+    try {
+      return await this.vehiculoRepository.findAllNew(query);
+    } catch (error) {
+      throw new BadRequestException('Error al obtener los vehículos paginados');
+    }
+  }
+
+
+  async findOne(id_vehiculo: string) {
+    const vehiculo = await this.vehiculoRepository.findOne(id_vehiculo);
+    if (!vehiculo) {
+      throw new NotFoundException(`Vehículo no encontrado`);
+    }
+    return vehiculo;
+  }
+
+  async update(id_vehiculo: string, data: UpdateVehiculoDto) {
+    const vehiculoExistente = await this.vehiculoRepository.findOne(id_vehiculo);
+    if (!vehiculoExistente) {
+      throw new NotFoundException(`El vehiculo no existe`);
+    }
+
+    return await this.vehiculoRepository.update(id_vehiculo, data);
+  }
+}
+
+# ========================================================================
+# ESTIMACIÓN DE TOKENS
+# ========================================================================
+#
+#  Modelo           : Genérico (sin modelo específico)
+#  Caracteres       : 91.694
+#  Tokens estimados : ~22.923
+#  Costo estimado   : no disponible (varía según proveedor)
+#  Context window   : no especificado para este modelo
+#
+#  Nota: los precios y límites pueden haber cambiado. Verificá en
+#  la documentación oficial del modelo antes de tomar decisiones de costo.
+# ========================================================================

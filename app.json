@@ -1,48 +1,49 @@
 {
-	"expo": {
-		"name": "playero",
-		"slug": "app-playero",
-		"version": "1.0.0",
-		"orientation": "portrait",
-		"icon": "./assets/icon.png",
-		"userInterfaceStyle": "automatic",
-		"splash": {
-			"image": "./assets/splash.png",
-			"resizeMode": "contain",
-			"backgroundColor": "#FFFFFF"
-		},
-		"android": {
-			"edgeToEdgeEnabled": true,
-			"adaptiveIcon": {
-				"foregroundImage": "./assets/adaptive-icon.png",
-				"backgroundColor": "#FFFFFF"
-			},
-			"splash": {
-				"image": "./assets/splash.png",
-				"resizeMode": "contain",
-				"backgroundColor": "#FFFFFF"
-			},
-			"package": "com.tecnoedil.playero"
-		},
-		"plugins": [
-			"expo-font",
-			[
-				"expo-build-properties",
-				{
-					"android": {
-						"usesCleartextTraffic": true
-					}
-				}
-			]
-		],
-		"owner": "tecnoedil",
-		"ios": {
-			"bundleIdentifier": "com.tecnoedil.playero"
-		},
-		"extra": {
-			"eas": {
-				"projectId": "814d9950-1119-490e-be96-57c420897927"
-			}
-		}
-	}
+  "expo": {
+    "name": "playero",
+    "slug": "app-playero",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "android": {
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "splash": {
+        "image": "./assets/splash.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.tecnoedil.playero"
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-sqlite"
+    ],
+    "owner": "tecnoedil",
+    "ios": {
+      "bundleIdentifier": "com.tecnoedil.playero"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "814d9950-1119-490e-be96-57c420897927"
+      }
+    }
+  }
 }
