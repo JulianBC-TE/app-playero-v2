@@ -45,7 +45,8 @@
     "react-native-svg": "15.11.2",
     "react-native-toast-message": "^2.3.0",
     "react-native-webview": "13.13.5",
-    "yup": "^1.6.1"
+    "yup": "^1.6.1",
+    "expo-crypto": "~14.1.5"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

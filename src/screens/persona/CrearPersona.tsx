@@ -9,7 +9,8 @@ import { Input } from "@components/Input";
 import { InputCard } from "@components/InputCard";
 import { Button } from "@components/Button";
 import { AppError } from "@utils/AppError";
-import { api } from "@services/api";
+//import { api } from "@services/api";
+import { savePersonaLocal } from "../../backend/db/modules/personaDB"
 
 import { Save, UserRoundPlus } from "lucide-react-native";
 import axios from "axios";

@@ -10,7 +10,7 @@ import debounce from "lodash.debounce";
 
 import { Input } from "@components/Input";
 import { InputCard } from "@components/InputCard";
-import { api } from "@services/api";
+//import { api } from "@services/api";
 import { VehiculoDTO } from "@dto/VehiculoDTO";
 import { VehiculoCard } from "@components/VehiculoCard";
 import { toastError, toastSuccess } from "@utils/toastMessage";
@@ -18,6 +18,7 @@ import { XCircle, Search } from "lucide-react-native";
 import { EmptyList } from "@/components/EmptyList";
 import { StackRoutesProps } from "@/route/app.routes";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { getVehiculosPaginado } from "../../backend/db/modules/vehiculoDB"
 
 const PAGE_SIZE = 15;
 
@@ -63,13 +64,8 @@ export function BuscarVehiculo({
 			setIsLoading(true);
 			try {
 				const currentPage = reset ? 1 : page;
-				const response = await api.get("/api/vehiculos/paginado", {
-					params: {
-						filter: debouncedQuery,
-						page: currentPage,
-						limit: PAGE_SIZE,
-					},
-				});
+				const data = await getVehiculosPaginado(debouncedQuery, currentPage, PAGE_SIZE);
+				const response = { data };
 
 				if (reset) {
 					setData(response.data.vehiculos);

@@ -1,0 +1,1886 @@
+<context_metadata>
+  generated_at: 2026-05-12T09:36:26
+  project_root: C:\dev\playero_2\mobile-playero
+  file_count: 14
+  extensions_included: .css, .html, .js, .jsx, .py, .ts, .tsx
+</context_metadata>
+
+<task>
+  crear modulos de conexion para Entidades con CRUD y sync de creación; cliente, persona, vehiculo
+</task>
+
+<file_tree>
+mobile-playero/
+  src/
+    services/
+      api.ts
+    contexts/
+      AuthContext.tsx
+    dto/
+      ClienteDTO.ts
+      PersonaDTO.ts
+      VehiculoDTO.ts
+    backend/
+      api/
+        authAPI.ts
+      db/
+        client.tsx
+    screens/
+      cliente/
+        CrearCliente.tsx
+      persona/
+        CrearPersona.tsx
+      vehiculo/
+        CrearVehiculo.tsx
+        httpClient.ts
+        schema.ts
+        modules/
+          authDB.ts
+          bodegaDB.ts
+</file_tree>
+
+<codebase>
+
+<file path="src/services/api.ts">
+import { AppError } from "@utils/AppError";
+import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from "axios";
+import { getAuthToken, saveAuthToken } from "@storage/storageAuthToken";
+import { getStorageServerUrl } from "@/storage/storageServer";
+
+type SignOut = () => Promise<void>;
+type PromiseType = {
+	onSuccess: (token: string) => void;
+	onFailure: (error: AxiosError) => void;
+};
+
+type APIInstanceProps = AxiosInstance & {
+	registerInterceptTokenManager: (signOut: SignOut) => () => void;
+};
+
+const api = axios.create({
+	timeout: 22000,
+}) as APIInstanceProps;
+
+let failedQueue: Array<PromiseType> = [];
+let isRefreshing = false;
+
+api.registerInterceptTokenManager = (signOut) => {
+	// Adicionando interceptor de requisição para configurar token em todas as requisições
+	const requestInterceptor = api.interceptors.request.use(
+		async (config) => {
+			try {
+				//->se trae el ip guardado
+				const serverIP = await getStorageServerUrl();
+				//->se verifica que el ip se cargue y este en el formato adecuado
+				if (serverIP) {
+					config.baseURL = serverIP;
+					if (!serverIP.startsWith("http://")) {
+						config.baseURL = `http://${serverIP}`;
+					}
+				}
+				//->traer el  token guardado y settearlo
+				const { token } = await getAuthToken();
+				if (token && config.headers) {
+					config.headers.Authorization = `Bearer ${token}`;
+				}
+				//->devolver el config
+				return config;
+			} catch (error) {
+				console.log("aqui 1", error);
+				return Promise.reject(error);
+			}
+		},
+		(error) => {
+			return Promise.reject(error);
+		}
+	);
+
+	// Interceptor de resposta para lidar com erros e refresh token
+	const responseInterceptor = api.interceptors.response.use(
+		//->Si fue exitosa se pasa directamente la respuesta
+		(response) => response,
+		//->si dió error, timeuot, etc, se trata
+		async (error) => {
+			if (!error.response) {
+				// Erros de rede ou timeouts
+				return Promise.reject(new AppError("No se pudo conectar al servidor."));
+			}
+
+			const { response } = error;
+			//->guardar una copia de la recuaest que falló
+			const originalRequest = error.config as AxiosRequestConfig & {
+				_retry?: boolean;
+			};
+
+			// Tratamento específico para erro 401 (Unauthorized)
+			if (response?.status === 401) {
+				// Tratamento para token expirado ou inválido
+				if (
+					response.data?.message === "token.expired" ||
+					response.data?.message === "token.invalid"
+				) {
+					if (originalRequest._retry) {
+						// Evita loop infinito se o refresh token também falhar
+						signOut();
+						return Promise.reject(
+							new AppError(
+								"Su sesión ha expirado. Por favor, inicie sesión nuevamente."
+							)
+						);
+					}
+					//->se trata de traer los tokens
+					originalRequest._retry = true;
+					const { refresh_token } = await getAuthToken();
+					//->se verifica que vengan los tokens
+					if (!refresh_token) {
+						signOut();
+						return Promise.reject(
+							new AppError(
+								"Sin token de autenticación. Por favor, inicie sesión."
+							)
+						);
+					}
+					//->si ya hay un token en refresh
+					if (isRefreshing) {
+						//->encola la request para reintentar cuando el refresh termine
+						return new Promise((resolve, reject) => {
+							// define qué hacer con esta request cuando el refresh se resuelva o falle
+							failedQueue.push({
+								onSuccess: (token: string) => {
+									if (originalRequest.headers) {
+										originalRequest.headers.Authorization = `Bearer ${token}`;
+									}
+									resolve(api(originalRequest));
+								},
+								onFailure: (err: AxiosError) => {
+									reject(err);
+								},
+							});
+						});
+					}
+					//->si no se esta en refreshing, ahora si se tiene que estar ya que se está refrescando la request actual
+					isRefreshing = true;
+					//->probamos hacer el refresh
+					return new Promise(async (resolve, reject) => {
+						try {
+							const { data } = await axios.post(
+								`${api.defaults.baseURL}/api/auth/refresh-token`,
+								{ refresh_token }
+							);
+							//-> si se hiso el resfresh de forma correcta ya tenemos los tokens nuevos
+							await saveAuthToken({
+								token: data.token,
+								refresh_token: data.refresh_token,
+							});
+
+							// Reconstruindo dados originais se existirem
+							if (
+								originalRequest.data &&
+								typeof originalRequest.data === "string"
+							) {
+								try {
+									originalRequest.data = JSON.parse(originalRequest.data);
+								} catch (e) {
+									console.log("aqui 2", e);
+									console.warn(
+										"Falla al parsear los datos de la solicitud original:",
+										e
+									);
+								}
+							}
+
+							// Atualizando headers
+							api.defaults.headers.common.Authorization = `Bearer ${data.token}`;
+							//->si hay request origianl tambien a esa hay que actualizarle los headers
+							if (originalRequest.headers) {
+								originalRequest.headers.Authorization = `Bearer ${data.token}`;
+							}
+
+							// Processando fila de requisições que falharam durante o refresh
+							failedQueue.forEach((request) => {
+								request.onSuccess(data.token);
+							});
+
+							console.log("Token atualizado com sucesso");
+							//-> ya con los tokens correctos se hace la recuesto original de nuevo
+							resolve(api(originalRequest));
+						} catch (refreshError) {
+							console.log("aqui 3", error);
+							// Processando falhas na fila
+							failedQueue.forEach((request) => {
+								request.onFailure(refreshError as AxiosError);
+							});
+
+							console.error("Falha ao atualizar token:", refreshError);
+
+							// Verificando se o erro do refresh tem um código específico
+							if (axios.isAxiosError(refreshError) && refreshError.response) {
+								reject(
+									new AppError(
+										refreshError.response.data?.message ||
+											"Não foi possível renovar sua sessão",
+										refreshError.response.status
+									)
+								);
+							} else {
+								reject(new AppError("Erro ao atualizar sua sessão", 401));
+							}
+
+							signOut();
+						} finally {
+							// se resetean las flags para permitir futuros refreshes
+							isRefreshing = false;
+							failedQueue = [];
+						}
+					});
+				}
+
+				// Outros erros 401 não relacionados ao token
+				signOut();
+				return Promise.reject(
+					new AppError(response.data?.message || "Acesso não autorizado", 401)
+				);
+			}
+
+			// Tratando outros códigos de erro HTTP (400, 404, 500, etc)
+			if (response?.data) {
+				return Promise.reject(
+					new AppError(
+						response.data.message || `Erro ${response.status}`,
+						response.status
+					)
+				);
+			}
+
+			// Fallback para qualquer outro tipo de erro
+			return Promise.reject(
+				new AppError("Ocurrió un error inesperado", error.code)
+			);
+		}
+	);
+
+	// Retornando função para limpar os interceptors
+	return () => {
+		api.interceptors.request.eject(requestInterceptor);
+		api.interceptors.response.eject(responseInterceptor);
+	};
+};
+
+export { api };
+</file>
+
+<file path="src/contexts/AuthContext.tsx">
+// src/contexts/AuthContext.tsx
+//
+// AuthContext limpio: no conoce axios, no conoce endpoints, no conoce AsyncStorage de tokens.
+// Solo orquesta authAPI (llamadas HTTP) y authDB (BD local) a través de funciones tipadas.
+
+import { createContext, useEffect, useState } from "react";
+import { UserDTO } from "@dto/userDTO";
+import { saveUser, getStorageUser, removeUser } from "@storage/storageUse";
+import { getAuthToken, saveAuthToken, removeAuthToken } from "@storage/storageAuthToken";
+import { getStorageServerUrl, saveServerUrl } from "@storage/storageServer";
+import { ClienteDTO } from "@dto/ClienteDTO";
+import { SucursalDTO } from "@/dto/sucursalDTO";
+import { getStorageSucursal, saveSucursal } from "@/storage/storageSucursal";
+
+// Backend: HTTP
+import { httpClient } from "@/backend/api/httpClient";
+import { login } from "@/backend/api/authAPI";
+
+// Backend: BD local
+import { saveUserLocally, loginOffline, clearSession } from "@/backend/db/modules/authDB";
+
+// ---------------------------------------------------------------------------
+// Tipos del contexto
+// ---------------------------------------------------------------------------
+
+export type AuthContextDataProps = {
+  user: UserDTO;
+  updateUserProfile: (userUpdated: UserDTO) => Promise<void>;
+  signIn: (cedula: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  isLoadingUserData: boolean;
+  isOffline: boolean;
+  cliente: ClienteDTO;
+  setCliente: (cliente: ClienteDTO | null) => void;
+  serverIP: string | null;
+  setServerIP: (ip: string | null) => Promise<void>;
+  isLoadingServerIP: boolean;
+  sucursal: SucursalDTO;
+  setSucursal: (sucursal: SucursalDTO | null) => void;
+};
+
+type AuthContextProviderProps = { children: React.ReactNode };
+
+export const AuthContext = createContext<AuthContextDataProps>(
+  {} as AuthContextDataProps
+);
+
+// ---------------------------------------------------------------------------
+// Provider
+// ---------------------------------------------------------------------------
+
+export function AuthContextProvider({ children }: AuthContextProviderProps) {
+  const [user, setUser] = useState<UserDTO>({} as UserDTO);
+  const [sucursal, setSucursalState] = useState<SucursalDTO>({} as SucursalDTO);
+  const [cliente, setClienteState] = useState<ClienteDTO>({} as ClienteDTO);
+  const [isLoadingUserData, setIsLoadingUserData] = useState(true);
+  const [isLoadingServerIP, setIsLoadingServerIP] = useState(true);
+  const [serverIP, setServerIPState] = useState<string | null>(null);
+  const [isOffline, setIsOffline] = useState(false);
+
+  // ── signIn ────────────────────────────────────────────────────────────────
+
+  async function signIn(cedula: string, password: string): Promise<void> {
+    setIsLoadingUserData(true);
+    try {
+      const online = await httpClient.isOnline();
+
+      if (online) {
+        // ── Login online ────────────────────────────────────────────────
+        const data = await login(cedula, password);
+        const refreshToken = data.refresh_token ?? "";
+        const userData: UserDTO = { cedula, name: data.name };
+
+        // Token JWT → AsyncStorage (efímero)
+        await saveAuthToken({ token: data.token, refresh_token: refreshToken });
+        await saveUser(userData);
+
+        // Hash de clave → SQLite (persiste para login offline)
+        await saveUserLocally({ cedula, name: data.name, password, refreshToken });
+
+        httpClient.setToken(data.token);
+        setUser(userData);
+        setIsOffline(false);
+
+      } else {
+        // ── Login offline ───────────────────────────────────────────────
+        const result = await loginOffline(cedula, password);
+
+        if (!result.ok) {
+          const messages: Record<typeof result.reason, string> = {
+            not_last_user: "Para cambiar de usuario necesitás conexión al servidor.",
+            wrong_password: "Contraseña incorrecta.",
+            no_local_user: "No hay datos locales. Conectate al servidor para hacer el primer login.",
+            error: "Error al iniciar sesión offline.",
+          };
+          throw new Error(messages[result.reason]);
+        }
+
+        const userData: UserDTO = { cedula: result.user.cedula, name: result.user.name };
+        await saveUser(userData);
+        setUser(userData);
+        setIsOffline(true);
+      }
+    } finally {
+      setIsLoadingUserData(false);
+    }
+  }
+
+  // ── signOut ───────────────────────────────────────────────────────────────
+
+  async function signOut(): Promise<void> {
+    try {
+      setIsLoadingUserData(true);
+      if (user.cedula) await clearSession(user.cedula);
+      httpClient.clearToken();
+      setUser({} as UserDTO);
+      setIsOffline(false);
+      await removeUser();
+      await removeAuthToken();
+    } finally {
+      setIsLoadingUserData(false);
+    }
+  }
+
+  // ── updateUserProfile ─────────────────────────────────────────────────────
+
+  async function updateUserProfile(userUpdated: UserDTO): Promise<void> {
+    setUser(userUpdated);
+    await saveUser(userUpdated);
+  }
+
+  // ── Carga inicial ─────────────────────────────────────────────────────────
+
+  async function loadUserData(): Promise<void> {
+    try {
+      setIsLoadingUserData(true);
+      const userLogged = await getStorageUser();
+      const { token } = await getAuthToken();
+
+      if (userLogged?.cedula) {
+        setUser(userLogged);
+        if (token) {
+          httpClient.setToken(token);
+          setIsOffline(false);
+        } else {
+          setIsOffline(true);
+        }
+      }
+    } finally {
+      setIsLoadingUserData(false);
+    }
+  }
+
+  async function loadServerIP(): Promise<void> {
+    const ip = await getStorageServerUrl();
+    const suc = await getStorageSucursal();
+    setServerIPState(ip);
+    setSucursalState(suc);
+    setIsLoadingServerIP(false);
+  }
+
+  // ── Setters ───────────────────────────────────────────────────────────────
+
+  async function setServerIP(ip: string | null): Promise<void> {
+    if (ip !== null) await saveServerUrl(ip);
+    setServerIPState(ip);
+  }
+
+  function setCliente(cliente: ClienteDTO | null): void {
+    setClienteState(cliente ?? ({} as ClienteDTO));
+  }
+
+  async function setSucursal(sucursal: SucursalDTO | null): Promise<void> {
+    if (sucursal !== null) {
+      await saveSucursal(sucursal);
+      setSucursalState(sucursal);
+    } else {
+      setSucursalState({} as SucursalDTO);
+    }
+  }
+
+  // ── Efectos ───────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    loadUserData();
+    loadServerIP();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = httpClient.registerSignOut(signOut);
+    return unsubscribe;
+  }, [signOut]);
+
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        signIn,
+        signOut,
+        isLoadingUserData,
+        isOffline,
+        updateUserProfile,
+        serverIP,
+        setServerIP,
+        isLoadingServerIP,
+        cliente,
+        setCliente,
+        sucursal,
+        setSucursal,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}
+</file>
+
+<file path="src/dto/ClienteDTO.ts">
+export type ClienteDTO = {
+	ruc: string;
+	descripcion_cliente: string;
+};
+</file>
+
+<file path="src/dto/PersonaDTO.ts">
+export type PersonaDTO = {
+	cedula: number;
+	nombre_apellido: string;
+};
+</file>
+
+<file path="src/dto/VehiculoDTO.ts">
+export type VehiculoDTO = {
+	id_vehiculo: string;
+	descripcion_vehiculo: string;
+	ruc: string;
+};
+</file>
+
+<file path="src/backend/api/authAPI.ts">
+// src/backend/api/authAPI.ts
+//
+// Todas las llamadas HTTP relacionadas a autenticación.
+// Las pantallas y contextos importan de aquí — nunca usan axios directamente.
+
+import { httpClient } from "./httpClient";
+
+// ---------------------------------------------------------------------------
+// Tipos de respuesta del servidor
+// ---------------------------------------------------------------------------
+
+export type LoginResponse = {
+  name: string;
+  token: string;
+  refresh_token?: string;
+};
+
+export type RefreshTokenResponse = {
+  token: string;
+  refresh_token: string;
+};
+
+// ---------------------------------------------------------------------------
+// login
+// POST /api/auth/login
+// ---------------------------------------------------------------------------
+
+export async function login(
+  cedula: string,
+  password: string
+): Promise<LoginResponse> {
+  const { data } = await httpClient.post<LoginResponse>("/api/auth/login", {
+    cedula: Number(cedula),
+    clave: password,
+  });
+
+  if (!data.name || !data.token) {
+    throw new Error("Respuesta del servidor inválida.");
+  }
+
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// refreshToken
+// POST /api/auth/refresh-token
+// (el httpClient ya lo maneja automáticamente en el interceptor,
+//  esta función queda disponible si alguna pantalla lo necesita llamar directo)
+// ---------------------------------------------------------------------------
+
+export async function refreshToken(
+  refresh_token: string
+): Promise<RefreshTokenResponse> {
+  const { data } = await httpClient.post<RefreshTokenResponse>(
+    "/api/auth/refresh-token",
+    { refresh_token }
+  );
+  return data;
+}
+</file>
+
+<file path="src/backend/db/client.tsx">
+import React from "react";
+import { drizzle } from "drizzle-orm/expo-sqlite";
+import * as SQLite from "expo-sqlite";
+import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
+import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
+import migrations from "./drizzle/migrations";
+
+const expoDb = SQLite.openDatabaseSync("playero.db", { 
+  enableChangeListener: true 
+});
+
+export const db = drizzle(expoDb);
+
+export function DatabaseProvider({ children }: { children: React.ReactNode }) {
+  useDrizzleStudio(expoDb);
+
+  const { success, error } = useMigrations(db, migrations);
+
+  if (error) {
+    console.error("❌ Migration error:", error);
+    return null;
+  }
+
+  if (!success) {
+    console.log("⏳ Aplicando migraciones...");
+    return null;
+  }
+
+  return <>{children}</>;
+}
+</file>
+
+<file path="src/screens/cliente/CrearCliente.tsx">
+import { Input } from "@components/Input";
+import { InputCard } from "@components/InputCard";
+import { Button } from "@components/Button";
+import { useState } from "react";
+import { AppError } from "@utils/AppError";
+import { Controller, useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
+import { api } from "@services/api";
+import { ClienteDTO } from "@dto/ClienteDTO";
+import { toastError, toastSuccess } from "@/utils/toastMessage";
+import { View } from "react-native";
+import { Save } from "lucide-react-native";
+
+type FormData = {
+	ruc: string;
+	nombre: string;
+};
+
+const addClientechema = yup.object({
+	nombre: yup
+		.string()
+		.required("Razón social es requerido")
+		.min(3, "El nome debe tener al menos 3 caracteres"),
+	ruc: yup
+		.string()
+		.required("RUC es requerido")
+		.matches(/^\d{6,8}(-?[0-9])$/, "El RUC solo puede contener números")
+		.min(6, "La cedula debe tener al menos 7 caracteres"),
+});
+
+export function CrearCliente() {
+	const [isLoading, setIsLoading] = useState(false);
+	const {
+		control,
+		handleSubmit,
+		formState: { errors },
+	} = useForm({
+		resolver: yupResolver(addClientechema),
+		defaultValues: {
+			nombre: "", // passar o parametro aqui quando for editar
+			ruc: "",
+		},
+	});
+
+	async function handleNewCliente({ ruc, nombre }: FormData) {
+		try {
+			setIsLoading(true);
+			const clienteData: ClienteDTO = {
+				ruc,
+				descripcion_cliente: nombre.toUpperCase(),
+			};
+
+			await api.post("/api/clientes", clienteData);
+
+			toastSuccess("Cliente creado exitosamente", "");
+		} catch (error) {
+			const isAppError = error instanceof AppError;
+			const statusCode =
+				isAppError && error.statusCode ? error.statusCode : undefined;
+
+			toastError(
+				"Error al crear cliente",
+				statusCode === 409
+					? "Ya existe un cliente con este RUC"
+					: "Error al crear cliente, intente nuevamente"
+			);
+		} finally {
+			setIsLoading(false);
+		}
+	}
+
+	return (
+		<View className='flex-1'>
+			{/* <ScreenHeader title='Crear Cliente' /> */}
+			<View className='flex-1 p-4 gap-4 items-center'>
+				<InputCard
+					title='RUC:'
+					required
+				>
+					<View className='w-full flex-row items-center'>
+						<Controller
+							control={control}
+							name='ruc'
+							rules={{ required: "RUC es requerido" }}
+							render={({ field: { onChange, value } }) => (
+								<Input
+									placeholder='Informe RUC'
+									placeholderTextColor='$gray600'
+									onChangeText={onChange}
+									errorMessage={errors.ruc?.message}
+								/>
+							)}
+						/>
+					</View>
+				</InputCard>
+
+				<InputCard
+					title='Razón Social:'
+					required
+				>
+					<View className='w-full flex-row items-center'>
+						<Controller
+							control={control}
+							name='nombre'
+							rules={{ required: "nombre del cliente es requerido" }}
+							render={({ field: { onChange, value } }) => (
+								<Input
+									placeholder='Informe razón social'
+									placeholderTextColor='$gray600'
+									value={value.toUpperCase()}
+									onChangeText={onChange}
+									errorMessage={errors.nombre?.message}
+								/>
+							)}
+						/>
+					</View>
+				</InputCard>
+				<View className='flex-row mt-32 gap-5'>
+					<Button
+						title='Crear'
+						onPress={handleSubmit(handleNewCliente)}
+						isLoading={isLoading}
+						icon={Save}
+						iconSize='md'
+						iconColor='#000'
+					/>
+				</View>
+			</View>
+		</View>
+	);
+}
+</file>
+
+<file path="src/screens/persona/CrearPersona.tsx">
+import { useState } from "react";
+import { View } from "react-native";
+import { Controller, useForm } from "react-hook-form";
+import * as yup from "yup";
+import { yupResolver } from "@hookform/resolvers/yup";
+import { toastError, toastSuccess } from "@utils/toastMessage";
+
+import { Input } from "@components/Input";
+import { InputCard } from "@components/InputCard";
+import { Button } from "@components/Button";
+import { AppError } from "@utils/AppError";
+import { api } from "@services/api";
+
+import { Save, UserRoundPlus } from "lucide-react-native";
+import axios from "axios";
+
+type FormData = {
+	cedula: string;
+	nombre: string;
+};
+
+const crearPersonaschema = yup.object({
+	nombre: yup
+		.string()
+		.required("Nombre es requerido")
+		.min(3, "El nome debe tener al menos 3 caracteres")
+		.test("tiene-apellido", "Ingrese el nombre y apellido", (value) => {
+			if (!value) return false;
+			const words = value.trim().split(/\s+/);
+			return words.length >= 2 && words[0].length > 2 && words[1].length > 3;
+		}),
+	cedula: yup
+		.string()
+		.required("Cédula es requerido")
+		.matches(/^[0-9]+$/, "La cedula solo puede contener números")
+		.min(6, "La cedula debe tener al menos 6 caracteres")
+		.max(7, "La cedula no puede tener más de 7 caracteres"),
+});
+
+export function CrearPersona() {
+	const [isLoading, setIsLoading] = useState(false);
+	const [isSaved, setIsSaved] = useState(false);
+	const {
+		control,
+		handleSubmit,
+		reset,
+		formState: { errors },
+	} = useForm({
+		resolver: yupResolver(crearPersonaschema),
+		defaultValues: {
+			nombre: "", // passar o parametro aqui quando for editar
+			cedula: "",
+		},
+	});
+
+	async function handleNewPersona({ cedula, nombre }: FormData) {
+		try {
+			setIsLoading(true);
+			await api.post("/api/personas", {
+				cedula: +cedula,
+				nombre_apellido: nombre.toUpperCase(),
+			});
+			toastSuccess("Grabación exitosa", "Persona creada exitosamente");
+			setIsSaved(true);
+		} catch (error) {
+			let statusCode: number | undefined;
+
+			if (error instanceof AppError) {
+				statusCode = error.statusCode;
+			} else if (axios.isAxiosError(error)) {
+				statusCode = error.response?.status;
+			}
+
+			toastError(
+				"Error en la creación",
+				statusCode === 409
+					? "Ya existe una persona con esta cédula"
+					: "Error al crear la persona, intente nuevamente"
+			);
+		} finally {
+			setIsLoading(false);
+		}
+	}
+
+	return (
+		<View className='flex-1'>
+			<View className='flex-1 p-4 gap-4 items-center'>
+				<InputCard
+					title='Cedula:'
+					required
+				>
+					<View className='flex-row w-full items-center'>
+						<Controller
+							control={control}
+							name='cedula'
+							rules={{ required: "cedula de identidad es requerido" }}
+							render={({ field: { onChange, value } }) => (
+								<Input
+									keyboardType='number-pad'
+									className='font-medium text-xl'
+									placeholder='Informe cédula'
+									placeholderTextColor='$gray600'
+									onChangeText={onChange}
+									value={value}
+									errorMessage={errors.cedula?.message}
+								/>
+							)}
+						/>
+					</View>
+				</InputCard>
+
+				<InputCard
+					title='Nombre y Apellido:'
+					required
+				>
+					<View className='flex-row'>
+						<Controller
+							control={control}
+							name='nombre'
+							rules={{ required: "nombre y apellido es requerido" }}
+							render={({ field: { onChange, value } }) => (
+								<Input
+									placeholder='Informe nombre y apellido'
+									placeholderTextColor='$gray600'
+									className='font-medium text-xl'
+									value={value.toUpperCase()}
+									onChangeText={onChange}
+									errorMessage={errors.nombre?.message}
+								/>
+							)}
+						/>
+					</View>
+				</InputCard>
+				<View className='flex-row mt-32 gap-5'>
+					<Button
+						title='Crear'
+						onPress={handleSubmit(handleNewPersona)}
+						isLoading={isLoading}
+						icon={Save}
+						iconSize='md'
+						iconColor='#000'
+					/>
+					{isSaved && (
+						<Button
+							title='Nuevo'
+							onPress={() => {
+								setIsSaved(false);
+								reset({
+									nombre: "",
+									cedula: "",
+								});
+							}}
+							isLoading={isLoading}
+							icon={UserRoundPlus}
+							iconSize='md'
+							iconColor='#000'
+						/>
+					)}
+				</View>
+			</View>
+		</View>
+	);
+}
+</file>
+
+<file path="src/screens/vehiculo/CrearVehiculo.tsx">
+import { Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useState } from "react";
+import axios from "axios";
+import { StackRoutesProps } from "@/route/app.routes";
+
+import { toastError, toastSuccess } from "@utils/toastMessage";
+import { Input } from "@components/Input";
+import { InputCard } from "@components/InputCard";
+import { Button } from "@components/Button";
+import { AppError } from "@utils/AppError";
+import { Controller, useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import * as yup from "yup";
+import { api } from "@services/api";
+import { SaveIcon, SquarePlus } from "lucide-react-native";
+import { useCliente } from "@/hooks/useCliente";
+
+type FormData = {
+	id_vehiculo: string;
+	descripcion_vehiculo: string;
+};
+
+const addVehiculochema = yup.object({
+	descripcion_vehiculo: yup
+		.string()
+		.required("Descripción es requerido")
+		.min(3, "La descripción debe tener al menos 3 caracteres"),
+	id_vehiculo: yup
+		.string()
+		.required("Id/Chapa es requerido")
+		.min(3, "La identificación debe tener al menos 3 caracteres"),
+});
+
+export function CrearVehiculo({
+	navigation,
+	route,
+}: StackRoutesProps<"crearvehiculo">) {
+	const { cliente, setCliente } = useCliente();
+	const [isLoading, setIsLoading] = useState(false);
+	const [isSaved, setIsSaved] = useState(false);
+
+	const {
+		control,
+		handleSubmit,
+		formState: { errors },
+		setValue,
+		reset,
+		clearErrors,
+		watch,
+	} = useForm({
+		resolver: yupResolver(addVehiculochema),
+		defaultValues: {
+			descripcion_vehiculo: "",
+			id_vehiculo: "",
+		},
+	});
+
+	async function handleNewVehiculo({
+		id_vehiculo,
+		descripcion_vehiculo,
+	}: FormData) {
+		try {
+			setIsLoading(true);
+			await api.post("/api/vehiculos", {
+				// converter para maiúsculo e remover espaços
+				id_vehiculo: id_vehiculo.toUpperCase().replace(/\s+/g, ""),
+				descripcion_vehiculo: descripcion_vehiculo.toUpperCase(),
+				ruc: cliente?.ruc,
+			});
+			setIsSaved(true);
+			toastSuccess("Creación de vehículo", "Vehículo creado exitosamente");
+		} catch (error) {
+			console.log(error);
+			let statusCode: number | undefined;
+
+			if (error instanceof AppError) {
+				statusCode = error.statusCode;
+			} else if (axios.isAxiosError(error)) {
+				statusCode = error.response?.status;
+			}
+
+			toastError(
+				"Error en la creación",
+				statusCode === 409
+					? "Ya existe un vehiculo con este registro"
+					: "Error al crear vehículo, intente nuevamente"
+			);
+		} finally {
+			setIsLoading(false);
+		}
+	}
+
+	return (
+		<View className='flex-1'>
+			<View className='flex-1 items-center p-4 gap-4'>
+				<InputCard
+					title='ID Vehículo:'
+					required
+				>
+					<View className='w-full items-center'>
+						<Controller
+							control={control}
+							name='id_vehiculo'
+							rules={{ required: "Identificación es requerido" }}
+							render={({ field: { onChange, value } }) => (
+								<Input
+									value={value.toUpperCase()}
+									placeholder='Identificación'
+									placeholderTextColor='$gray600'
+									onChangeText={onChange}
+									errorMessage={errors.id_vehiculo?.message}
+								/>
+							)}
+						/>
+					</View>
+				</InputCard>
+
+				<InputCard
+					title='Descripción del Vehículo:'
+					required
+				>
+					<View className='w-full items-center'>
+						<Controller
+							control={control}
+							name='descripcion_vehiculo'
+							rules={{ required: "Descripción es requerido" }}
+							render={({ field: { onChange, value } }) => (
+								<Input
+									value={value.toUpperCase()}
+									placeholder='Descripcion'
+									placeholderTextColor='$gray600'
+									onChangeText={onChange}
+									errorMessage={errors.descripcion_vehiculo?.message}
+								/>
+							)}
+						/>
+					</View>
+				</InputCard>
+
+				<InputCard
+					title='Cliente:'
+					required={true}
+				>
+					<View className='flex-row w-full items-center'>
+						<View className='w-full h-10 bg-white rounded-md border border-gray-300'>
+							<TouchableOpacity
+								className='flex-1 justify-center px-4'
+								onPress={() =>
+									navigation.navigate("cliente", { enabledSelect: true })
+								}
+								style={{ flex: 1 }}
+							>
+								<Text className='text-lg font-medium'>
+									{cliente?.descripcion_cliente || "Selecionar cliente"}
+								</Text>
+							</TouchableOpacity>
+						</View>
+					</View>
+				</InputCard>
+
+				<View className='flex-row gap-4 mt-32'>
+					<Button
+						title='Crear'
+						onPress={handleSubmit(handleNewVehiculo)}
+						isLoading={isLoading}
+						disabled={isSaved}
+						icon={SaveIcon}
+						iconSize='md'
+						iconColor='#000'
+					/>
+					{isSaved && (
+						<Button
+							title='Nuevo'
+							onPress={() => {
+								reset({
+									id_vehiculo: "",
+									descripcion_vehiculo: "",
+								});
+								clearErrors();
+								setIsSaved(false);
+							}}
+							icon={SquarePlus}
+							iconSize='md'
+							iconColor='#000'
+						/>
+					)}
+				</View>
+			</View>
+		</View>
+	);
+}
+</file>
+
+<file path="src/backend/api/httpClient.ts">
+// src/backend/api/httpClient.ts
+//
+// Cliente HTTP centralizado. Es el único lugar del proyecto que conoce axios.
+// Maneja: baseURL dinámica, token JWT, refresh automático de token, y signOut.
+//
+// USO:
+//   import { httpClient } from "@/backend/api/httpClient"
+//   httpClient.registerSignOut(signOut)   ← llamar una vez en AuthContext
+//   httpClient.get("/api/recursos")
+//   httpClient.post("/api/auth/login", body)
+
+import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AUTH_TOKEN_STORAGE, SERVER_URL } from "@storage/storageConfig";
+
+// ---------------------------------------------------------------------------
+// Tipos internos
+// ---------------------------------------------------------------------------
+
+type TokenStorage = { token: string; refresh_token: string };
+type QueueItem = { onSuccess: (token: string) => void; onFailure: (err: AxiosError) => void };
+
+// ---------------------------------------------------------------------------
+// Helpers de AsyncStorage (internos, no exportar)
+// ---------------------------------------------------------------------------
+
+async function readTokens(): Promise<TokenStorage> {
+  const raw = await AsyncStorage.getItem(AUTH_TOKEN_STORAGE);
+  return raw ? JSON.parse(raw) : { token: "", refresh_token: "" };
+}
+
+async function writeTokens(tokens: TokenStorage): Promise<void> {
+  await AsyncStorage.setItem(AUTH_TOKEN_STORAGE, JSON.stringify(tokens));
+}
+
+async function readServerUrl(): Promise<string | null> {
+  const raw = await AsyncStorage.getItem(SERVER_URL);
+  return raw ? JSON.parse(raw) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Construcción del cliente
+// ---------------------------------------------------------------------------
+
+const axiosInstance: AxiosInstance = axios.create({ timeout: 22000 });
+
+let failedQueue: QueueItem[] = [];
+let isRefreshing = false;
+let registeredSignOut: (() => Promise<void>) | null = null;
+
+function resolveQueue(token: string) {
+  failedQueue.forEach((item) => item.onSuccess(token));
+  failedQueue = [];
+}
+
+function rejectQueue(err: AxiosError) {
+  failedQueue.forEach((item) => item.onFailure(err));
+  failedQueue = [];
+}
+
+// ── Interceptor de REQUEST: inyecta baseURL y token ─────────────────────────
+axiosInstance.interceptors.request.use(async (config) => {
+  const serverIP = await readServerUrl();
+  if (serverIP) {
+    config.baseURL = serverIP.startsWith("http://") ? serverIP : `http://${serverIP}`;
+  }
+
+  const { token } = await readTokens();
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+
+// ── Interceptor de RESPONSE: maneja 401 y refresh token ─────────────────────
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    if (!error.response) {
+      return Promise.reject(new Error("No se pudo conectar al servidor."));
+    }
+
+    const { response } = error;
+    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+
+    if (response?.status === 401) {
+      const message = (response.data as any)?.message;
+
+      if (message === "token.expired" || message === "token.invalid") {
+        if (originalRequest._retry) {
+          registeredSignOut?.();
+          return Promise.reject(new Error("Sesión expirada. Iniciá sesión nuevamente."));
+        }
+
+        originalRequest._retry = true;
+        const { refresh_token } = await readTokens();
+
+        if (!refresh_token) {
+          registeredSignOut?.();
+          return Promise.reject(new Error("Sin token de autenticación."));
+        }
+
+        if (isRefreshing) {
+          return new Promise((resolve, reject) => {
+            failedQueue.push({
+              onSuccess: (token) => {
+                if (originalRequest.headers) originalRequest.headers.Authorization = `Bearer ${token}`;
+                resolve(axiosInstance(originalRequest));
+              },
+              onFailure: reject,
+            });
+          });
+        }
+
+        isRefreshing = true;
+
+        return new Promise(async (resolve, reject) => {
+          try {
+            const baseURL = axiosInstance.defaults.baseURL;
+            const { data } = await axios.post(`${baseURL}/api/auth/refresh-token`, { refresh_token });
+
+            await writeTokens({ token: data.token, refresh_token: data.refresh_token });
+            axiosInstance.defaults.headers.common.Authorization = `Bearer ${data.token}`;
+            if (originalRequest.headers) originalRequest.headers.Authorization = `Bearer ${data.token}`;
+
+            resolveQueue(data.token);
+            resolve(axiosInstance(originalRequest));
+          } catch (refreshError) {
+            rejectQueue(refreshError as AxiosError);
+            registeredSignOut?.();
+            reject(refreshError);
+          } finally {
+            isRefreshing = false;
+          }
+        });
+      }
+
+      registeredSignOut?.();
+      return Promise.reject(new Error((response.data as any)?.message || "Acceso no autorizado."));
+    }
+
+    const msg = (response?.data as any)?.message || `Error ${response?.status}`;
+    return Promise.reject(new Error(msg));
+  }
+);
+
+// ---------------------------------------------------------------------------
+// API pública del httpClient
+// ---------------------------------------------------------------------------
+
+export const httpClient = {
+  /** Registrar la función signOut del AuthContext para que el interceptor pueda llamarla */
+  registerSignOut(fn: () => Promise<void>) {
+    registeredSignOut = fn;
+    return () => { registeredSignOut = null; };
+  },
+
+  /** Actualizar el token en los headers globales (llamar tras login) */
+  setToken(token: string) {
+    axiosInstance.defaults.headers.common.Authorization = `Bearer ${token}`;
+  },
+
+  /** Limpiar el token de los headers (llamar tras logout) */
+  clearToken() {
+    delete axiosInstance.defaults.headers.common.Authorization;
+  },
+
+  get<T = any>(url: string, config?: AxiosRequestConfig) {
+    return axiosInstance.get<T>(url, config);
+  },
+
+  post<T = any>(url: string, data?: any, config?: AxiosRequestConfig) {
+    return axiosInstance.post<T>(url, data, config);
+  },
+
+  put<T = any>(url: string, data?: any, config?: AxiosRequestConfig) {
+    return axiosInstance.put<T>(url, data, config);
+  },
+
+  patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig) {
+    return axiosInstance.patch<T>(url, data, config);
+  },
+
+  delete<T = any>(url: string, config?: AxiosRequestConfig) {
+    return axiosInstance.delete<T>(url, config);
+  },
+
+  /** Verificar conectividad al servidor (usado para detectar modo offline) */
+  async isOnline(): Promise<boolean> {
+    try {
+      await axiosInstance.get("/api/health", { timeout: 5000 });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+};
+</file>
+
+<file path="src/backend/db/schema.ts">
+// src/backend/db/schema.ts
+import { sqliteTable, integer, text, real } from "drizzle-orm/sqlite-core";
+import { relations } from "drizzle-orm";
+
+export const personas = sqliteTable("personas", {
+  cedula: integer("cedula").primaryKey(),
+  nombreApellido: text("nombre_apellido").notNull(),
+  timestamp: integer("timestamp"),
+  sync: integer("sync").notNull().default(0),
+});
+
+export const usuariosApp = sqliteTable("usuarios_app", {
+  cedula: integer("cedula").primaryKey(),   // FK → personas.cedula
+  clave: text("clave").notNull(),
+  refreshToken: text("refresh_token"),
+  salt: text("salt"),
+});
+
+export const clientes = sqliteTable("clientes", {
+  ruc: text("ruc").primaryKey(),
+  descripcionCliente: text("descripcion_cliente").notNull(),
+  timestamp: integer("timestamp"),
+  sync: integer("sync").notNull().default(0),
+});
+
+export const vehiculos = sqliteTable("vehiculos", {
+  idVehiculo: text("id_vehiculo").primaryKey(),
+  descripcionVehiculo: text("descripcion_vehiculo").notNull(),
+  ruc: text("ruc").notNull(),              // FK → clientes.ruc
+  timestamp: integer("timestamp"),
+  sync: integer("sync").notNull().default(0),
+});
+
+export const sucursales = sqliteTable("sucursales", {
+  idSucursal: integer("id_sucursal").primaryKey(),
+  descripcionSucursal: text("descripcion_sucursal").notNull(),
+});
+
+export const bodegas = sqliteTable("bodegas", {
+  idBodega: integer("id_bodega").primaryKey(),
+  descripcionBodega: text("descripcion_bodega").notNull(),
+  idSucursal: integer("id_sucursal").notNull(), // FK → sucursales.id_sucursal
+  trapaso: integer("trapaso", { mode: "boolean" }).notNull().default(false),
+});
+
+export const picos = sqliteTable("picos", {
+  idPico: integer("id_pico").primaryKey(),
+  descripcionPico: text("descripcion_pico").notNull(),
+  idBodega: integer("id_bodega").notNull(),     // FK → bodegas.id_bodega
+  idPicoSurtidor: integer("id_pico_surtidor").notNull(),
+});
+
+export const tanques = sqliteTable("tanques", {
+  idTanque: integer("id_tanque").primaryKey(),
+  descripcionTanque: text("descripcion_tanque").notNull(),
+  idBodega: integer("id_bodega").notNull(),     // FK → bodegas.id_bodega
+  capacidadLitros: real("capacidad_litros"),
+});
+
+export const turnos = sqliteTable("turnos", {
+  idTurno: integer("id_turno").primaryKey({ autoIncrement: true }),
+  idBodega: integer("id_bodega").notNull(),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+  estado: integer("estado").notNull().default(1),
+  observacionAnulacion: text("observacion_anulacion"),
+});
+
+export const tickets = sqliteTable("tickets", {
+  idTicket: integer("id_ticket").primaryKey({ autoIncrement: true }),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+  estado: integer("estado").notNull().default(1),
+});
+
+export const trapasos = sqliteTable("trapasos", {
+  idTrapaso: integer("id_trapaso").primaryKey({ autoIncrement: true }),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+  estado: integer("estado").notNull().default(1),
+});
+
+export const calibraciones = sqliteTable("calibraciones", {
+  idCalibracion: integer("id_calibracion").primaryKey({ autoIncrement: true }),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+});
+
+export const abastecimientos = sqliteTable("abastecimientos", {
+  idAbastecimiento: integer("id_abastecimiento").primaryKey({ autoIncrement: true }),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+});
+
+export const despachos = sqliteTable("despachos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  idHrs: integer("id_hrs").notNull(),
+  pico: integer("pico").notNull(),
+  combustible: integer("combustible").notNull(),
+  tanque: integer("tanque").notNull(),
+  totalCtvs: integer("total_ctvs").notNull(),
+  volumenMl: integer("volumen_ml").notNull(),
+  precioCvl: integer("precio_cvl").notNull(),
+  decTotal: integer("dec_total").notNull(),
+  decVolumen: integer("dec_volumen").notNull(),
+  decPrecio: integer("dec_precio").notNull(),
+  tiempoSeg: integer("tiempo_seg"),
+  fechaHora: integer("fecha_hora").notNull(),
+  totalIni: integer("total_ini"),
+  totalFin: integer("total_fin"),
+  frentistaId: text("frentista_id"),
+  clienteId: text("cliente_id"),
+  volTanqueMl: integer("vol_tanque_ml"),
+  creadoEn: integer("creado_en").notNull().$defaultFn(() => Date.now()),
+  sync: integer("sync", { mode: "boolean" }),
+  proces: integer("proces", { mode: "boolean" }),
+});
+
+export const syncs = sqliteTable("syncs", {
+  idSync: integer("id_sync").primaryKey({ autoIncrement: true }),
+  tipo: text("tipo").notNull().unique(),
+  fecha: integer("fecha").notNull(),
+});
+
+export const usuariosAdmin = sqliteTable("usuarios_admin", {
+  correo: text("correo").primaryKey(),
+  nombre: text("nombre").notNull(),
+  salt: text("salt").notNull(),
+  clave: text("clave").notNull(),
+  refreshToken: text("refresh_token"),
+  timestamp: integer("timestamp"),
+});
+
+// ==================== RELACIONES ====================
+
+export const personasRelations = relations(personas, ({ one }) => ({
+  usuarioApp: one(usuariosApp, {
+    fields: [personas.cedula],
+    references: [usuariosApp.cedula],
+  }),
+}));
+
+export const vehiculosRelations = relations(vehiculos, ({ one }) => ({
+  cliente: one(clientes, {
+    fields: [vehiculos.ruc],
+    references: [clientes.ruc],
+  }),
+}));
+
+export const bodegasRelations = relations(bodegas, ({ one, many }) => ({
+  sucursal: one(sucursales, {
+    fields: [bodegas.idSucursal],
+    references: [sucursales.idSucursal],
+  }),
+  picos: many(picos),
+  tanques: many(tanques),
+}));
+</file>
+
+<file path="src/backend/db/modules/authDB.ts">
+// src/backend/db/modules/authDB.ts
+//
+// Módulo de base de datos para autenticación.
+// Maneja login online y offline, sesión activa y último usuario.
+//
+// REGLAS DE NEGOCIO:
+//   - Login online  → autentica contra API, guarda hash de clave localmente
+//   - Login offline → solo si la cedula ingresada es el último usuario autenticado online
+//   - Cambio de usuario offline → bloqueado (requiere conexión)
+//   - Hash de contraseña → SHA-256 con salt aleatorio via expo-crypto
+
+import { db } from "@/backend/db/client";
+import { usuariosApp, personas, syncs } from "@/backend/db/schema";
+import { eq } from "drizzle-orm";
+import * as Crypto from "expo-crypto";
+
+// ---------------------------------------------------------------------------
+// Tipos públicos
+// ---------------------------------------------------------------------------
+
+export type SessionUser = {
+  cedula: string;
+  name: string;
+};
+
+export type LoginResult =
+  | { ok: true;  user: SessionUser; token: string; refreshToken: string; offline: false }
+  | { ok: true;  user: SessionUser; token: null;   refreshToken: null;   offline: true  }
+  | { ok: false; reason: "wrong_password" | "not_last_user" | "no_local_user" | "error" };
+
+// Clave en tabla syncs para recordar la última cédula autenticada online.
+// Guardamos la cédula numérica en el campo `fecha` (reutilizamos la tabla key-value).
+const LAST_USER_KEY = "__last_online_user__";
+
+// ---------------------------------------------------------------------------
+// Utilidades de hash
+// ---------------------------------------------------------------------------
+
+async function hashPassword(password: string, salt: string): Promise<string> {
+  return await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    salt + password
+  );
+}
+
+async function generateSalt(): Promise<string> {
+  const bytes = Crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// ---------------------------------------------------------------------------
+// getLastOnlineUser
+// Devuelve la cédula del último usuario que hizo login online en este dispositivo.
+// ---------------------------------------------------------------------------
+
+export async function getLastOnlineUser(): Promise<string | null> {
+  try {
+    const result = await db
+      .select({ fecha: syncs.fecha })
+      .from(syncs)
+      .where(eq(syncs.tipo, LAST_USER_KEY))
+      .limit(1);
+
+    return result[0] ? String(result[0].fecha) : null;
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// saveUserLocally
+// Persiste persona + hash de contraseña + refreshToken tras un login online exitoso.
+// También marca esta cédula como el último usuario online del dispositivo.
+// ---------------------------------------------------------------------------
+
+export async function saveUserLocally({
+  cedula,
+  name,
+  password,
+  refreshToken,
+}: {
+  cedula: string;
+  name: string;
+  password: string;
+  refreshToken: string;
+}): Promise<void> {
+  const salt = await generateSalt();
+  const claveHash = await hashPassword(password, salt);
+  const cedulaNum = Number(cedula);
+
+  // Upsert persona
+  await db
+    .insert(personas)
+    .values({ cedula: cedulaNum, nombreApellido: name, timestamp: Date.now(), sync: 0 })
+    .onConflictDoUpdate({
+      target: personas.cedula,
+      set: { nombreApellido: name, timestamp: Date.now() },
+    });
+
+  // Upsert usuariosApp con hash nuevo
+  await db
+    .insert(usuariosApp)
+    .values({ cedula: cedulaNum, clave: claveHash, salt, refreshToken })
+    .onConflictDoUpdate({
+      target: usuariosApp.cedula,
+      set: { clave: claveHash, salt, refreshToken },
+    });
+
+  // Marcar como último usuario online (upsert en syncs)
+  await db
+    .insert(syncs)
+    .values({ tipo: LAST_USER_KEY, fecha: cedulaNum })
+    .onConflictDoUpdate({
+      target: syncs.tipo,
+      set: { fecha: cedulaNum },
+    });
+}
+
+// ---------------------------------------------------------------------------
+// loginOffline
+// Intenta autenticar sin conexión a internet.
+//
+// Casos de fallo:
+//   no_local_user → nunca hubo login online en el dispositivo
+//   not_last_user → la cédula ingresada no es el último usuario online (cambio de usuario)
+//   wrong_password → contraseña incorrecta
+// ---------------------------------------------------------------------------
+
+export async function loginOffline(
+  cedula: string,
+  password: string
+): Promise<LoginResult> {
+  try {
+    // 1. Verificar que exista un último usuario online
+    const lastCedula = await getLastOnlineUser();
+
+    if (!lastCedula) {
+      return { ok: false, reason: "no_local_user" };
+    }
+
+    // 2. Verificar que sea el mismo usuario (bloquear cambio de usuario offline)
+    if (lastCedula !== cedula) {
+      return { ok: false, reason: "not_last_user" };
+    }
+
+    // 3. Verificar contraseña contra hash local
+    const localData = await db
+      .select({ clave: usuariosApp.clave, salt: usuariosApp.salt })
+      .from(usuariosApp)
+      .where(eq(usuariosApp.cedula, Number(cedula)))
+      .limit(1);
+
+    if (!localData[0]?.salt) {
+      return { ok: false, reason: "no_local_user" };
+    }
+
+    const hash = await hashPassword(password, localData[0].salt);
+    if (hash !== localData[0].clave) {
+      return { ok: false, reason: "wrong_password" };
+    }
+
+    // 4. Traer nombre del usuario
+    const persona = await db
+      .select({ cedula: personas.cedula, name: personas.nombreApellido })
+      .from(personas)
+      .where(eq(personas.cedula, Number(cedula)))
+      .limit(1);
+
+    if (!persona[0]) {
+      return { ok: false, reason: "no_local_user" };
+    }
+
+    return {
+      ok: true,
+      user: { cedula: String(persona[0].cedula), name: persona[0].name },
+      token: null,
+      refreshToken: null,
+      offline: true,
+    };
+  } catch {
+    return { ok: false, reason: "error" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// clearSession
+// Limpia el refreshToken al cerrar sesión.
+// NO borra el hash de contraseña para mantener la capacidad de login offline.
+// ---------------------------------------------------------------------------
+
+export async function clearSession(cedula: string): Promise<void> {
+  await db
+    .update(usuariosApp)
+    .set({ refreshToken: null })
+    .where(eq(usuariosApp.cedula, Number(cedula)));
+}
+</file>
+
+<file path="src/backend/db/modules/bodegaDB.ts">
+// src/backend/db/modules/bodegaDB.ts
+//
+// Módulo de base de datos para bodegas.
+// Las bodegas son catálogo de solo lectura sincronizado desde el servidor.
+//
+// REGLAS DE NEGOCIO:
+//   - Las bodegas no se crean localmente, solo se descargan del servidor.
+//   - Cada bodega pertenece a una sucursal (idSucursal).
+//   - getBodegasByIdSucursal() filtra por la sucursal activa del contexto.
+//   - El campo `trapaso` indica si la bodega puede ser destino de un traspaso.
+
+import { db } from "@/backend/db/client";
+import { bodegas, syncs } from "@/backend/db/schema";
+import { eq } from "drizzle-orm";
+import { BodegaDTO } from "@/dto/BodegaDTO";
+
+// Clave en tabla syncs para registrar la última sincronización de bodegas.
+const SYNC_KEY = "__last_sync_bodegas__";
+
+// ---------------------------------------------------------------------------
+// Tipo extendido interno
+// El DTO público solo tiene id_bodega y descripcion_bodega.
+// Internamente necesitamos idSucursal para filtrar.
+// ---------------------------------------------------------------------------
+
+type BodegaRow = {
+  id_bodega: string;
+  descripcion_bodega: string;
+  id_sucursal: number;
+  trapaso: boolean;
+};
+
+// ---------------------------------------------------------------------------
+// saveBodegas
+// Upsert masivo de bodegas recibidas del servidor.
+// ---------------------------------------------------------------------------
+
+export async function saveBodegas(items: BodegaRow[]): Promise<void> {
+  if (items.length === 0) return;
+
+  for (const item of items) {
+    await db
+      .insert(bodegas)
+      .values({
+        idBodega: Number(item.id_bodega),
+        descripcionBodega: item.descripcion_bodega,
+        idSucursal: item.id_sucursal,
+        trapaso: item.trapaso ?? false,
+      })
+      .onConflictDoUpdate({
+        target: bodegas.idBodega,
+        set: {
+          descripcionBodega: item.descripcion_bodega,
+          idSucursal: item.id_sucursal,
+          trapaso: item.trapaso ?? false,
+        },
+      });
+  }
+
+  // Registrar timestamp de sincronización
+  await db
+    .insert(syncs)
+    .values({ tipo: SYNC_KEY, fecha: Date.now() })
+    .onConflictDoUpdate({
+      target: syncs.tipo,
+      set: { fecha: Date.now() },
+    });
+}
+
+// ---------------------------------------------------------------------------
+// getBodegas
+// Devuelve todas las bodegas del catálogo local.
+// ---------------------------------------------------------------------------
+
+export async function getBodegas(): Promise<BodegaDTO[]> {
+  const rows = await db
+    .select({
+      idBodega: bodegas.idBodega,
+      descripcionBodega: bodegas.descripcionBodega,
+    })
+    .from(bodegas);
+
+  return rows.map((r) => ({
+    id_bodega: String(r.idBodega),
+    descripcion_bodega: r.descripcionBodega,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// getBodegasByIdSucursal
+// Devuelve las bodegas que pertenecen a la sucursal activa.
+// Usado en los Select de Turno, Abastecimiento, Traspaso.
+// ---------------------------------------------------------------------------
+
+export async function getBodegasByIdSucursal(
+  idSucursal: number
+): Promise<BodegaDTO[]> {
+  const rows = await db
+    .select({
+      idBodega: bodegas.idBodega,
+      descripcionBodega: bodegas.descripcionBodega,
+    })
+    .from(bodegas)
+    .where(eq(bodegas.idSucursal, idSucursal));
+
+  return rows.map((r) => ({
+    id_bodega: String(r.idBodega),
+    descripcion_bodega: r.descripcionBodega,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// getBodegasTraspaso
+// Devuelve las bodegas habilitadas como destino de traspaso.
+// Usado en el Select de bodega destino en la pantalla Traspaso.
+// ---------------------------------------------------------------------------
+
+export async function getBodegasTraspaso(
+  idSucursal: number
+): Promise<BodegaDTO[]> {
+  const rows = await db
+    .select({
+      idBodega: bodegas.idBodega,
+      descripcionBodega: bodegas.descripcionBodega,
+    })
+    .from(bodegas)
+    .where(eq(bodegas.idSucursal, idSucursal));
+
+  // Filtramos en memoria porque drizzle-orm necesita and() para múltiples where.
+  // Si el volumen es grande se puede usar and(eq(...), eq(...)).
+  return rows
+    .filter((r) => {
+      // trapaso viene como 0/1 desde SQLite; lo evaluamos como boolean
+      return (r as any).trapaso === 1 || (r as any).trapaso === true;
+    })
+    .map((r) => ({
+      id_bodega: String(r.idBodega),
+      descripcion_bodega: r.descripcionBodega,
+    }));
+}
+
+// ---------------------------------------------------------------------------
+// getBodegaById
+// Devuelve una bodega por su ID.
+// ---------------------------------------------------------------------------
+
+export async function getBodegaById(
+  idBodega: number
+): Promise<BodegaDTO | null> {
+  const rows = await db
+    .select({
+      idBodega: bodegas.idBodega,
+      descripcionBodega: bodegas.descripcionBodega,
+    })
+    .from(bodegas)
+    .where(eq(bodegas.idBodega, idBodega))
+    .limit(1);
+
+  if (!rows[0]) return null;
+
+  return {
+    id_bodega: String(rows[0].idBodega),
+    descripcion_bodega: rows[0].descripcionBodega,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// getLastSyncDate
+// ---------------------------------------------------------------------------
+
+export async function getLastSyncDate(): Promise<number | null> {
+  try {
+    const result = await db
+      .select({ fecha: syncs.fecha })
+      .from(syncs)
+      .where(eq(syncs.tipo, SYNC_KEY))
+      .limit(1);
+
+    return result[0] ? result[0].fecha : null;
+  } catch {
+    return null;
+  }
+}
+</file>
+
+</codebase>
+
+<response_instructions>
+  You are receiving the specific files you requested.
+  Your task is defined in <task>.
+  You now have sufficient context. Proceed with your full response.
+  Do not ask for additional files.
+</response_instructions>
+
+# ========================================================================
+# ESTIMACIÓN DE TOKENS
+# ========================================================================
+#
+#  Modelo           : Genérico (sin modelo específico)
+#  Caracteres       : 56.203
+#  Tokens estimados : ~14.050
+#  Costo estimado   : no disponible (varía según proveedor)
+#  Context window   : no especificado para este modelo
+#
+#  Nota: los precios y límites pueden haber cambiado. Verificá en
+#  la documentación oficial del modelo antes de tomar decisiones de costo.
+# ========================================================================
