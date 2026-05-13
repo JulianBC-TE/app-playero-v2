@@ -4,7 +4,8 @@ import { StackRoutesProps } from "@/route/app.routes";
 
 import { Input } from "@components/Input";
 import { InputCard } from "@components/InputCard";
-import { api } from "@services/api";
+//import { api } from "@services/api";
+import { getClientes } from "@/backend/db/modules/clienteDB";
 import { AppError } from "@utils/AppError";
 import { Loading } from "@components/Loading";
 import { ClienteCard } from "@components/ClienteCard";
@@ -54,7 +55,8 @@ export function BuscarCliente({
 		setIsLoading(true);
 		console.log("Fetching clientes...");
 		try {
-			const response = await api.get("/api/clientes");
+			const data = await getClientes();
+			const response = {data}
 
 			const clientesData: ClienteDTO[] = response.data.map(
 				(cliente: ClienteDTO) => ({

@@ -7,6 +7,7 @@ export type SalidaStorageDTO = {
 	persona: PersonaDTO | null;
 	vehiculo: VehiculoDTO | null;
 	firma: string | null;
+	selectedBodega: string;
 	selectedPico: string;
 	idPico_surtidor: number;
 	salida: number; // 0: inicial, 1: cargando, 2: finalizado

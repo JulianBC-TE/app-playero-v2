@@ -1,3 +1,9 @@
+// src/screens/calibracion/Calibracion.tsx
+// ─── MIGRADO: ya no usa api.ts ────────────────────────────────────────────────
+//  - fetchPicos()      → getPicosByBodega / getPicos()  desde picoDB
+//  - turno/status      → turnoStatusService.getTurnoStatus()
+//  - POST /calibraciones → db.insert(calibraciones) desde calibracionDB
+// ─────────────────────────────────────────────────────────────────────────────
 import {
   StyleSheet,
   Text,
@@ -19,8 +25,6 @@ import { useAppContext } from "@/hooks/useAppContext";
 import { PicoDTO } from "@/dto/PicosDTO";
 import { StackRoutesProps } from "@/route/app.routes";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
-import { api } from "@/services/api";
-import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
 import { Input } from "@/components/Input";
 import { TextSearch } from "@/components/TextSearch";
 import { PersonaDTO } from "@/dto/PersonaDTO";
@@ -34,6 +38,13 @@ import {
   calibracionDTO,
   hasCalibracionGuardada,
 } from "@/storage/storageCalibracion";
+
+// ── BD ────────────────────────────────────────────────────────────────────────
+import { getPicosByBodega, getPicos } from "@/backend/db/modules/picoDB";
+import { getBodegasByIdSucursal } from "@/backend/db/modules/bodegaDB";
+import { getTurnoStatusLocal } from "@/backend/db/modules/turnoBD";
+import { db } from "@/backend/db/client";
+import { calibraciones } from "@/backend/db/schema";
 
 export function Calibracion({
   navigation,
@@ -70,15 +81,11 @@ export function Calibracion({
     sequencias: [],
   });
 
-  // Bandera que indica que ya se intentó restaurar el estado del storage.
-  // guardarEstado NO debe ejecutarse hasta que la restauración haya ocurrido
-  // para evitar pisar datos guardados con el estado inicial vacío.
   const [estadoRestaurado, setEstadoRestaurado] = useState(false);
 
   // ─── Guardar estado en storage ────────────────────────────────────────────
   const guardarEstado = useCallback(async () => {
     if (!estadoRestaurado) return;
-
     try {
       const now = new Date();
       const fecha = now.toISOString().slice(0, 10);
@@ -95,15 +102,10 @@ export function Calibracion({
       });
 
       const estado: calibracionDTO = {
-        // Timestamp al momento de guardar
         fecha,
         hora,
-
-        // Derivado del pico seleccionado
         idBodega,
         id_pico,
-
-        // Campos de formulario
         obs,
         obsAdicional,
         cedula: persona?.cedula ?? 0,
@@ -115,13 +117,10 @@ export function Calibracion({
         photoPrecintoColocado,
         firma,
         tipoOperacionSeleccionado,
-
-        // Mediciones
         taxilitroInicial: mediciones.taxilitroInicial,
         taxilitroFinal: mediciones.taxilitroFinal,
         totalMediciones: mediciones.totalMediciones,
         sequencias: mediciones.sequencias,
-
         turnoCerrado,
       };
 
@@ -146,66 +145,51 @@ export function Calibracion({
     picos,
   ]);
 
-  // Cada vez que cambia cualquier pieza de estado relevante, persistir.
   useEffect(() => {
     guardarEstado();
   }, [guardarEstado]);
 
-useEffect(() => {
-	const unsubscribe = navigation.addListener("beforeRemove", (e) => {
-	  if (isLoading || !estadoRestaurado && !hasCalibracionGuardada()) return;
-
-	  /*if (!huboCambios()) {
-		return;
-	  }*/
-
-	  e.preventDefault();
-
-	  Alert.alert(
-		"Salir de abastecimiento",
-		"Hay cambios sin confirmar. ¿Qué desea hacer?",
-		[
-		  {
-			text: "Cancelar",
-			style: "cancel",
-		  },
-		  // DESPUÉS
-		  {
-			text: "Salir sin guardar",
-			style: "destructive",
-			onPress: () => {
-			  Alert.alert(
-				"¿Estás seguro?",
-				"Se perderán todos los datos de esta Calibracion. Esta acción no se puede deshacer.",
-				[
-				  {
-					text: "Cancelar",
-					style: "cancel",
-				  },
-				  {
-					text: "Sí, salir sin guardar",
-					style: "destructive",
-					onPress: async () => {
-					  await removeCalibracion();
-					  navigation.dispatch(e.data.action);
-					},
-				  },
-				],
-			  );
-			},
-		  },
-		  {
-			text: "Guardar y salir",
-			onPress: async () => {
-			  await guardarEstado();
-			  navigation.dispatch(e.data.action);
-			},
-		  },
-		],
-	  );
-	});
-
-	return unsubscribe;
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", (e) => {
+      if (isLoading || (!estadoRestaurado && !hasCalibracionGuardada())) return;
+      e.preventDefault();
+      Alert.alert(
+        "Salir de calibración",
+        "Hay cambios sin confirmar. ¿Qué desea hacer?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          {
+            text: "Salir sin guardar",
+            style: "destructive",
+            onPress: () => {
+              Alert.alert(
+                "¿Estás seguro?",
+                "Se perderán todos los datos de esta Calibración. Esta acción no se puede deshacer.",
+                [
+                  { text: "Cancelar", style: "cancel" },
+                  {
+                    text: "Sí, salir sin guardar",
+                    style: "destructive",
+                    onPress: async () => {
+                      await removeCalibracion();
+                      navigation.dispatch(e.data.action);
+                    },
+                  },
+                ],
+              );
+            },
+          },
+          {
+            text: "Guardar y salir",
+            onPress: async () => {
+              await guardarEstado();
+              navigation.dispatch(e.data.action);
+            },
+          },
+        ],
+      );
+    });
+    return unsubscribe;
   }, [navigation, guardarEstado, isLoading, estadoRestaurado]);
 
   // ─── Restaurar estado desde storage al montar ─────────────────────────────
@@ -218,21 +202,19 @@ useEffect(() => {
           setSelectedPico(estadoGuardado.selectedPico);
           setObs(estadoGuardado.obs);
           setObsAdicional(estadoGuardado.obsAdicional);
-		  if(estadoGuardado.obsAdicional)setMotivoConfirmado(true);
+          if (estadoGuardado.obsAdicional) setMotivoConfirmado(true);
           setNumeroPrecintoAtual(estadoGuardado.numeroPrecintoAtual);
           setNumeroPrecintoColocado(estadoGuardado.numeroPrecintoColocado);
           setPhotoPrecintoAtual(estadoGuardado.photoPrecintoAtual);
           setPhotoPrecintoColocado(estadoGuardado.photoPrecintoColocado);
           setFirma(estadoGuardado.firma);
           setTurnoCerrado(estadoGuardado.turnoCerrado);
-
           if (estadoGuardado.cedula) {
             setPersona({
               cedula: estadoGuardado.cedula,
               nombre_apellido: estadoGuardado.nombre,
             } as PersonaDTO);
           }
-
           if (estadoGuardado.totalMediciones > 0) {
             setMediciones({
               taxilitroInicial: estadoGuardado.taxilitroInicial,
@@ -245,33 +227,24 @@ useEffect(() => {
       } catch (error) {
         console.log("[Calibracion] Error al restaurar estado:", error);
       } finally {
-        // Marcar restauración completa sin importar si había datos o no,
-        // para habilitar los guardados automáticos a partir de este punto.
         setEstadoRestaurado(true);
       }
     }
-
     restaurarEstado();
   }, []);
 
   // ─── Parámetros de navegación (retorno desde subpantallas) ────────────────
   useEffect(() => {
-    if (route.params?.onSequencia) {
-      setMediciones(route.params.onSequencia);
-    }
-    if (route.params?.onPersona) {
-      setPersona(route.params.onPersona);
-    }
-    if (route.params?.onFirma) {
-      setFirma(route.params.onFirma);
-    }
+    if (route.params?.onSequencia) setMediciones(route.params.onSequencia);
+    if (route.params?.onPersona) setPersona(route.params.onPersona);
+    if (route.params?.onFirma) setFirma(route.params.onFirma);
   }, [
     route.params?.onPersona,
     route.params?.onFirma,
     route.params?.onSequencia,
   ]);
 
-  // ─── Carga inicial de picos ───────────────────────────────────────────────
+  // ─── Carga inicial de picos desde BD ──────────────────────────────────────
   useEffect(() => {
     fetchPicos();
   }, []);
@@ -280,11 +253,9 @@ useEffect(() => {
   function handlePhotoObs(image: string) {
     setPhotoObs(image);
   }
-
   function handlePhotoPrecintoColocado(image: string) {
     setPhotoPrecintoColocado(image);
   }
-
   function handlePhotoPrecintoAtual(image: string) {
     setPhotoPrecintoAtual(image);
   }
@@ -318,15 +289,11 @@ useEffect(() => {
               setPhotoPrecintoAtual(base64);
               break;
           }
-          toastSuccess(
-            "Registro Fotográfico",
-            "Foto capturada con exitosamente.",
-          );
+          toastSuccess("Registro Fotográfico", "Foto capturada exitosamente.");
         }
       }
     } catch (error) {
-      toastError("Error ao capturar foto", "Intente nuevamente más tarde.");
-      console.error("Erro ao capturar foto:", error);
+      toastError("Error al capturar foto", "Intente nuevamente más tarde.");
     } finally {
       setIsLoading(false);
     }
@@ -335,103 +302,82 @@ useEffect(() => {
   // ─── Validación antes de ir a secuencias ──────────────────────────────────
   async function handleVerificacion() {
     if (tipoOperacionSeleccionado === "") {
-      Alert.alert(
-        "Tipo de operación requerido",
-        "Debe seleccionar un tipo de operación.",
-      );
+      Alert.alert("Tipo de operación requerido", "Debe seleccionar un tipo de operación.");
       return;
     }
     if (tipoOperacionSeleccionado === "2") {
-      if (numeroPrecintoAtual === "") {
-        Alert.alert(
-          "Precinto",
-          "Debe ingresar el número de precinto a retirar.",
-        );
+      if (!numeroPrecintoAtual) {
+        Alert.alert("Precinto", "Debe ingresar el número de precinto a retirar.");
         return;
       }
-      if (photoPrecintoAtual === "") {
-        Alert.alert(
-          "Precinto",
-          "Debe capturar una foto del precinto colocado.",
-        );
+      if (!photoPrecintoAtual) {
+        Alert.alert("Precinto", "Debe capturar una foto del precinto retirado.");
         return;
       }
-      if (numeroPrecintoColocado === "") {
-        Alert.alert(
-          "Precinto",
-          "Debe ingresar el número de precinto a colocar.",
-        );
+      if (!numeroPrecintoColocado) {
+        Alert.alert("Precinto", "Debe ingresar el número de precinto a colocar.");
         return;
       }
-      if (photoPrecintoColocado === "") {
-        Alert.alert(
-          "Precinto",
-          "Debe capturar una foto del precinto colocado.",
-        );
+      if (!photoPrecintoColocado) {
+        Alert.alert("Precinto", "Debe capturar una foto del precinto colocado.");
         return;
       }
     }
-
     if (!selectedPico) {
       Alert.alert("Pico requerido", "Debe seleccionar un pico expedidor.");
       return;
     }
-
     const picoSurtidor = picos.find(
       (pico) => pico.id_pico_surtidor === Number(selectedPico),
     );
-		console.log("Pico Surtidor:", picoSurtidor);
-
     if (!picoSurtidor) {
-      Alert.alert(
-        "ID Pico Surtidor",
-        "El valor para el pico surtidor no fue encontrado.",
-      );
+      Alert.alert("ID Pico Surtidor", "El valor para el pico surtidor no fue encontrado.");
       return;
     }
-
-    navigation.navigate("sequencias", {
-      pico_surtidor: Number(selectedPico),
-    });
+    navigation.navigate("sequencias", { pico_surtidor: Number(selectedPico) });
   }
 
-  // ─── Fetch de picos y estado del turno ────────────────────────────────────
+  // ─── Fetch de picos desde BD (reemplaza api.get /api/picos) ──────────────
   async function fetchPicos() {
     setIsLoading(true);
     try {
-      const turno = await api.get(
-        `api/registros/turno/status/${sucursal.id_sucursal}`,
-      );
+      // Estado del turno desde BD
+      const turnoStatus = await getTurnoStatusLocal(sucursal.id_sucursal);
+      if (turnoStatus === "cerrado" || turnoStatus === "falta_cerrar") {
+        setTurnoCerrado(true);
+      }
 
-      const turnoData: StatusTurnoDTO = {
-        status: turno.data.status,
-        Inicio_turno: turno.data.Inicio_turno,
-        Fin_turno: turno.data.Fin_turno,
-        Fin_turno_anterior: turno.data.Fin_turno_anterior,
-      };
-      if (turnoData.status === "cerrado") setTurnoCerrado(true);
-
-      const data = await api.get(`/api/picos/${sucursal.id_sucursal}`);
-      const picosData: PicoDTO[] = data.data.picos;
-      setPicos(picosData);
+      // Bodegas de la sucursal → picos de cada bodega
+      const bodegas = await getBodegasByIdSucursal(sucursal.id_sucursal);
+      if (bodegas.length > 0) {
+        // Cargar picos de todas las bodegas de la sucursal
+        const todasLasBodegas = bodegas.map((b) => Number(b.id_bodega));
+        let todosPicos: PicoDTO[] = [];
+        for (const idBod of todasLasBodegas) {
+          const picosBodega = await getPicosByBodega(idBod);
+          todosPicos = [...todosPicos, ...picosBodega];
+        }
+        setPicos(todosPicos);
+      } else {
+        // Fallback: todos los picos
+        const todosPicos = await getPicos();
+        setPicos(todosPicos);
+      }
     } catch (error) {
-      console.error("Error al buscar picos:", error);
+      console.error("Error al buscar picos desde BD:", error);
       toastError("Error al buscar picos", "Intente nuevamente más tarde.");
     } finally {
       setIsLoading(false);
     }
   }
 
-  // ─── Guardar todo y enviar a la API ───────────────────────────────────────
+  // ─── Guardar todo en BD local (reemplaza api.post /api/calibraciones) ─────
   async function saveAllData() {
-    if (persona === null) {
-      Alert.alert(
-        "Persona requerida",
-        "Debe seleccionar una persona encargada.",
-      );
+    if (!persona) {
+      Alert.alert("Persona requerida", "Debe seleccionar una persona encargada.");
       return;
     }
-    if (firma === null) {
+    if (!firma) {
       Alert.alert("Firma requerida", "Debe firmar para continuar.");
       return;
     }
@@ -451,39 +397,43 @@ useEffect(() => {
         }
       });
 
-      const data = {
-        json: {
-          fecha_hora: fecha,
-          hora: hora,
-          bodega: id_bodega,
-          obs_gral: obs + " | " + obsAdicional,
-          ci_encargado: persona?.cedula,
-          nombre_encargado: persona?.nombre_apellido,
-          pico: id_pico,
-          taxilitro_inicial: mediciones.taxilitroInicial,
-          taxilitro_final: mediciones.taxilitroFinal,
-          nro_precinto_retirado:
-            tipoOperacionSeleccionado === "2" ? numeroPrecintoAtual : "",
-          nro_precinto_colocado:
-            tipoOperacionSeleccionado === "2" ? numeroPrecintoColocado : "",
-          foto_precinto_retirado:
-            tipoOperacionSeleccionado === "2" ? photoPrecintoAtual : "",
-          foto_precinto_colocado:
-            tipoOperacionSeleccionado === "2" ? photoPrecintoColocado : "",
-          firma_calibrador: firma,
-          tipo_operacion:
-            tipoOperacionSeleccionado === "1" ? "VERIFICACION" : "CALIBRACION",
-          detalles: mediciones.sequencias.map((medicion) => ({
-            val_medicion: medicion.valor_medicion,
-            foto_med_balde: medicion.foto_medicion,
-            taxilitro_carga: medicion.taxilitro.toString(),
-          })),
-        },
+      const payload = {
+        fecha_hora: fecha,
+        hora,
+        bodega: id_bodega,
+        obs_gral: obs + " | " + obsAdicional,
+        ci_encargado: persona?.cedula,
+        nombre_encargado: persona?.nombre_apellido,
+        pico: id_pico,
+        taxilitro_inicial: mediciones.taxilitroInicial,
+        taxilitro_final: mediciones.taxilitroFinal,
+        nro_precinto_retirado:
+          tipoOperacionSeleccionado === "2" ? numeroPrecintoAtual : "",
+        nro_precinto_colocado:
+          tipoOperacionSeleccionado === "2" ? numeroPrecintoColocado : "",
+        foto_precinto_retirado:
+          tipoOperacionSeleccionado === "2" ? photoPrecintoAtual : "",
+        foto_precinto_colocado:
+          tipoOperacionSeleccionado === "2" ? photoPrecintoColocado : "",
+        firma_calibrador: firma,
+        tipo_operacion:
+          tipoOperacionSeleccionado === "1" ? "VERIFICACION" : "CALIBRACION",
+        detalles: mediciones.sequencias.map((medicion) => ({
+          val_medicion: medicion.valor_medicion,
+          foto_med_balde: medicion.foto_medicion,
+          taxilitro_carga: medicion.taxilitro.toString(),
+        })),
       };
 
-      await api.post("/api/calibraciones", data);
+      // Guardar en BD local (tabla calibraciones, pendiente de sync)
+      await db.insert(calibraciones).values({
+        json: JSON.stringify(payload),
+        tipo: tipoOperacionSeleccionado === "1" ? "VERIFICACION" : "CALIBRACION",
+        sync: 0,
+        fecha: Date.now(),
+        hora: Date.now(),
+      });
 
-      // Limpiar el storage una vez que los datos se enviaron correctamente
       await removeCalibracion();
 
       toastSuccess(
@@ -492,7 +442,7 @@ useEffect(() => {
       );
       navigation.navigate("home");
     } catch (error) {
-      console.error("Error al guardar todos los datos:", error);
+      console.error("Error al guardar calibración:", error);
       toastError("Error al guardar", "Intente nuevamente más tarde.");
     } finally {
       setIsLoading(false);
@@ -515,18 +465,14 @@ useEffect(() => {
           <View style={styles.overlay}>
             <View style={styles.modalContent}>
               <Text className="font-bold text-red-500 text-center text-2xl underline mb-4">
-                Importente!!!
+                Importante!!!
               </Text>
               <Text className="font-medium text-justify text-xl mb-4">
                 Está intentando registrar una calibración y el turno se
                 encuentra cerrado. Una vez finalizada se debe realizar el cierre
                 correspondiente de las bodegas correspondientes.
               </Text>
-              <InputCard
-                className="min-h-40"
-                title="Indique el motivo"
-                required
-              >
+              <InputCard className="min-h-40" title="Indique el motivo" required>
                 <Input
                   value={obsAdicional}
                   placeholder="Describa el motivo"
@@ -539,13 +485,10 @@ useEffect(() => {
                 style={styles.button}
                 onPress={() => {
                   if (obsAdicional.trim() === "") {
-                    Alert.alert(
-                      "Motivo requerido",
-                      "Por favor describa el motivo.",
-                    );
+                    Alert.alert("Motivo requerido", "Por favor describa el motivo.");
                     return;
                   }
-				  setMotivoConfirmado(true)
+                  setMotivoConfirmado(true);
                   setTurnoCerrado(false);
                 }}
               >
@@ -572,25 +515,18 @@ useEffect(() => {
           showsVerticalScrollIndicator={false}
         >
           <View className="flex-1 items-center p-4 gap-4">
-            <InputCard
-              title="Tipo de operación"
-              required={true}
-              locked={salida !== 0}
-            >
+            <InputCard title="Tipo de operación" required locked={salida !== 0}>
               <Select
                 data={tipoOperacion}
                 isLoading={isLoading}
                 selectedValue={tipoOperacionSeleccionado}
                 setSelectedValue={setTipoOperacionSeleccionado}
-                labelField={"label"}
+                labelField="label"
                 valueField="value"
               />
             </InputCard>
-            <InputCard
-              title="Selecione el pico:"
-              required={true}
-              locked={salida !== 0}
-            >
+
+            <InputCard title="Seleccione el pico:" required locked={salida !== 0}>
               {salida === 0 && (
                 <Select
                   data={picos}
@@ -609,10 +545,7 @@ useEffect(() => {
             </InputCard>
 
             {tipoOperacionSeleccionado === "2" && (
-              <InputCard
-                title="Número de Precinto a retirar"
-                locked={salida !== 0}
-              >
+              <InputCard title="Número de Precinto a retirar" locked={salida !== 0}>
                 <View className="flex-row items-center p-2 gap-2">
                   <Input
                     editable={salida === 0}
@@ -633,10 +566,7 @@ useEffect(() => {
               </InputCard>
             )}
             {tipoOperacionSeleccionado === "2" && (
-              <InputCard
-                title="Número de Precinto colocado"
-                locked={salida !== 0}
-              >
+              <InputCard title="Número de Precinto colocado" locked={salida !== 0}>
                 <View className="flex-row items-center p-2 gap-2">
                   <Input
                     editable={!isLoading}
@@ -657,84 +587,81 @@ useEffect(() => {
               </InputCard>
             )}
 
-            <InputCard
-              title="Verificación del pico"
-              required={true}
-              locked={salida !== 0}
-            >
-              {mediciones.totalMediciones === 0 && (
+            {/* Botón para ir a secuencias */}
+            {mediciones.totalMediciones === 0 && (
+              <Button
+                title="Realizar verificación"
+                onPress={handleVerificacion}
+                isLoading={isLoading}
+                icon={Fuel}
+                iconSize="md"
+                iconColor="#000"
+              />
+            )}
+
+            {mediciones.totalMediciones > 0 && (
+              <InputCard title="Mediciones registradas">
+                <Text className="text-black text-base p-2">
+                  Taxilitro Inicial: {mediciones.taxilitroInicial}
+                </Text>
+                <Text className="text-black text-base p-2">
+                  Taxilitro Final: {mediciones.taxilitroFinal}
+                </Text>
+                <Text className="text-black text-base p-2">
+                  Total de mediciones: {mediciones.totalMediciones}
+                </Text>
                 <Button
-                  title="Verificar"
-                  onPress={() => {
-                    handleVerificacion();
-                  }}
+                  title="Reiniciar mediciones"
+                  onPress={handleVerificacion}
                   isLoading={isLoading}
-                  icon={Fuel}
+                  icon={Pencil}
                   iconSize="md"
                   iconColor="#000"
                 />
-              )}
-              {mediciones.totalMediciones > 0 && (
-                <>
-                  <Text className="text-lg text-black font-bold">
-                    Mediciones Realizadas: {mediciones.totalMediciones}
-                  </Text>
-                </>
-              )}
-            </InputCard>
+              </InputCard>
+            )}
 
             {mediciones.totalMediciones > 0 && (
-              <InputCard title="Observaciones" locked={salida !== 0}>
-                <View className="flex-row items-center p-2 gap-2">
-                  <Input
-                    multiline
-                    numberOfLines={4}
-                    placeholder="observaciones"
-                    value={obs}
-                    onChangeText={setObs}
+              <>
+                <InputCard title="Chofer/Encargado" required>
+                  <TextSearch
+                    textValue={persona?.nombre_apellido}
+                    placeholder="Buscar persona"
+                    onPress={() =>
+                      navigation.navigate("buscarpersona", {
+                        enabledSelect: true,
+                        fromScreen: "calibracion",
+                      })
+                    }
                   />
-                  <View className="flex-col gap-6">
+                </InputCard>
+
+                <InputCard title="Observaciones">
+                  <View className="flex-row items-center p-2 gap-2">
+                    <Input
+                      multiline
+                      numberOfLines={4}
+                      placeholder="Observaciones"
+                      value={obs}
+                      onChangeText={setObs}
+                    />
                     <Photo
                       form="icon"
-                      disabled={salida !== 0}
                       iconSize="lg"
-                      iconColor={salida !== 0 ? "#756868eb" : "#000"}
+                      iconColor={photoObs ? "#05a722" : "#000"}
                       setImage={handlePhotoObs}
+                      disabled={isLoading}
                     />
                   </View>
-                </View>
-              </InputCard>
-            )}
-            {mediciones.totalMediciones > 0 && (
-              <InputCard
-                title="Encargado de la calibración"
-                required={true}
-                locked={salida !== 0}
-              >
-                <TextSearch
-                  enabled={salida === 0}
-                  textValue={persona?.nombre_apellido}
-                  placeholder="Buscar persona"
-                  onPress={() =>
-                    navigation.navigate("buscarpersona", {
-                      enabledSelect: true,
-                      fromScreen: "calibracion",
-                    })
-                  }
-                />
-              </InputCard>
-            )}
+                </InputCard>
 
-            {mediciones.totalMediciones > 0 && persona && (
-              <>
                 <View className="flex-row gap-4">
                   <Button
-                    disabled={mediciones.totalMediciones === 0}
                     title="Firmar"
                     onPress={() =>
                       navigation.navigate("firma", {
                         fromScreen: "calibracion",
-                        persona: persona,
+                        persona,
                       })
                     }
                     isLoading={isLoading}
@@ -745,7 +672,7 @@ useEffect(() => {
                   {firma && (
                     <Button
                       title="Grabar"
-                      onPress={() => saveAllData()}
+                      onPress={saveAllData}
                       isLoading={isLoading}
                       icon={SaveAll}
                       iconSize="md"
@@ -763,12 +690,6 @@ useEffect(() => {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f0f0f0",
-  },
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -781,11 +702,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 10,
     elevation: 5,
-  },
-  title: {
-    fontSize: 18,
-    marginBottom: 20,
-    textAlign: "center",
   },
   button: {
     marginTop: 20,

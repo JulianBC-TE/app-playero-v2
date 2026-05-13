@@ -1,63 +1,46 @@
 <context_metadata>
-  generated_at: 2026-05-12T08:19:52
-  project_root: C:\dev\playero_2\mobile-playero\src
-  file_count: 29
+  generated_at: 2026-05-13T11:31:18
+  project_root: C:\dev\playero_2\mobile-playero
+  file_count: 15
   extensions_included: .css, .html, .js, .jsx, .py, .ts, .tsx
 </context_metadata>
 
 <task>
-  identificar que datos manda el frontend y hacer una ruta para implementar una api interna que mande estos datos al bd y que a FUTURO se pueda añadir un modulo de sincronizacion con una base de datos externa
+  calibracion, abastecimiento y traspaso utilizan api y quiero que ahora utilicen moduloes de bd, todo los datoso como por ejemplo taxilitro, que se traía de api ahora se cargan manual y ya no hace falta la autorizacion
 </task>
 
 <file_tree>
-src/
-  services/
-    api.ts
-  dto/
-    BodegaDTO.ts
-    CargaZetaDTO.ts
-    ClienteDTO.ts
-  backend/
-    errors.ts
-    MedicionDTO.ts
-    PersonaDTO.ts
-    PicosDTO.ts
-    SequenciaCalibracionDTO.tsx
-    statusTurnoDTO.ts
-    sucursalDTO.ts
-    TanqueDTO.ts
-    TraspasoDTO.ts
-    TurnoDTO.ts
-    VehiculoDTO.ts
-  screens/
-    abastecimiento/
-      Abastecimiento.tsx
-    calibracion/
-      Calibracion.tsx
-      CargaCombustible.tsx
-    cliente/
-      CrearCliente.tsx
-    persona/
-      CrearPersona.tsx
-    vehiculo/
-      CrearVehiculo.tsx
-    turno/
-      Medicion.tsx
-      MedicionAbastecimiento.tsx
-    db/
-      prisma-compat.ts
-    salida/
-      Salida.tsx
-      schema.ts
-      Sequencias.tsx
-    traspaso/
-      Traspaso.tsx
-      Turno.tsx
+mobile-playero/
+  src/
+    services/
+      api.ts
+    dto/
+      BodegaDTO.ts
+      PicosDTO.ts
+      SequenciaCalibracionDTO.tsx
+      TanqueDTO.ts
+    screens/
+      abastecimiento/
+        Abastecimiento.tsx
+      calibracion/
+        Calibracion.tsx
+        CargaCombustible.tsx
+        MedicionAbastecimiento.tsx
+    backend/
+      db/
+        schema.ts
+        Sequencias.tsx
+      traspaso/
+        Traspaso.tsx
+        modules/
+          bodegaDB.ts
+          picoDB.ts
+          tanqueDB.ts
 </file_tree>
 
 <codebase>
 
-<file path="services/api.ts">
+<file path="src/services/api.ts">
 import { AppError } from "@utils/AppError";
 import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from "axios";
 import { getAuthToken, saveAuthToken } from "@storage/storageAuthToken";
@@ -285,83 +268,14 @@ api.registerInterceptTokenManager = (signOut) => {
 export { api };
 </file>
 
-<file path="dto/BodegaDTO.ts">
+<file path="src/dto/BodegaDTO.ts">
 export type BodegaDTO = {
 	id_bodega: string;
 	descripcion_bodega: string;
 };
 </file>
 
-<file path="dto/CargaZetaDTO.ts">
-export type CargaZetaDTO = {
-	id_pico_para_zeta: number;
-	taxilitro_inicial: number;
-	taxilitro_final: number;
-	litros_zeta: number;
-};
-</file>
-
-<file path="dto/ClienteDTO.ts">
-export type ClienteDTO = {
-	ruc: string;
-	descripcion_cliente: string;
-};
-</file>
-
-<file path="backend/errors.ts">
-// src/backend/errors.ts
-export class BadRequestException extends Error {
-  statusCode = 400;
-  constructor(message: string) {
-    super(message);
-    this.name = 'BadRequestException';
-  }
-}
-
-export class NotFoundException extends Error {
-  statusCode = 404;
-  constructor(message: string) {
-    super(message);
-    this.name = 'NotFoundException';
-  }
-}
-
-export class ConflictException extends Error {
-  statusCode = 409;
-  constructor(message: string) {
-    super(message);
-    this.name = 'ConflictException';
-  }
-}
-
-export class UnauthorizedException extends Error {
-  statusCode = 401;
-  constructor(message: string) {
-    super(message);
-    this.name = 'UnauthorizedException';
-  }
-}
-</file>
-
-<file path="dto/MedicionDTO.ts">
-export type MedicionDTO = {
-	// tanque: string;
-	id_tanque: string;
-	regla: number;
-	temperatura: number;
-	litros: number;
-	foto_tanque: string;
-};
-</file>
-
-<file path="dto/PersonaDTO.ts">
-export type PersonaDTO = {
-	cedula: number;
-	nombre_apellido: string;
-};
-</file>
-
-<file path="dto/PicosDTO.ts">
+<file path="src/dto/PicosDTO.ts">
 export type PicoDTO = {
 	id_pico: number;
 	id_pico_surtidor: number;
@@ -370,7 +284,7 @@ export type PicoDTO = {
 };
 </file>
 
-<file path="dto/SequenciaCalibracionDTO.tsx">
+<file path="src/dto/SequenciaCalibracionDTO.tsx">
 export type SequenciaCalibracionDTO = {
 	taxilitroInicial: number;
 	taxilitroFinal: number;
@@ -383,45 +297,7 @@ export type SequenciaCalibracionDTO = {
 };
 </file>
 
-<file path="dto/statusTurnoDTO.ts">
-// {
-//     "Fin_turno":
-//     {
-//         "falta": [1016, 1017],
-//         "ok": false
-//     },
-//     "Inicio_turno":
-//     {
-//         "falta": [1016, 1017],
-//         "ok": false
-//     }
-// }
-
-export type StatusTurnoDTO = {
-	status: string;
-	Inicio_turno: {
-		ok: boolean;
-		falta: number[];
-	};
-	Fin_turno: {
-		ok: boolean;
-		falta: number[];
-	};
-	Fin_turno_anterior: {
-		ok: boolean;
-		falta: number[];
-	};
-};
-</file>
-
-<file path="dto/sucursalDTO.ts">
-export type SucursalDTO = {
-	id_sucursal: number;
-	descripcion_sucursal: string;
-};
-</file>
-
-<file path="dto/TanqueDTO.ts">
+<file path="src/dto/TanqueDTO.ts">
 export type TanqueDTO = {
 	id_tanque: number;
 	descripcion_tanque: string;
@@ -429,137 +305,7 @@ export type TanqueDTO = {
 };
 </file>
 
-<file path="dto/TraspasoDTO.ts">
-// const data = {
-// 	json: {
-// 		bod_origem: Number(selectedBodegaOrigem),
-// 		bod_destino: Number(selectedBodegaDestino),
-// 		id_tamque_destino: Number(medicionInicial[0].id_tanque),
-// 		regla_altura_inicial: medicionInicial[0].regla.toString(),
-// 		regla_altura_final: medicionFinal[0].regla.toString(),
-// 		litros_tanque_inicial: medicionInicial[0].litros,
-// 		litros_tanque_final: medicionFinal[0].litros,
-// 		temp_inicial: medicionInicial[0].temperatura,
-// 		temp_final: medicionFinal[0].temperatura,
-// 		id_pico: Number(selectedPico),
-// 		taxilitro_inicial: totalizadorPicoInicial, // Este valor debe ser calculado o enviado
-// 		taxilitro_final: totalizadorPicoFinal, // Este valor debe ser calculado o enviado
-// 		litros_pico: Number(cargaCombustible),
-// 		obs_traspaso: obs + " >>" + obsAdicional || "",
-// 		foto_obs: base64Obs ? [base64Obs] : [],
-// 		foto_medicion_inicial: medicionInicial[0].foto_tanque || [],
-// 		foto_medicion_final: medicionFinal[0].foto_tanque || [],
-// 		fecha: fecha,
-// 		hora: hora,
-// 		firma_receptor: firma ? [firma] : [],
-// 		id_playero: user.cedula,
-// 		id_encargado_receptor: Number(persona?.cedula),
-// 	},
-// };
-
-import { PersonaDTO } from "./PersonaDTO";
-
-export type TraspasoDTO = {
-	json: {
-		bod_origen: number;
-		bod_destino: number;
-		id_tanque_destino: number;
-		regla_altura_inicial: string;
-		regla_altura_final: string;
-		litros_tanque_inicial: number;
-		litros_tanque_final: number;
-		temp_inicial: number;
-		temp_final: number;
-		id_pico: number;
-		taxilitro_inicial: number;
-		taxilitro_final: number;
-		litros_pico: number;
-		last_id_salida?: number;
-		obs_traspaso: string;
-		obs_adicional: string;
-		foto_obs_traspaso: string[];
-		foto_medicion_inicial: string[] | [];
-		foto_medicion_final: string[] | [];
-		fecha: string;
-		hora: string;
-		firma_receptor: string[];
-		id_playero: number;
-		id_encargado_receptor: number;
-		id_autorizado?: number;
-		corte_id?: number;
-	};
-};
-</file>
-
-<file path="dto/TurnoDTO.ts">
-/*
-Interface Turno
-{
-  "json": {
-    "id_suc": 1070,
-    "id_bod": 1016,
-    "fecha": "2025-05-22",
-    "hora": "12:30:00",
-    "ci_playero": 4147891,
-    "litros": 20500,
-    "observacion": "prueba",
-    "fotos_observacion": [
-      "base64",
-      "base64"
-    ],
-    "med_tanques": [
-      {
-        "id_tanque": 1,
-        "regla": 83.75,
-        "temperatura": 20,
-        "litros": 16750,
-        "foto_tanque": [
-          "base64"
-        ]
-      }
-    ],
-    "med_picos": [
-      {
-        "id_pico": 1,
-        "taxilitro": 1845011
-      }
-    ]
-  }
-}
-*/
-
-export type TurnoDTO = {
-	id_suc: number;
-	id_bod: number;
-	fecha: string;
-	hora: string;
-	ci_playero: number;
-	litros: number;
-	observacion: string;
-	fotos_observacion: string[];
-	med_tanques: {
-		id_tanque: number;
-		regla: number;
-		temperatura: number;
-		litros: number;
-		foto_tanque: string[];
-	}[];
-	med_picos: {
-		id_pico: number;
-		taxilitro: number;
-	}[];
-};
-</file>
-
-<file path="dto/VehiculoDTO.ts">
-export type VehiculoDTO = {
-	id_vehiculo: string;
-	descripcion_vehiculo: string;
-	ruc: string;
-};
-</file>
-
-<file path="screens/abastecimiento/Abastecimiento.tsx">
+<file path="src/screens/abastecimiento/Abastecimiento.tsx">
 import {
   StyleSheet,
   Text,
@@ -1295,7 +1041,7 @@ const styles = StyleSheet.create({
 });
 </file>
 
-<file path="screens/calibracion/Calibracion.tsx">
+<file path="src/screens/calibracion/Calibracion.tsx">
 import {
   StyleSheet,
   Text,
@@ -2100,7 +1846,7 @@ const styles = StyleSheet.create({
 });
 </file>
 
-<file path="screens/abastecimiento/CargaCombustible.tsx">
+<file path="src/screens/abastecimiento/CargaCombustible.tsx">
 import { Fuel, ArrowLeft } from "lucide-react-native";
 import { Button } from "@/components/Button";
 import { InputCard } from "@/components/InputCard";
@@ -2513,781 +2259,7 @@ export function CargaCombustible({
 }
 </file>
 
-<file path="screens/cliente/CrearCliente.tsx">
-import { Input } from "@components/Input";
-import { InputCard } from "@components/InputCard";
-import { Button } from "@components/Button";
-import { useState } from "react";
-import { AppError } from "@utils/AppError";
-import { Controller, useForm } from "react-hook-form";
-import { yupResolver } from "@hookform/resolvers/yup";
-import * as yup from "yup";
-import { api } from "@services/api";
-import { ClienteDTO } from "@dto/ClienteDTO";
-import { toastError, toastSuccess } from "@/utils/toastMessage";
-import { View } from "react-native";
-import { Save } from "lucide-react-native";
-
-type FormData = {
-	ruc: string;
-	nombre: string;
-};
-
-const addClientechema = yup.object({
-	nombre: yup
-		.string()
-		.required("Razón social es requerido")
-		.min(3, "El nome debe tener al menos 3 caracteres"),
-	ruc: yup
-		.string()
-		.required("RUC es requerido")
-		.matches(/^\d{6,8}(-?[0-9])$/, "El RUC solo puede contener números")
-		.min(6, "La cedula debe tener al menos 7 caracteres"),
-});
-
-export function CrearCliente() {
-	const [isLoading, setIsLoading] = useState(false);
-	const {
-		control,
-		handleSubmit,
-		formState: { errors },
-	} = useForm({
-		resolver: yupResolver(addClientechema),
-		defaultValues: {
-			nombre: "", // passar o parametro aqui quando for editar
-			ruc: "",
-		},
-	});
-
-	async function handleNewCliente({ ruc, nombre }: FormData) {
-		try {
-			setIsLoading(true);
-			const clienteData: ClienteDTO = {
-				ruc,
-				descripcion_cliente: nombre.toUpperCase(),
-			};
-
-			await api.post("/api/clientes", clienteData);
-
-			toastSuccess("Cliente creado exitosamente", "");
-		} catch (error) {
-			const isAppError = error instanceof AppError;
-			const statusCode =
-				isAppError && error.statusCode ? error.statusCode : undefined;
-
-			toastError(
-				"Error al crear cliente",
-				statusCode === 409
-					? "Ya existe un cliente con este RUC"
-					: "Error al crear cliente, intente nuevamente"
-			);
-		} finally {
-			setIsLoading(false);
-		}
-	}
-
-	return (
-		<View className='flex-1'>
-			{/* <ScreenHeader title='Crear Cliente' /> */}
-			<View className='flex-1 p-4 gap-4 items-center'>
-				<InputCard
-					title='RUC:'
-					required
-				>
-					<View className='w-full flex-row items-center'>
-						<Controller
-							control={control}
-							name='ruc'
-							rules={{ required: "RUC es requerido" }}
-							render={({ field: { onChange, value } }) => (
-								<Input
-									placeholder='Informe RUC'
-									placeholderTextColor='$gray600'
-									onChangeText={onChange}
-									errorMessage={errors.ruc?.message}
-								/>
-							)}
-						/>
-					</View>
-				</InputCard>
-
-				<InputCard
-					title='Razón Social:'
-					required
-				>
-					<View className='w-full flex-row items-center'>
-						<Controller
-							control={control}
-							name='nombre'
-							rules={{ required: "nombre del cliente es requerido" }}
-							render={({ field: { onChange, value } }) => (
-								<Input
-									placeholder='Informe razón social'
-									placeholderTextColor='$gray600'
-									value={value.toUpperCase()}
-									onChangeText={onChange}
-									errorMessage={errors.nombre?.message}
-								/>
-							)}
-						/>
-					</View>
-				</InputCard>
-				<View className='flex-row mt-32 gap-5'>
-					<Button
-						title='Crear'
-						onPress={handleSubmit(handleNewCliente)}
-						isLoading={isLoading}
-						icon={Save}
-						iconSize='md'
-						iconColor='#000'
-					/>
-				</View>
-			</View>
-		</View>
-	);
-}
-</file>
-
-<file path="screens/persona/CrearPersona.tsx">
-import { useState } from "react";
-import { View } from "react-native";
-import { Controller, useForm } from "react-hook-form";
-import * as yup from "yup";
-import { yupResolver } from "@hookform/resolvers/yup";
-import { toastError, toastSuccess } from "@utils/toastMessage";
-
-import { Input } from "@components/Input";
-import { InputCard } from "@components/InputCard";
-import { Button } from "@components/Button";
-import { AppError } from "@utils/AppError";
-import { api } from "@services/api";
-
-import { Save, UserRoundPlus } from "lucide-react-native";
-import axios from "axios";
-
-type FormData = {
-	cedula: string;
-	nombre: string;
-};
-
-const crearPersonaschema = yup.object({
-	nombre: yup
-		.string()
-		.required("Nombre es requerido")
-		.min(3, "El nome debe tener al menos 3 caracteres")
-		.test("tiene-apellido", "Ingrese el nombre y apellido", (value) => {
-			if (!value) return false;
-			const words = value.trim().split(/\s+/);
-			return words.length >= 2 && words[0].length > 2 && words[1].length > 3;
-		}),
-	cedula: yup
-		.string()
-		.required("Cédula es requerido")
-		.matches(/^[0-9]+$/, "La cedula solo puede contener números")
-		.min(6, "La cedula debe tener al menos 6 caracteres")
-		.max(7, "La cedula no puede tener más de 7 caracteres"),
-});
-
-export function CrearPersona() {
-	const [isLoading, setIsLoading] = useState(false);
-	const [isSaved, setIsSaved] = useState(false);
-	const {
-		control,
-		handleSubmit,
-		reset,
-		formState: { errors },
-	} = useForm({
-		resolver: yupResolver(crearPersonaschema),
-		defaultValues: {
-			nombre: "", // passar o parametro aqui quando for editar
-			cedula: "",
-		},
-	});
-
-	async function handleNewPersona({ cedula, nombre }: FormData) {
-		try {
-			setIsLoading(true);
-			await api.post("/api/personas", {
-				cedula: +cedula,
-				nombre_apellido: nombre.toUpperCase(),
-			});
-			toastSuccess("Grabación exitosa", "Persona creada exitosamente");
-			setIsSaved(true);
-		} catch (error) {
-			let statusCode: number | undefined;
-
-			if (error instanceof AppError) {
-				statusCode = error.statusCode;
-			} else if (axios.isAxiosError(error)) {
-				statusCode = error.response?.status;
-			}
-
-			toastError(
-				"Error en la creación",
-				statusCode === 409
-					? "Ya existe una persona con esta cédula"
-					: "Error al crear la persona, intente nuevamente"
-			);
-		} finally {
-			setIsLoading(false);
-		}
-	}
-
-	return (
-		<View className='flex-1'>
-			<View className='flex-1 p-4 gap-4 items-center'>
-				<InputCard
-					title='Cedula:'
-					required
-				>
-					<View className='flex-row w-full items-center'>
-						<Controller
-							control={control}
-							name='cedula'
-							rules={{ required: "cedula de identidad es requerido" }}
-							render={({ field: { onChange, value } }) => (
-								<Input
-									keyboardType='number-pad'
-									className='font-medium text-xl'
-									placeholder='Informe cédula'
-									placeholderTextColor='$gray600'
-									onChangeText={onChange}
-									value={value}
-									errorMessage={errors.cedula?.message}
-								/>
-							)}
-						/>
-					</View>
-				</InputCard>
-
-				<InputCard
-					title='Nombre y Apellido:'
-					required
-				>
-					<View className='flex-row'>
-						<Controller
-							control={control}
-							name='nombre'
-							rules={{ required: "nombre y apellido es requerido" }}
-							render={({ field: { onChange, value } }) => (
-								<Input
-									placeholder='Informe nombre y apellido'
-									placeholderTextColor='$gray600'
-									className='font-medium text-xl'
-									value={value.toUpperCase()}
-									onChangeText={onChange}
-									errorMessage={errors.nombre?.message}
-								/>
-							)}
-						/>
-					</View>
-				</InputCard>
-				<View className='flex-row mt-32 gap-5'>
-					<Button
-						title='Crear'
-						onPress={handleSubmit(handleNewPersona)}
-						isLoading={isLoading}
-						icon={Save}
-						iconSize='md'
-						iconColor='#000'
-					/>
-					{isSaved && (
-						<Button
-							title='Nuevo'
-							onPress={() => {
-								setIsSaved(false);
-								reset({
-									nombre: "",
-									cedula: "",
-								});
-							}}
-							isLoading={isLoading}
-							icon={UserRoundPlus}
-							iconSize='md'
-							iconColor='#000'
-						/>
-					)}
-				</View>
-			</View>
-		</View>
-	);
-}
-</file>
-
-<file path="screens/vehiculo/CrearVehiculo.tsx">
-import { Text, TouchableOpacity, View } from "react-native";
-import { useEffect, useState } from "react";
-import axios from "axios";
-import { StackRoutesProps } from "@/route/app.routes";
-
-import { toastError, toastSuccess } from "@utils/toastMessage";
-import { Input } from "@components/Input";
-import { InputCard } from "@components/InputCard";
-import { Button } from "@components/Button";
-import { AppError } from "@utils/AppError";
-import { Controller, useForm } from "react-hook-form";
-import { yupResolver } from "@hookform/resolvers/yup";
-import * as yup from "yup";
-import { api } from "@services/api";
-import { SaveIcon, SquarePlus } from "lucide-react-native";
-import { useCliente } from "@/hooks/useCliente";
-
-type FormData = {
-	id_vehiculo: string;
-	descripcion_vehiculo: string;
-};
-
-const addVehiculochema = yup.object({
-	descripcion_vehiculo: yup
-		.string()
-		.required("Descripción es requerido")
-		.min(3, "La descripción debe tener al menos 3 caracteres"),
-	id_vehiculo: yup
-		.string()
-		.required("Id/Chapa es requerido")
-		.min(3, "La identificación debe tener al menos 3 caracteres"),
-});
-
-export function CrearVehiculo({
-	navigation,
-	route,
-}: StackRoutesProps<"crearvehiculo">) {
-	const { cliente, setCliente } = useCliente();
-	const [isLoading, setIsLoading] = useState(false);
-	const [isSaved, setIsSaved] = useState(false);
-
-	const {
-		control,
-		handleSubmit,
-		formState: { errors },
-		setValue,
-		reset,
-		clearErrors,
-		watch,
-	} = useForm({
-		resolver: yupResolver(addVehiculochema),
-		defaultValues: {
-			descripcion_vehiculo: "",
-			id_vehiculo: "",
-		},
-	});
-
-	async function handleNewVehiculo({
-		id_vehiculo,
-		descripcion_vehiculo,
-	}: FormData) {
-		try {
-			setIsLoading(true);
-			await api.post("/api/vehiculos", {
-				// converter para maiúsculo e remover espaços
-				id_vehiculo: id_vehiculo.toUpperCase().replace(/\s+/g, ""),
-				descripcion_vehiculo: descripcion_vehiculo.toUpperCase(),
-				ruc: cliente?.ruc,
-			});
-			setIsSaved(true);
-			toastSuccess("Creación de vehículo", "Vehículo creado exitosamente");
-		} catch (error) {
-			console.log(error);
-			let statusCode: number | undefined;
-
-			if (error instanceof AppError) {
-				statusCode = error.statusCode;
-			} else if (axios.isAxiosError(error)) {
-				statusCode = error.response?.status;
-			}
-
-			toastError(
-				"Error en la creación",
-				statusCode === 409
-					? "Ya existe un vehiculo con este registro"
-					: "Error al crear vehículo, intente nuevamente"
-			);
-		} finally {
-			setIsLoading(false);
-		}
-	}
-
-	return (
-		<View className='flex-1'>
-			<View className='flex-1 items-center p-4 gap-4'>
-				<InputCard
-					title='ID Vehículo:'
-					required
-				>
-					<View className='w-full items-center'>
-						<Controller
-							control={control}
-							name='id_vehiculo'
-							rules={{ required: "Identificación es requerido" }}
-							render={({ field: { onChange, value } }) => (
-								<Input
-									value={value.toUpperCase()}
-									placeholder='Identificación'
-									placeholderTextColor='$gray600'
-									onChangeText={onChange}
-									errorMessage={errors.id_vehiculo?.message}
-								/>
-							)}
-						/>
-					</View>
-				</InputCard>
-
-				<InputCard
-					title='Descripción del Vehículo:'
-					required
-				>
-					<View className='w-full items-center'>
-						<Controller
-							control={control}
-							name='descripcion_vehiculo'
-							rules={{ required: "Descripción es requerido" }}
-							render={({ field: { onChange, value } }) => (
-								<Input
-									value={value.toUpperCase()}
-									placeholder='Descripcion'
-									placeholderTextColor='$gray600'
-									onChangeText={onChange}
-									errorMessage={errors.descripcion_vehiculo?.message}
-								/>
-							)}
-						/>
-					</View>
-				</InputCard>
-
-				<InputCard
-					title='Cliente:'
-					required={true}
-				>
-					<View className='flex-row w-full items-center'>
-						<View className='w-full h-10 bg-white rounded-md border border-gray-300'>
-							<TouchableOpacity
-								className='flex-1 justify-center px-4'
-								onPress={() =>
-									navigation.navigate("cliente", { enabledSelect: true })
-								}
-								style={{ flex: 1 }}
-							>
-								<Text className='text-lg font-medium'>
-									{cliente?.descripcion_cliente || "Selecionar cliente"}
-								</Text>
-							</TouchableOpacity>
-						</View>
-					</View>
-				</InputCard>
-
-				<View className='flex-row gap-4 mt-32'>
-					<Button
-						title='Crear'
-						onPress={handleSubmit(handleNewVehiculo)}
-						isLoading={isLoading}
-						disabled={isSaved}
-						icon={SaveIcon}
-						iconSize='md'
-						iconColor='#000'
-					/>
-					{isSaved && (
-						<Button
-							title='Nuevo'
-							onPress={() => {
-								reset({
-									id_vehiculo: "",
-									descripcion_vehiculo: "",
-								});
-								clearErrors();
-								setIsSaved(false);
-							}}
-							icon={SquarePlus}
-							iconSize='md'
-							iconColor='#000'
-						/>
-					)}
-				</View>
-			</View>
-		</View>
-	);
-}
-</file>
-
-<file path="screens/turno/Medicion.tsx">
-import { ScreenHeader } from "@/components/ScreenHeader";
-import { StackRoutesProps } from "@/route/app.routes";
-import { Image, View } from "react-native";
-import { Button } from "@/components/Button";
-
-import { toastError, toastSuccess } from "@utils/toastMessage";
-import { useEffect, useState } from "react";
-import { InputCard } from "@/components/InputCard";
-import { Input } from "@/components/Input";
-import { api } from "@/services/api";
-import { TanqueDTO } from "@/dto/TanqueDTO";
-import { MedicionDTO } from "@/dto/MedicionDTO";
-import { Select } from "@/components/Select";
-
-import * as yup from "yup";
-import { yupResolver } from "@hookform/resolvers/yup";
-
-import { Check } from "lucide-react-native";
-import { Controller, useForm } from "react-hook-form";
-import { Photo } from "@/components/Photo";
-
-type FormData = {
-	altura_regla: string;
-	litros: string;
-	temperatura: string;
-};
-
-const habilitarTanque = yup.object({
-	altura_regla: yup
-		.string()
-		.required("Altura de la regla es requerido")
-		.matches(
-			/^[0-9]*\,?[0-9]+$/,
-			"El formato de de esta información no és válida"
-		),
-	temperatura: yup
-		.string()
-		.required("Temperatura del tanque es requerido")
-		.matches(/^[0-9]*\,?[0-9]+$/, "El formato de la temperatura no és válida"),
-	litros: yup
-		.string()
-		.required("Cantidad de litros en el tanque requerido")
-		.matches(/^[0-9]*\,?[0-9]+$/, "Formato de Litros no és inválido"),
-});
-
-export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
-	const [base64Image, setBase64Image] = useState<string>("");
-	const idBodega = route.params?.idBodega || "0";
-	const [isLoading, setIsLoading] = useState(false);
-	const [tanques, setTanques] = useState<TanqueDTO[]>([]);
-	const [selectedTanques, setSelectedTanques] = useState("");
-	const [medicion, setMedicion] = useState<MedicionDTO[]>([]);
-	const [fromScreen, setFromScreen] = useState(
-		route.params?.fromScreen || "turno"
-	);
-
-	const {
-		control,
-		handleSubmit,
-		reset,
-		formState: { errors },
-	} = useForm({
-		resolver: yupResolver(habilitarTanque),
-		defaultValues: {
-			altura_regla: "", // passar o parametro aqui quando for editar
-			temperatura: "",
-			litros: "",
-		},
-	});
-
-	const definirMedicion = ({ altura_regla, litros, temperatura }: FormData) => {
-		if (base64Image === "") {
-			toastError(
-				"Registro fotografico requerido",
-				"Por favor, capture una foto del tanque."
-			);
-			return;
-		}
-		// Busca o nome do tanque selecionado
-		const tanqueSelecionado = tanques.find(
-			(t) => t.id_tanque === +selectedTanques
-		);
-
-		if (!tanqueSelecionado) {
-			toastError("Tanque inválido", "Seleccione un tanque válido.");
-			return;
-		}
-
-		const newMedicion: MedicionDTO = {
-			//tanque: tanqueSelecionado.descripcion_tanque || "",
-			id_tanque: selectedTanques,
-			regla: parseFloat(altura_regla),
-			temperatura: parseFloat(temperatura),
-			litros: parseFloat(litros),
-			foto_tanque: base64Image,
-		};
-		// Atualiza a lista de mediciones
-		const updatedMediciones = [...medicion, newMedicion];
-		setMedicion(updatedMediciones);
-
-		// Remove o tanque processado da lista
-		const tanquesAtualizados = tanques.filter(
-			(t) => t.id_tanque !== +selectedTanques
-		);
-		setTanques(tanquesAtualizados);
-		setSelectedTanques(""); // Limpa o tanque selecionado
-
-		reset(); // Limpa os campos do formulário
-		setBase64Image(""); // Limpa a imagem capturada
-		toastSuccess(
-			"Tanque registrado",
-			"El tanque ha sido registrado con éxito."
-		);
-
-		// Se era o último tanque, conclui
-		if (tanquesAtualizados.length === 0) {
-			toastSuccess(
-				"Tanques Medidos",
-				"Todos los tanques han sido medidos con éxito."
-			);
-			navigation.popTo(fromScreen as any, { onMedicion: updatedMediciones });
-		}
-	};
-
-	function handleRemoveMedicion(idTanque: string) {
-		setMedicion((prev) => prev.filter((item) => item.id_tanque !== idTanque));
-		toastSuccess("Medición removida", "La medición ha sido removida.");
-	}
-
-	async function fetchTanques() {
-		try {
-			setIsLoading(true);
-			const response = await api.get("/api/tanques", {
-				params: {
-					id_bodega: idBodega,
-				},
-			});
-
-			const data = response.data;
-			if (data?.tanques?.length) {
-				setTanques(data.tanques);
-			}
-		} catch (error) {
-			toastError(
-				"Error al buscar tanques",
-				"No se pudieron cargar los tanques."
-			);
-		} finally {
-			setIsLoading(false);
-		}
-	}
-
-	useEffect(() => {
-		if (idBodega) {
-			fetchTanques();
-		}
-	}, []);
-
-	return (
-		<View className='flex-1'>
-			<ScreenHeader title='Medición' />
-			<View className='flex-1 p-4 gap-4 items-center'>
-				<InputCard
-					title='Tanque'
-					required
-				>
-					<Select
-						data={tanques}
-						isLoading={isLoading}
-						selectedValue={selectedTanques}
-						setSelectedValue={setSelectedTanques}
-						labelField='descripcion_tanque'
-						valueField='id_tanque'
-					/>
-				</InputCard>
-
-				{/* Crie uma renderização condicional baseado na seleção de um tanque */}
-
-				<InputCard
-					title='Altura Regla'
-					required
-				>
-					<Controller
-						control={control}
-						name='altura_regla'
-						render={({ field: { onChange, value } }) => (
-							<Input
-								keyboardType='number-pad'
-								align='center'
-								textAlignVertical='top'
-								className='ml-2 text-center'
-								value={value}
-								onChangeText={onChange}
-								placeholder='Informe la altura de la regla'
-								errorMessage={errors.altura_regla?.message}
-							/>
-						)}
-					/>
-				</InputCard>
-				<InputCard
-					title='Litros'
-					required
-				>
-					<Controller
-						control={control}
-						name='litros'
-						render={({ field: { onChange, value } }) => (
-							<Input
-								keyboardType='number-pad'
-								align='center'
-								textAlignVertical='top'
-								className='ml-2'
-								value={value}
-								onChangeText={onChange}
-								placeholder='Litros en el tanque'
-								errorMessage={errors.litros?.message}
-							/>
-						)}
-					/>
-				</InputCard>
-				<InputCard
-					title='Temperatura'
-					required
-				>
-					<Controller
-						control={control}
-						name='temperatura'
-						render={({ field: { onChange, value } }) => (
-							<Input
-								keyboardType='number-pad'
-								align='center'
-								textAlignVertical='top'
-								className='ml-2'
-								value={value}
-								onChangeText={onChange}
-								placeholder='Informe la temperatura del tanque'
-								errorMessage={errors.temperatura?.message}
-							/>
-						)}
-					/>
-				</InputCard>
-				<InputCard
-					title='Fotos'
-					className='min-h-48'
-					required
-				>
-					<View className='w-full items-center p-4 gap-2'>
-						<Image
-							source={{ uri: `data:image/jpeg;base64,${base64Image}` }}
-							className='mr-4 w-20 h-20 rounded-lg border border-gray-300'
-							resizeMode='cover'
-						/>
-						<Photo
-							form='button'
-							iconSize='lg'
-							setImage={setBase64Image}
-						/>
-					</View>
-				</InputCard>
-
-				<View className='w-full flex-col justify-center gap-4'>
-					<View className='flex-row justify-center gap-4'>
-						<Button
-							title='Definir'
-							onPress={handleSubmit(definirMedicion)}
-							isLoading={isLoading}
-							icon={Check}
-							iconSize='md'
-							iconColor='#000'
-						/>
-					</View>
-				</View>
-			</View>
-		</View>
-	);
-}
-</file>
-
-<file path="screens/abastecimiento/MedicionAbastecimiento.tsx">
+<file path="src/screens/abastecimiento/MedicionAbastecimiento.tsx">
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { StackRoutesProps } from "@/route/app.routes";
 import {
@@ -3305,7 +2277,7 @@ import { toastError, toastSuccess } from "@utils/toastMessage";
 import { useCallback, useEffect, useState } from "react";
 import { InputCard } from "@/components/InputCard";
 import { Input } from "@/components/Input";
-import { api } from "@/services/api";
+//import { api } from "@/services/api";
 import { TanqueDTO } from "@/dto/TanqueDTO";
 import { MedicionDTO } from "@/dto/MedicionDTO";
 import { Select } from "@/components/Select";
@@ -3321,6 +2293,7 @@ import {
   removeMedicionAbastecimiento,
   saveMedicionAbastecimiento,
 } from "@/storage/storageMedicionAbastecimiento";
+import { getTanquesByBodega } from "@/backend/db/modules/tanqueDB";
 
 type FormData = {
   alturaInicial: string;
@@ -3401,59 +2374,59 @@ export function MedicionAbastecimiento({
   });
 
   const alturaInicialWatch = watch("alturaInicial");
-const litrosInicialWatch = watch("litrosInicial");
-const tempInicialWatch = watch("tempInicial");
+  const litrosInicialWatch = watch("litrosInicial");
+  const tempInicialWatch = watch("tempInicial");
 
-const alturaFinalWatch = watch("alturaFinal");
-const litrosFinalWatch = watch("litrosFinal");
-const tempFinalWatch = watch("tempFinal");
+  const alturaFinalWatch = watch("alturaFinal");
+  const litrosFinalWatch = watch("litrosFinal");
+  const tempFinalWatch = watch("tempFinal");
 
-const litros_inicial = Number(litrosInicialWatch);
-const litros_final = Number(litrosFinalWatch);
+  const litros_inicial = Number(litrosInicialWatch);
+  const litros_final = Number(litrosFinalWatch);
 
-const capacidadeRestante = litrosTanque - litros_inicial;
+  const capacidadeRestante = litrosTanque - litros_inicial;
 
   // ─── Persistencia: guardar estado cuando cambia algo relevante ───
   const guardarEstado = useCallback(async () => {
-  if (!estadoRestaurado) return;
+    if (!estadoRestaurado) return;
 
-  try {
-    await saveMedicionAbastecimiento({
-      medicionInicial,
-      medicionFinal,
-      base64ImageInicial,
-      base64ImageFinal,
-      selectedTanques,
-      idBodega,
+    try {
+      await saveMedicionAbastecimiento({
+        medicionInicial,
+        medicionFinal,
+        base64ImageInicial,
+        base64ImageFinal,
+        selectedTanques,
+        idBodega,
 
-      alturaInicial: alturaInicialWatch,
-      litrosInicial: litrosInicialWatch,
-      tempInicial: tempInicialWatch,
+        alturaInicial: alturaInicialWatch,
+        litrosInicial: litrosInicialWatch,
+        tempInicial: tempInicialWatch,
 
-      alturaFinal: alturaFinalWatch,
-      litrosFinal: litrosFinalWatch,
-      tempFinal: tempFinalWatch,
-    });
-  } catch (error) {
-    console.log("[MedicionAbastecimiento] Error al guardar estado:", error);
-  }
-}, [
-  estadoRestaurado,
-  medicionInicial,
-  medicionFinal,
-  base64ImageInicial,
-  base64ImageFinal,
-  selectedTanques,
-  idBodega,
+        alturaFinal: alturaFinalWatch,
+        litrosFinal: litrosFinalWatch,
+        tempFinal: tempFinalWatch,
+      });
+    } catch (error) {
+      console.log("[MedicionAbastecimiento] Error al guardar estado:", error);
+    }
+  }, [
+    estadoRestaurado,
+    medicionInicial,
+    medicionFinal,
+    base64ImageInicial,
+    base64ImageFinal,
+    selectedTanques,
+    idBodega,
 
-  alturaInicialWatch,
-  litrosInicialWatch,
-  tempInicialWatch,
+    alturaInicialWatch,
+    litrosInicialWatch,
+    tempInicialWatch,
 
-  alturaFinalWatch,
-  litrosFinalWatch,
-  tempFinalWatch,
-]);
+    alturaFinalWatch,
+    litrosFinalWatch,
+    tempFinalWatch,
+  ]);
 
   useEffect(() => {
     guardarEstado();
@@ -3471,15 +2444,15 @@ const capacidadeRestante = litrosTanque - litros_inicial;
           setBase64ImageInicial(guardado.base64ImageInicial);
           setBase64ImageFinal(guardado.base64ImageFinal);
           setSelectedTanques(guardado.selectedTanques);
-		  reset({
-  alturaInicial: guardado.alturaInicial || "",
-  litrosInicial: guardado.litrosInicial || "",
-  tempInicial: guardado.tempInicial || "",
+          reset({
+            alturaInicial: guardado.alturaInicial || "",
+            litrosInicial: guardado.litrosInicial || "",
+            tempInicial: guardado.tempInicial || "",
 
-  alturaFinal: guardado.alturaFinal || "",
-  litrosFinal: guardado.litrosFinal || "",
-  tempFinal: guardado.tempFinal || "",
-});
+            alturaFinal: guardado.alturaFinal || "",
+            litrosFinal: guardado.litrosFinal || "",
+            tempFinal: guardado.tempFinal || "",
+          });
           // Los tanques ya medidos se filtran DESPUÉS de que fetchTanques cargue
           // — ver el useEffect que combina tanques + medicionInicial restaurada
         }
@@ -3598,19 +2571,11 @@ const capacidadeRestante = litrosTanque - litros_inicial;
   };
 
   async function fetchTanques() {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const response = await api.get("/api/tanques", {
-        params: {
-          id_bodega: idBodega,
-        },
-      });
-
-      const data = response.data;
-      if (data?.tanques?.length) {
-        setTanques(data.tanques);
-      }
-    } catch (error) {
+      const data = await getTanquesByBodega(Number(idBodega));
+      setTanques(data);
+    } catch {
       toastError(
         "Error al buscar tanques",
         "No se pudieron cargar los tanques.",
@@ -3844,1418 +2809,7 @@ const capacidadeRestante = litrosTanque - litros_inicial;
 }
 </file>
 
-<file path="backend/db/prisma-compat.ts">
-// src/backend/db/prisma-compat.ts
-import { db } from "./client";
-import * as schema from "./schema";
-import { eq, and, like, or, asc, desc } from "drizzle-orm";
-
-// Mapeo de nombre Prisma → tabla Drizzle
-const tableMap = {
-  sucursales:   schema.sucursales,
-  bodegas:      schema.bodegas,
-  usuariosApp:  schema.usuariosApp,
-  picos:        schema.picos,
-  vehiculos:    schema.vehiculos,
-  clientes:     schema.clientes,
-  turnos:       schema.turnos,
-  tickets:      schema.tickets,
-  trapasos:     schema.trapasos,
-  calibraciones: schema.calibraciones,
-  abastecimientos: schema.abastecimientos,
-  despachos:    schema.despachos,
-  personas:     schema.personas,
-  syncs:        schema.syncs,
-  usuariosAdmin: schema.usuariosAdmin,
-} as const;
-
-type TableName = keyof typeof tableMap;
-
-// Construye la condición WHERE a partir del objeto { campo: valor } de Prisma
-function buildWhere(table: any, where: Record<string, any>) {
-  const conditions = Object.entries(where).map(([col, val]) => {
-    const tableCol = table[col];
-    if (!tableCol) throw new Error(`Columna '${col}' no existe en la tabla`);
-    return eq(tableCol, val);
-  });
-  return conditions.length === 1 ? conditions[0] : and(...conditions);
-}
-
-// Construye ORDER BY a partir de { campo: 'asc' | 'desc' }
-function buildOrderBy(table: any, orderBy: Record<string, string>) {
-  return Object.entries(orderBy).map(([col, dir]) =>
-    dir === "desc" ? desc(table[col]) : asc(table[col])
-  );
-}
-
-function makeTableProxy(tableName: TableName) {
-  const table = tableMap[tableName] as any;
-
-  return {
-    async findUnique({ where, select }: { where: Record<string, any>; select?: any }) {
-      const result = await db.select().from(table).where(buildWhere(table, where)).limit(1);
-      return result[0] ?? null;
-    },
-
-    async findFirst({ where, select, orderBy }: { where?: Record<string, any>; select?: any; orderBy?: any }) {
-      let q = db.select().from(table) as any;
-      if (where) q = q.where(buildWhere(table, where));
-      if (orderBy) q = q.orderBy(...buildOrderBy(table, orderBy));
-      const result = await q.limit(1);
-      return result[0] ?? null;
-    },
-
-    async findMany({ where, select, orderBy, take, skip }: {
-      where?: Record<string, any>;
-      select?: any;
-      orderBy?: Record<string, string>;
-      take?: number;
-      skip?: number;
-    } = {}) {
-      let q = db.select().from(table) as any;
-      if (where) q = q.where(buildWhere(table, where));
-      if (orderBy) q = q.orderBy(...buildOrderBy(table, orderBy));
-      if (take)   q = q.limit(take);
-      if (skip)   q = q.offset(skip);
-      return q;
-    },
-
-    async create({ data }: { data: Record<string, any> }) {
-      const result = await db.insert(table).values(data).returning();
-      return result[0];
-    },
-
-    async update({ where, data }: { where: Record<string, any>; data: Record<string, any> }) {
-      const result = await db.update(table).set(data).where(buildWhere(table, where)).returning();
-      return result[0];
-    },
-
-    async upsert({ where, create, update }: {
-      where: Record<string, any>;
-      create: Record<string, any>;
-      update: Record<string, any>;
-    }) {
-      const existing = await db.select().from(table).where(buildWhere(table, where)).limit(1);
-      if (existing[0]) {
-        const result = await db.update(table).set(update).where(buildWhere(table, where)).returning();
-        return result[0];
-      } else {
-        const result = await db.insert(table).values(create).returning();
-        return result[0];
-      }
-    },
-
-    async delete({ where }: { where: Record<string, any> }) {
-      const result = await db.delete(table).where(buildWhere(table, where)).returning();
-      return result[0];
-    },
-
-    async count({ where }: { where?: Record<string, any> } = {}) {
-      // Drizzle no tiene .count() directo en expo-sqlite, usamos select + length
-      let q = db.select().from(table) as any;
-      if (where) q = q.where(buildWhere(table, where));
-      const result = await q;
-      return result.length;
-    },
-  };
-}
-
-// Raw SQL — equivalente a $queryRawUnsafe de Prisma
-async function $queryRawUnsafe(sql: string, ...params: any[]) {
-  return db.run({ sql, args: params } as any);
-}
-
-// El objeto que reemplaza a PrismaService
-export const prismaService = {
-  sucursales:      makeTableProxy("sucursales"),
-  bodegas:         makeTableProxy("bodegas"),
-  usuariosApp:     makeTableProxy("usuariosApp"),
-  picos:           makeTableProxy("picos"),
-  vehiculos:       makeTableProxy("vehiculos"),
-  clientes:        makeTableProxy("clientes"),
-  turnos:          makeTableProxy("turnos"),
-  tickets:         makeTableProxy("tickets"),
-  trapasos:        makeTableProxy("trapasos"),
-  calibraciones:   makeTableProxy("calibraciones"),
-  abastecimientos: makeTableProxy("abastecimientos"),
-  despachos:       makeTableProxy("despachos"),
-  personas:        makeTableProxy("personas"),
-  syncs:           makeTableProxy("syncs"),
-  usuariosAdmin:   makeTableProxy("usuariosAdmin"),
-  $queryRawUnsafe,
-};
-
-export type PrismaCompatService = typeof prismaService;
-</file>
-
-<file path="screens/salida/Salida.tsx">
-import * as Location from "expo-location";
-import { Input } from "@/components/Input";
-import { InputCard } from "@/components/InputCard";
-import { ScreenHeader } from "@/components/ScreenHeader";
-import { TextSearch } from "@/components/TextSearch";
-import { PersonaDTO } from "@/dto/PersonaDTO";
-import { VehiculoDTO } from "@/dto/VehiculoDTO";
-import { BackHandler } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
-import { StackRoutesProps } from "@/route/app.routes";
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
-import { Controller, useForm } from "react-hook-form";
-import { Fuel, Pencil, SaveAll, RotateCcw } from "lucide-react-native";
-import { toastError, toastSuccess, toastInfo } from "@/utils/toastMessage";
-import { yupResolver } from "@hookform/resolvers/yup";
-import * as yup from "yup";
-import { useAppContext } from "@/hooks/useAppContext";
-import { api } from "@/services/api";
-import { PicoDTO } from "@/dto/PicosDTO";
-import { Select } from "@/components/Select";
-import { Button } from "@/components/Button";
-import { Loading } from "@/components/Loading";
-import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
-import { Photo } from "@/components/Photo";
-import {
-  getStorageSalida,
-  removeSalida,
-  saveSalida,
-  SalidaStorageDTO,
-} from "@/storage/storageSalida";
-
-// ─── Tipos de respuesta de la API ───────────────────────────────────────────
-
-type UltimaCargaResponse = {
-  id: number;
-  id_hrs: number;
-  pico: number;
-  volumen_ml: string | number; // Prisma BigInt serializado como string
-  total_ini: string | number | null;
-  total_fin: string | number | null;
-  fecha_hora: string;
-} | null;
-
-type TotalizadorResponse = {
-  pico: number;
-  totalizador: number; // litros con 2 decimales
-};
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Convierte volumen_ml (BigInt serializado / centilitros*100) a litros.
- * La API guarda volumen_ml dividido por 100 para obtener litros con 2 decimales.
- */
-function volumenMlALitros(volumen_ml: string | number): number {
-  return Number(volumen_ml) / 100;
-}
-
-/**
- * Convierte total_ini / total_fin (taxilitros almacenados como BigInt*100) a litros.
- */
-function taxilitroALitros(taxilitro: string | number | null): number {
-  if (taxilitro === null || taxilitro === undefined) return 0;
-  return Number(taxilitro) / 100;
-}
-
-// ─── Form & Schema ────────────────────────────────────────────────────────────
-
-type FormData = {
-  horometro?: string | null;
-  kilometraje?: string | null;
-  observaciones?: string;
-};
-
-let idAutorizado = 0;
-
-const registrarSalidaSchema = yup.object({
-  horometro: yup
-    .string()
-    .nullable()
-    .notRequired()
-    .matches(/^[0-9,]*$/, "Solo números y coma permitidos"),
-  kilometraje: yup
-    .string()
-    .nullable()
-    .notRequired()
-    .matches(/^[0-9]*$/, "Solo números permitidos"),
-  observaciones: yup
-    .string()
-    .optional()
-    .max(500, "Máximo 500 caracteres permitidos"),
-});
-
-// ─── Componente ───────────────────────────────────────────────────────────────
-
-export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
-  const { sucursal, user } = useAppContext();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRecuperando, setIsRecuperando] = useState(false);
-  const [estadoRestaurado, setEstadoRestaurado] = useState(false);
-  const [estadoInicial, setEstadoInicial] = useState<SalidaStorageDTO | null>(
-    null,
-  );
-  const [turnoCerrado, setTurnoCerrado] = useState(false);
-  const [picos, setPicos] = useState<PicoDTO[]>([]);
-  const [persona, setPersona] = useState<PersonaDTO | null>(null);
-  const [vehiculo, setVehiculo] = useState<VehiculoDTO | null>(null);
-  const [firma, setFirma] = useState<string | null>(null);
-  const [salida, setSalida] = useState<number>(0);
-  const [cargaCombustible, setCargaCombustible] = useState<string>("000,00");
-
-  const [selectedPico, setSelectedPico] = useState<string>("");
-  const [idPico_surtidor, setIdPicoSurtidor] = useState<number>(0);
-  const [totalizadorPicoInicial, setTotalizadorPicoInicial] =
-    useState<number>(0);
-  const [totalizadorPicoFinal, setTotalizadorPicoFinal] = useState<number>(0);
-
-  const [motivoConfirmado, setMotivoConfirmado] = useState(false);
-
-  // Flag: había una carga interrumpida al restaurar (salida guardada === 1)
-  const [huboInterrupcion, setHuboInterrupcion] = useState(false);
-
-  const [base64Vehiculo, setBase64Vehiculo] = useState<string>("");
-  const [base64Horometro, setBase64Horometro] = useState<string>("");
-  const [base64Kilometraje, setBase64Kilometraje] = useState<string>("");
-  const [base64Obs, setBase64Obs] = useState<string>("");
-
-  const [obsAdicional, setObsAdicional] = useState<string>("");
-  const [shouldContinue, setShouldContinue] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  const [location, setLocation] = useState<Location.LocationObject | null>(
-    null,
-  );
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const {
-    control,
-    handleSubmit,
-    reset,
-    setValue,
-    formState: { errors },
-  } = useForm({
-    resolver: yupResolver(registrarSalidaSchema),
-    defaultValues: {
-      horometro: "",
-      kilometraje: "",
-      observaciones: "",
-    },
-  });
-
-  // ─── Persistencia ────────────────────────────────────────────────────────────
-
-  const guardarEstado = useCallback(async () => {
-    if (!estadoRestaurado) return;
-    try {
-      const estado: SalidaStorageDTO = {
-        persona,
-        vehiculo,
-        firma,
-        selectedPico,
-        idPico_surtidor,
-        salida,
-        cargaCombustible,
-        totalizadorPicoInicial,
-        totalizadorPicoFinal,
-        base64Vehiculo,
-        base64Horometro,
-        base64Kilometraje,
-        base64Obs,
-        horometro: control._formValues.horometro ?? "",
-        kilometraje: control._formValues.kilometraje ?? "",
-        observaciones: control._formValues.observaciones ?? "",
-        obsAdicional,
-        turnoCerrado,
-      };
-      await saveSalida(estado);
-    } catch (error) {
-      console.log("[Salida] Error al guardar estado:", error);
-    }
-  }, [
-    estadoRestaurado,
-    persona,
-    vehiculo,
-    firma,
-    selectedPico,
-    idPico_surtidor,
-    salida,
-    cargaCombustible,
-    totalizadorPicoInicial,
-    totalizadorPicoFinal,
-    base64Vehiculo,
-    base64Horometro,
-    base64Kilometraje,
-    base64Obs,
-    obsAdicional,
-    turnoCerrado,
-  ]);
-
-  useEffect(() => {
-    guardarEstado();
-  }, [guardarEstado]);
-
-  // ─── Detección de cambios ─────────────────────────────────────────────────
-
-  const huboCambios = useCallback(() => {
-    if (!estadoInicial || !estadoRestaurado) return false;
-    const actual: SalidaStorageDTO = {
-      persona,
-      vehiculo,
-      firma,
-      selectedPico,
-      idPico_surtidor,
-      salida,
-      cargaCombustible,
-      totalizadorPicoInicial,
-      totalizadorPicoFinal,
-      base64Vehiculo,
-      base64Horometro,
-      base64Kilometraje,
-      base64Obs,
-      horometro: control._formValues.horometro ?? "",
-      kilometraje: control._formValues.kilometraje ?? "",
-      observaciones: control._formValues.observaciones ?? "",
-      obsAdicional,
-      turnoCerrado,
-    };
-    return JSON.stringify(actual) !== JSON.stringify(estadoInicial);
-  }, [
-    estadoInicial,
-    estadoRestaurado,
-    persona,
-    vehiculo,
-    firma,
-    selectedPico,
-    idPico_surtidor,
-    salida,
-    cargaCombustible,
-    totalizadorPicoInicial,
-    totalizadorPicoFinal,
-    base64Vehiculo,
-    base64Horometro,
-    base64Kilometraje,
-    base64Obs,
-    obsAdicional,
-    turnoCerrado,
-    control._formValues,
-  ]);
-
-  // ─── Guardar/Salir ────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("beforeRemove", (e) => {
-      if (isLoading || !estadoRestaurado) return;
-      //if (!huboCambios()) return;
-
-      e.preventDefault();
-
-      Alert.alert(
-        "Salir de salida",
-        "Hay cambios sin confirmar. ¿Qué desea hacer?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Salir sin guardar",
-            style: "destructive",
-            onPress: () => {
-              Alert.alert(
-                "¿Estás seguro?",
-                "Se perderán todos los datos de esta Salida. Esta acción no se puede deshacer.",
-                [
-                  { text: "Cancelar", style: "cancel" },
-                  {
-                    text: "Sí, salir sin guardar",
-                    style: "destructive",
-                    onPress: async () => {
-                      await removeSalida();
-                      setEstadoInicial(null);
-                      navigation.dispatch(e.data.action);
-                    },
-                  },
-                ],
-              );
-            },
-          },
-          {
-            text: "Guardar y salir",
-            onPress: async () => {
-              await guardarEstado();
-              navigation.dispatch(e.data.action);
-            },
-          },
-        ],
-      );
-    });
-
-    return unsubscribe;
-  }, [navigation, guardarEstado, huboCambios, isLoading, estadoRestaurado]);
-
-  // ─── Restaurar estado al montar ──────────────────────────────────────────
-
-  useEffect(() => {
-    async function restaurarEstado() {
-      let guardado: SalidaStorageDTO | null = null;
-      try {
-        guardado = await getStorageSalida();
-        if (guardado) {
-          setPersona(guardado.persona);
-          setVehiculo(guardado.vehiculo);
-          setFirma(guardado.firma);
-          setSelectedPico(guardado.selectedPico);
-          setIdPicoSurtidor(guardado.idPico_surtidor);
-          setCargaCombustible(guardado.cargaCombustible);
-          setTotalizadorPicoInicial(
-            Number(guardado.totalizadorPicoInicial) || 0,
-          );
-          setTotalizadorPicoFinal(Number(guardado.totalizadorPicoFinal) || 0);
-          setBase64Vehiculo(guardado.base64Vehiculo);
-          setBase64Horometro(guardado.base64Horometro);
-          setBase64Kilometraje(guardado.base64Kilometraje);
-          setBase64Obs(guardado.base64Obs);
-          setValue("horometro", guardado.horometro);
-          setValue("kilometraje", guardado.kilometraje);
-          setValue("observaciones", guardado.observaciones);
-          setObsAdicional(guardado.obsAdicional);
-          if (guardado.obsAdicional) setMotivoConfirmado(true);
-          setTurnoCerrado(guardado.turnoCerrado);
-          setEstadoInicial(guardado);
-
-          // ── NUEVO: detectar interrupción durante la carga ──────────────────
-          if (guardado.salida === 1) {
-            // Había una carga en curso cuando la app se cerró.
-            // Volvemos a estado 0 y marcamos la interrupción para mostrar el Alert.
-            console.log("salida = ", guardado.salida)
-            setSalida(0);
-            setHuboInterrupcion(true);
-          } else {
-            setSalida(guardado.salida);
-          }
-        }
-      } catch (error) {
-        console.log("[Salida] Error al restaurar estado:", error);
-      } finally {
-        if (!guardado) {
-          setEstadoInicial({
-            persona: null,
-            vehiculo: null,
-            firma: null,
-            selectedPico: "",
-            idPico_surtidor: 0,
-            salida: 0,
-            cargaCombustible: "000,00",
-            totalizadorPicoInicial: 0,
-            totalizadorPicoFinal: 0,
-            base64Vehiculo: "",
-            base64Horometro: "",
-            base64Kilometraje: "",
-            base64Obs: "",
-            horometro: "",
-            kilometraje: "",
-            observaciones: "",
-            obsAdicional: "",
-            turnoCerrado: false,
-          });
-        }
-        setEstadoRestaurado(true);
-      }
-    }
-    restaurarEstado();
-  }, []);
-
-  // ─── Alert de recuperación (se dispara después de restaurar) ─────────────
-
-  useEffect(() => {
-    if (!huboInterrupcion || !estadoRestaurado){console.log("No mostrar mensaje de alerta");return;}
-
-    // Solo mostramos el Alert si tenemos un pico surtidor guardado para consultar
-    if (idPico_surtidor === 0) {
-      setHuboInterrupcion(false);
-      return;
-    }
-
-    Alert.alert(
-      "Carga interrumpida",
-      "La app se cerró durante una carga en curso. ¿Desea intentar recuperar los litros cargados?",
-      [
-        {
-          text: "Recuperar",
-          onPress: () => {
-            setHuboInterrupcion(false);
-            setShouldContinue(true);
-            setSalida(1)
-            //handleRecuperarCarga();
-            fetchLoop();
-          },
-        },
-        {
-          text: "Empezar de nuevo",
-          style: "cancel",
-          onPress: () => {
-            setHuboInterrupcion(false);
-            // Limpiamos los totalizadores para que no aparezca el botón "Recuperar"
-            setTotalizadorPicoInicial(0);
-            setTotalizadorPicoFinal(0);
-          },
-        },
-      ],
-      { cancelable: false },
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [huboInterrupcion, estadoRestaurado]);
-
-  // ─── Recuperación de carga perdida ───────────────────────────────────────
-
-  /**
-   * Intenta recuperar los litros de una carga que ocurrió pero no fue capturada.
-   *
-   * Estrategia:
-   * 1. Llama a GET /abastecimientos/ultimacarga/:pico (sincroniza + consulta BD)
-   *    - Si total_ini coincide con totalizadorPicoInicial guardado → carga correcta, usarla.
-   *    - Si no hay coincidencia pero hay datos → usar como mejor estimación.
-   * 2. Fallback: GET /api/totalizador/:pico → litros = totalizadorActual - totalizadorPicoInicial
-   * 3. Si todo falla → toastError y el playero ingresa los litros manualmente.
-   */
-  /*async function handleRecuperarCarga() {
-    if (idPico_surtidor === 0) {
-      toastError(
-        "Recuperación fallida",
-        "No hay pico surtidor registrado. Seleccioná el pico e intentá nuevamente.",
-      );
-      return;
-    }
-    console.log("intentando recuperar");
-
-    setIsRecuperando(true);
-    try {
-      // ── Intento 1: última carga de la BD ─────────────────────────────────
-      let recuperado = false;
-      try {
-        const res = await api.get<UltimaCargaResponse>(
-          `/abastecimientos/ultimacarga/${idPico_surtidor}`,
-        );
-        const ultimaCarga = res.data;
-
-        if (ultimaCarga && ultimaCarga.volumen_ml !== undefined) {
-          const litros = volumenMlALitros(ultimaCarga.volumen_ml);
-          const taxIni = taxilitroALitros(ultimaCarga.total_ini);
-          const taxFin = taxilitroALitros(ultimaCarga.total_fin);
-
-          // Verificamos si esta carga corresponde a la que iniciamos.
-          // Si guardamos un totalizadorPicoInicial > 0, comparamos con tolerancia de 1 litro.
-          const totalIniGuardado = totalizadorPicoInicial;
-          const esLaCargaCorrecta =
-            totalIniGuardado === 0 || // No tenemos referencia → aceptamos
-            Math.abs(taxIni - totalIniGuardado) < 1; // Tolerancia 1 litro
-
-          if (litros > 0) {
-            setTotalizadorPicoInicial(taxIni);
-            setTotalizadorPicoFinal(taxFin);
-            setCargaCombustible(litros.toFixed(2));
-            setSalida(2);
-            recuperado = true;
-
-            if (esLaCargaCorrecta) {
-              toastSuccess(
-                "Carga recuperada",
-                `Se recuperaron ${litros.toFixed(2)} litros del pico ${idPico_surtidor}.`,
-              );
-            } else {
-              // Datos recuperados, pero el taxilitro inicial no coincide exactamente.
-              // Podría ser una carga diferente. Avisamos al playero.
-              toastInfo(
-                "Carga recuperada con advertencia",
-                `Se encontraron ${litros.toFixed(2)} L, pero verificá que correspondan a esta carga.`,
-              );
-            }
-          }
-        }
-      } catch (errUltimaCarga) {
-        console.warn(
-          "[Salida] handleRecuperarCarga: fallo en ultimacarga, intentando totalizador.",
-          errUltimaCarga,
-        );
-      }
-
-      // ── Intento 2 (fallback): totalizador actual − totalizador inicial ────
-      if (!recuperado && totalizadorPicoInicial > 0) {
-        try {
-          const res = await api.get<TotalizadorResponse>(
-            `/api/totalizador/${idPico_surtidor}`,
-          );
-          const totalizadorActual = res.data.totalizador;
-          const litros = totalizadorActual - totalizadorPicoInicial;
-
-          if (litros > 0) {
-            setTotalizadorPicoFinal(totalizadorActual);
-            setCargaCombustible(litros.toFixed(2));
-            setSalida(2);
-            recuperado = true;
-            toastSuccess(
-              "Carga recuperada (estimada)",
-              `Se estimaron ${litros.toFixed(2)} L usando el totalizador actual del pico.`,
-            );
-          } else {
-            // litros <= 0: el totalizador no avanzó (carga no ocurrió realmente)
-            toastError(
-              "Sin carga detectada",
-              "El totalizador no registró movimiento. La carga puede no haberse realizado.",
-            );
-          }
-        } catch (errTotalizador) {
-          console.warn(
-            "[Salida] handleRecuperarCarga: fallo en totalizador.",
-            errTotalizador,
-          );
-        }
-      }
-
-      // ── Intento 3: sin referencia de totalizador inicial ─────────────────
-      if (!recuperado && totalizadorPicoInicial === 0) {
-        toastError(
-          "Recuperación fallida",
-          "No hay referencia del totalizador inicial. Ingresá los litros manualmente en Observaciones.",
-        );
-        // Pasamos a estado 2 igual para que el playero pueda grabar con datos manuales
-        setSalida(2);
-      }
-
-      // Si llegamos acá y recuperado sigue false (todos los intentos fallaron con error)
-      if (!recuperado && totalizadorPicoInicial > 0) {
-        toastError(
-          "Recuperación fallida",
-          "No se pudo contactar al servidor. Verificá la conexión e intentá nuevamente.",
-        );
-      }
-    } finally {
-      setIsRecuperando(false);
-    }
-  }*/
-
-  // ─── Fotos ───────────────────────────────────────────────────────────────
-
-  function handlePhotoVehiculo(base64: string) {
-    setBase64Vehiculo(base64);
-  }
-  function handlePhotoHorometro(base64: string) {
-    setBase64Horometro(base64);
-  }
-  function handlePhotoKilometraje(base64: string) {
-    setBase64Kilometraje(base64);
-  }
-  function handlePhotoObs(base64: string) {
-    setBase64Obs(base64);
-  }
-
-  // ─── Picos ───────────────────────────────────────────────────────────────
-
-  async function fetchPicos() {
-    setIsLoading(true);
-    try {
-      const turno = await api.get(
-        `api/registros/turno/status/${sucursal.id_sucursal}`,
-      );
-      const turnoData: StatusTurnoDTO = {
-        status: turno.data.status,
-        Inicio_turno: turno.data.Inicio_turno,
-        Fin_turno: turno.data.Fin_turno,
-        Fin_turno_anterior: turno.data.Fin_turno_anterior,
-      };
-      if (turnoData.status === "cerrado" || turnoData.status == "falta_cerrar")
-        setTurnoCerrado(true);
-
-      const data = await api.get(`/api/picos/${sucursal.id_sucursal}`);
-      const picos: PicoDTO[] = data.data.picos;
-      setPicos(picos);
-    } catch (error) {
-      console.error("Error al buscar picos:", error);
-      toastError("Error al buscar picos", "Intente nuevamente más tarde.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  // ─── Grabar ticket ───────────────────────────────────────────────────────
-
-  async function handleSaveAll() {
-    let id_bodega = 0;
-    let id_pico_surtidor = 0;
-
-    const now = new Date();
-    const fecha = now.toISOString().slice(0, 10);
-    const hora = now.toTimeString().slice(0, 8);
-    picos.map((pico) => {
-      if (pico.id_pico === Number(selectedPico)) {
-        id_bodega = pico.id_bodega;
-        id_pico_surtidor = pico.id_pico_surtidor;
-        setIdPicoSurtidor(pico.id_pico_surtidor);
-      }
-    });
-
-    const data = {
-      json: {
-        id_suc: sucursal.id_sucursal,
-        id_bod: id_bodega,
-        id_pico: Number(selectedPico),
-        id_vehiculo: vehiculo?.id_vehiculo || "",
-        id_playero: Number(user.cedula),
-        id_operador: Number(persona?.cedula),
-        litros: Number(cargaCombustible),
-        kilometraje: Number(control._formValues.kilometraje) || 0,
-        horometro:
-          Number((control._formValues.horometro || "").replace(",", ".")) || 0,
-        inicio_taxilitro: Number(totalizadorPicoInicial) || 0,
-        fin_taxilitro: Number(totalizadorPicoFinal) || 0,
-        ruc_cliente: "",
-        fecha: fecha,
-        hora: hora,
-        precio: 0,
-        foto_chapa: base64Vehiculo ? [base64Vehiculo] : [],
-        firma_conductor: firma ? [firma] : [],
-        foto_kilometraje: base64Kilometraje ? [base64Kilometraje] : [],
-        foto_horometro: base64Horometro ? [base64Horometro] : [],
-        ubicacion_carga: location
-          ? `https://www.google.com/maps?q=${location.coords.latitude},${location.coords.longitude}`
-          : "",
-        observaciones_ticket:
-          control._formValues.observaciones + " >>" + obsAdicional || "",
-        foto_observaciones: base64Obs ? [base64Obs] : [],
-      },
-    };
-
-    try {
-      setIsLoading(true);
-      await api.post("/api/tickets", data);
-      setIsLoading(false);
-
-      await removeSalida();
-      setPersona(null);
-      setVehiculo(null);
-      setFirma(null);
-      setBase64Vehiculo("");
-      setBase64Horometro("");
-      setBase64Kilometraje("");
-      setBase64Obs("");
-      reset();
-      setSalida(0);
-      setCargaCombustible("000,00");
-      setTotalizadorPicoInicial(0);
-      setTotalizadorPicoFinal(0);
-      setHuboInterrupcion(false);
-      toastSuccess("Registro de Salida", "Salida registrada exitosamente.");
-      navigation.navigate("home");
-    } catch (error) {
-      console.error("Error al guardar los datos:", error);
-      toastError("Registro de Salida", "Intente nuevamente más tarde.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  // ─── Iniciar carga ───────────────────────────────────────────────────────
-
-  async function handleSalida({
-    kilometraje,
-    horometro,
-    observaciones,
-  }: FormData) {
-    if (!persona) {
-      Alert.alert("Persona requerida", "Debe seleccionar un operador.");
-      return;
-    }
-    if (!vehiculo) {
-      Alert.alert("Vehículo requerido", "Debe seleccionar un vehículo.");
-      return;
-    }
-    if (base64Vehiculo === "") {
-      Alert.alert(
-        "Foto requerida",
-        "Debe capturar una foto de la chapa o el código del vehículo.",
-      );
-      return;
-    }
-    if (!selectedPico) {
-      Alert.alert("Pico requerido", "Debe seleccionar un pico expedidor.");
-      return;
-    }
-    if (kilometraje === "" && horometro === "") {
-      Alert.alert(
-        "Campos requeridos",
-        "Debe completar al menos uno de los campos: Horómetro o Kilometraje.",
-      );
-      return;
-    }
-    if (horometro !== "" && base64Horometro === "") {
-      Alert.alert("Foto requerida", "Debe capturar una foto del horómetro.");
-      return;
-    }
-    if (kilometraje !== "" && base64Kilometraje === "") {
-      Alert.alert("Foto requerida", "Debe capturar una foto del kilometraje.");
-      return;
-    }
-    const picoSurtidor = picos.find(
-      (pico) => pico.id_pico === Number(selectedPico),
-    );
-    if (!picoSurtidor) {
-      Alert.alert(
-        "ID Pico Surtidor",
-        "El valor para el pico surtidor no fue encontrado.",
-      );
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      // Capturamos el totalizador ANTES de autorizar para tener referencia de recuperación
-      let totalizadorAntes = 0;
-      try {
-        const resTot = await api.get<TotalizadorResponse>(
-          `/api/totalizador/${picoSurtidor.id_pico_surtidor}`,
-        );
-        totalizadorAntes = resTot.data.totalizador;
-      } catch (errTot) {
-        console.warn("[Salida] No se pudo obtener totalizador previo:", errTot);
-        // No bloqueamos la carga, el fallback de recuperación simplemente no tendrá referencia
-      }
-
-      setIdPicoSurtidor(Number(picoSurtidor.id_pico_surtidor));
-      setTotalizadorPicoInicial(totalizadorAntes);
-
-      const response = await api.post("/api/autorizar", {
-        pico: Number(picoSurtidor.id_pico_surtidor),
-      });
-
-      if (response.data.respuesta === "NoCargo") {
-        toastError(
-          "Pico no Retirado",
-          "El pico no se ha retirado del surtidor.",
-        );
-        return;
-      } else if (response.data.respuesta !== "Cargando") {
-        toastError(
-          "Pico no disponible",
-          "El pico no está disponible para la carga.",
-        );
-        return;
-      }
-
-      idAutorizado = response.data.idUltimaCarga;
-      setSalida(1);
-      setShouldContinue(true);
-    } catch (error) {
-      setSalida(0);
-      setShouldContinue(false);
-      console.log("Error al autorizar la carga:", error);
-      toastError("Registro de Salida", "Intente nuevamente más tarde.");
-      setIsLoading(false);
-      return;
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  // ─── Effects ─────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (sucursal) {
-      fetchPicos();
-    }
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setErrorMsg("Permiso de ubicación denegado");
-        return;
-      }
-      const currentLocation = await Location.getCurrentPositionAsync({});
-      setLocation(currentLocation);
-    })();
-  }, []);
-
-  useEffect(() => {
-    if (route.params?.onPersona) setPersona(route.params.onPersona);
-    if (route.params?.onVehiculo) setVehiculo(route.params.onVehiculo);
-    if (route.params?.onFirma) setFirma(route.params.onFirma);
-  }, [
-    route.params?.onPersona,
-    route.params?.onVehiculo,
-    route.params?.onFirma,
-  ]);
-
-  // ─── Polling de estado del surtidor ──────────────────────────────────────
-
-  const fetchBox = useCallback(async () => {
-    try {
-      const response = await api.get(`/api/salida-control/${idPico_surtidor}`);
-
-      if (response.data.estado === "B") {
-        if (response.data.id <= idAutorizado) {
-          setSalida(0);
-          setShouldContinue(false);
-          setIsLoading(false);
-          idAutorizado = 0;
-          return;
-        }
-        idAutorizado = 0;
-        setSalida(2);
-        setShouldContinue(false);
-        setTotalizadorPicoInicial(response.data.taxiltroInicioDespacho);
-        setTotalizadorPicoFinal(response.data.taxiltroFinDespacho);
-        setCargaCombustible(response.data.volumenDespachado.toFixed(2));
-      }
-    } catch (error) {
-      console.error("Erro ao buscar dados:", error);
-    }
-  }, [idPico_surtidor, setSalida, setShouldContinue, setCargaCombustible]);
-
-  const fetchLoop = useCallback(async () => {
-    if (!shouldContinue) return;
-    await fetchBox();
-    if (shouldContinue) {
-      intervalRef.current = setTimeout(() => {
-        fetchLoop();
-      }, 3000);
-    }
-  }, [fetchBox, shouldContinue]);
-
-  useEffect(() => {
-    if (shouldContinue) {
-      fetchLoop();
-    }
-    return () => {
-      if (intervalRef.current) {
-        clearTimeout(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, [shouldContinue, fetchLoop]);
-
-  // ─── Bloquear botón físico de retroceso ──────────────────────────────────
-
-  useFocusEffect(
-    useCallback(() => {
-      const onBackPress = () => {
-        if (salida === 1 || salida === 2) return true;
-        return false;
-      };
-      const subscription = BackHandler.addEventListener(
-        "hardwareBackPress",
-        onBackPress,
-      );
-      return () => subscription.remove();
-    }, [salida]),
-  );
-
-  // ─── Render: turno cerrado ────────────────────────────────────────────────
-
-  if (turnoCerrado && !motivoConfirmado) {
-    return (
-      <View className="flex-1">
-        <ScreenHeader title="Salida Excepcional" />
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
-        >
-          <ScrollView
-            contentContainerStyle={{ flexGrow: 1 }}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.overlay}>
-              <View style={styles.modalContent}>
-                <Text className="font-bold text-red-500 text-center text-2xl underline mb-4">
-                  Importente!!!
-                </Text>
-                <Text className="font-medium text-justify text-xl mb-4">
-                  Está intentando registrar una salida y el turno se encuentra
-                  cerrado. Una vez finalizada la/s carga/s se deberá realizar el
-                  cierre correspondiente en el apartado "Cierre Extra", para las
-                  bodegas que hayan sufrido movimientos.
-                </Text>
-                <InputCard
-                  className="min-h-40"
-                  title="Indique el motivo"
-                  required
-                >
-                  <Input
-                    value={obsAdicional}
-                    placeholder="Describa el motivo"
-                    multiline
-                    numberOfLines={4}
-                    onChangeText={setObsAdicional}
-                  />
-                </InputCard>
-                <TouchableOpacity
-                  style={styles.button}
-                  onPress={() => {
-                    if (obsAdicional.trim() === "") {
-                      Alert.alert(
-                        "Motivo requerido",
-                        "Por favor describa el motivo.",
-                      );
-                      return;
-                    }
-                    setMotivoConfirmado(true);
-                    setTurnoCerrado(false);
-                  }}
-                >
-                  <Text style={styles.buttonText}>Guardar</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
-    );
-  }
-
-  // ─── Render: flujo normal ─────────────────────────────────────────────────
-
-  return (
-    <View className="flex-1">
-      <ScreenHeader
-        title="Salida Combustible"
-        disableBackButton={salida === 1 || salida === 2}
-      />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
-      >
-        <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View className="flex-1 items-center p-4 gap-4">
-            {/* Chofer/Operador */}
-            <InputCard
-              title="Chofer/Operador"
-              required={true}
-              locked={salida !== 0}
-            >
-              <TextSearch
-                enabled={salida === 0}
-                textValue={persona?.nombre_apellido}
-                placeholder="Buscar persona"
-                onPress={() =>
-                  navigation.navigate("buscarpersona", {
-                    enabledSelect: true,
-                    fromScreen: "salida",
-                  })
-                }
-              />
-            </InputCard>
-
-            {/* Equipo/Vehículo */}
-            <InputCard
-              title="Equipo/Vehículo"
-              required={true}
-              locked={salida !== 0}
-            >
-              <View className="flex-row items-center p-2 gap-2">
-                <TextSearch
-                  enabled={salida === 0}
-                  textValue={vehiculo?.descripcion_vehiculo}
-                  placeholder="Buscar vehículo"
-                  onPress={() =>
-                    navigation.navigate("buscarvehiculo", {
-                      enabledSelect: true,
-                      fromScreen: "salida",
-                    })
-                  }
-                />
-                <Photo
-                  form="icon"
-                  iconSize="lg"
-                  iconColor={
-                    base64Vehiculo.length > 0
-                      ? "#05a722"
-                      : salida !== 0
-                        ? "#756868eb"
-                        : "#000"
-                  }
-                  setImage={handlePhotoVehiculo}
-                  disabled={salida !== 0}
-                />
-              </View>
-            </InputCard>
-
-            {/* Pico expendedor */}
-            <InputCard
-              title="Pico expendedor:"
-              required={true}
-              locked={salida !== 0}
-            >
-              {salida === 0 && (
-                <Select
-                  data={picos}
-                  isLoading={isLoading}
-                  selectedValue={selectedPico}
-                  setSelectedValue={setSelectedPico}
-                  labelField="descripcion_pico"
-                  valueField="id_pico"
-                />
-              )}
-              {salida !== 0 && (
-                <Text className="text-lg text-black font-bold">
-                  Pico seleccionado: {selectedPico}
-                </Text>
-              )}
-            </InputCard>
-
-            {/* Horómetro */}
-            <InputCard title="Horómetro" locked={salida !== 0}>
-              <View className="flex-row items-center p-2 gap-2">
-                <Controller
-                  control={control}
-                  name="horometro"
-                  render={({ field: { onChange, value } }) => (
-                    <Input
-                      editable={salida === 0}
-                      keyboardType="number-pad"
-                      align="center"
-                      placeholder="Informe el horómetro"
-                      value={value ?? ""}
-                      onChangeText={onChange}
-                      errorMessage={errors.horometro?.message}
-                    />
-                  )}
-                />
-                <Photo
-                  form="icon"
-                  iconSize="lg"
-                  iconColor={
-                    base64Horometro.length > 0
-                      ? "#05a722"
-                      : salida !== 0
-                        ? "#756868eb"
-                        : "#000"
-                  }
-                  setImage={handlePhotoHorometro}
-                  disabled={salida !== 0}
-                />
-              </View>
-            </InputCard>
-
-            {/* Kilometraje */}
-            <InputCard title="Kilometraje" locked={salida !== 0}>
-              <View className="flex-row items-center p-2 gap-2">
-                <Controller
-                  control={control}
-                  name="kilometraje"
-                  render={({ field: { onChange, value } }) => (
-                    <Input
-                      editable={salida === 0}
-                      keyboardType="number-pad"
-                      align="center"
-                      placeholder="Informe el kilometraje"
-                      value={value ?? ""}
-                      onChangeText={onChange}
-                      errorMessage={errors.kilometraje?.message}
-                    />
-                  )}
-                />
-                <Photo
-                  form="icon"
-                  iconSize="lg"
-                  iconColor={
-                    base64Kilometraje.length > 0
-                      ? "#05a722"
-                      : salida !== 0
-                        ? "#756868eb"
-                        : "#000"
-                  }
-                  setImage={handlePhotoKilometraje}
-                  disabled={salida !== 0}
-                />
-              </View>
-            </InputCard>
-
-            {/* Panel de carga */}
-            <InputCard title="" locked={salida !== 0}>
-              <View className="flex-row p-2 gap-2">
-                {/* Columna izquierda: acciones */}
-                <View className="flex-1 justify-center items-center gap-2">
-                  {salida === 0 && (
-                    <>
-                      <Text className="text-xl text-black font-bold">
-                        Registrar carga
-                      </Text>
-                      <Button
-                        title="Comenzar"
-                        onPress={handleSubmit(handleSalida)}
-                        isLoading={isLoading}
-                        icon={Fuel}
-                        iconSize="md"
-                        iconColor="#000"
-                      />
-
-                      {/* ── NUEVO: botón Recuperar carga ────────────────────────
-                          Visible cuando hay un totalizador inicial guardado
-                          (indica que hubo una carga previa que no se completó).      */}
-                      {/*totalizadorPicoInicial > 0 && idPico_surtidor > 0 && (
-                        <Button
-                          title="Recuperar carga"
-                          onPress={handleRecuperarCarga}
-                          isLoading={isRecuperando}
-                          icon={RotateCcw}
-                          iconSize="md"
-                          iconColor="#c47d00"
-                        />
-                      )*/}
-                    </>
-                  )}
-
-                  {salida === 1 && (
-                    <>
-                      <Text className="text-xl text-black font-bold">
-                        Cargando...
-                      </Text>
-                      <Loading />
-                    </>
-                  )}
-
-                  {salida === 2 && (
-                    <>
-                      <Text className="text-xl text-black font-bold">
-                        Finalizado
-                      </Text>
-                      <Button
-                        title="Recuperar Carga"
-                        onPress={fetchBox}
-                        isLoading={isRecuperando}
-                        icon={RotateCcw}
-                        iconSize="md"
-                        iconColor="#ffffff"
-                        style={{ width: 180, padding: 3 }}
-                      />
-                    </>
-                  )}
-                </View>
-
-                {/* Columna derecha: litros */}
-                <View className="flex-1 items-center gap-2">
-                  <Text className="text-xl text-black font-bold">
-                    Litros Cargados
-                  </Text>
-                  <Text className="text-2xl text-black font-bold">
-                    {cargaCombustible}
-                  </Text>
-                </View>
-              </View>
-            </InputCard>
-
-            {/* Observaciones y botones de firma/grabar (solo en estado 2) */}
-            {salida === 2 && (
-              <>
-                <InputCard title="Observaciones">
-                  <View className="flex-row items-center p-2 gap-2">
-                    <Controller
-                      control={control}
-                      name="observaciones"
-                      render={({ field: { onChange, value } }) => (
-                        <Input
-                          multiline
-                          numberOfLines={4}
-                          placeholder="observaciones"
-                          value={value}
-                          onChangeText={onChange}
-                        />
-                      )}
-                    />
-                    <View className="flex-col gap-6">
-                      <Photo
-                        form="icon"
-                        iconSize="lg"
-                        iconColor={base64Obs.length > 0 ? "#05a722" : "#000"}
-                        setImage={handlePhotoObs}
-                        disabled={isLoading}
-                      />
-                    </View>
-                  </View>
-                </InputCard>
-                <View className="flex-row gap-4">
-                  <Button
-                    title="Firmar"
-                    onPress={() =>
-                      navigation.navigate("firma", {
-                        fromScreen: "salida",
-                        persona: persona,
-                      })
-                    }
-                    isLoading={isLoading}
-                    icon={Pencil}
-                    iconSize="md"
-                    iconColor="#000"
-                  />
-                  {firma && (
-                    <Button
-                      title="Grabar"
-                      onPress={() => handleSaveAll()}
-                      isLoading={isLoading}
-                      icon={SaveAll}
-                      iconSize="md"
-                      iconColor="#000"
-                    />
-                  )}
-                </View>
-              </>
-            )}
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f0f0f0",
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    alignItems: "center",
-  },
-  modalContent: {
-    marginTop: 100,
-    width: 350,
-    padding: 20,
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    elevation: 5,
-  },
-  title: {
-    fontSize: 18,
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  button: {
-    marginTop: 20,
-    backgroundColor: "#007BFF",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    textAlign: "center",
-  },
-});
-</file>
-
-<file path="backend/db/schema.ts">
+<file path="src/backend/db/schema.ts">
 // src/backend/db/schema.ts
 import { sqliteTable, integer, text, real } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
@@ -5430,7 +2984,7 @@ export const bodegasRelations = relations(bodegas, ({ one, many }) => ({
 }));
 </file>
 
-<file path="screens/calibracion/Sequencias.tsx">
+<file path="src/screens/calibracion/Sequencias.tsx">
 import { StackRoutesProps } from "@/route/app.routes";
 import { api } from "@/services/api";
 import { toastError } from "@/utils/toastMessage";
@@ -5774,7 +3328,7 @@ export function Sequencias({
 }
 </file>
 
-<file path="screens/traspaso/Traspaso.tsx">
+<file path="src/screens/traspaso/Traspaso.tsx">
 import { Input } from "@/components/Input";
 import { InputCard } from "@/components/InputCard";
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -7024,500 +4578,500 @@ const styles = StyleSheet.create({
 });
 </file>
 
-<file path="screens/turno/Turno.tsx">
-import {
-	Alert,
-	Image,
-	Pressable,
-	ScrollView,
-	View,
-	StyleSheet,
-	TouchableOpacity,
-	Text,
-} from "react-native";
-import { useEffect, useState } from "react";
-import { api } from "@/services/api";
-import { StackRoutesProps } from "@/route/app.routes";
+<file path="src/backend/db/modules/bodegaDB.ts">
+// src/backend/db/modules/bodegaDB.ts
+//
+// Módulo de base de datos para bodegas.
+// Las bodegas son catálogo de solo lectura sincronizado desde el servidor.
+//
+// REGLAS DE NEGOCIO:
+//   - Las bodegas no se crean localmente, solo se descargan del servidor.
+//   - Cada bodega pertenece a una sucursal (idSucursal).
+//   - getBodegasByIdSucursal() filtra por la sucursal activa del contexto.
+//   - El campo `trapaso` indica si la bodega puede ser destino de un traspaso.
 
-import { ScreenHeader } from "@/components/ScreenHeader";
-import { InputCard } from "@/components/InputCard";
-import { Button } from "@/components/Button";
-import { toastError, toastSuccess } from "@/utils/toastMessage";
-import { Input } from "@/components/Input";
-import { Select } from "@/components/Select";
-
+import { db } from "@/backend/db/client";
+import { bodegas, syncs } from "@/backend/db/schema";
+import { eq } from "drizzle-orm";
 import { BodegaDTO } from "@/dto/BodegaDTO";
-import { MedicionDTO } from "@/dto/MedicionDTO";
-import { TurnoDTO } from "@/dto/TurnoDTO";
 
-import { RulerDimensionLine, CheckCheck } from "lucide-react-native";
-import { useAppContext } from "@/hooks/useAppContext";
-import { AppError } from "@/utils/AppError";
-import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
-import { Photo } from "@/components/Photo";
+// Clave en tabla syncs para registrar la última sincronización de bodegas.
+const SYNC_KEY = "__last_sync_bodegas__";
 
-/**
- * Componente para gestionar el turno de trabajo.
- *
- * @param param0 - Props de navegación y ruta.
- * @returns Componente de turno.
- */
-export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
-	const [isLoading, setIsLoading] = useState(false);
-	const [faltaAnterior, setFaltaAnterior] = useState(false);
-	const [listaBodegasFaltaAnterior, setListaBodegasFaltaAnterior] = useState<
-		BodegaDTO[]
-	>([]);
-	const [inicioTurno, setInicioTurno] = useState(false);
-	const [base64Images, setBase64Images] = useState<string[]>([]);
-	const [obs, setObs] = useState("");
-	const [obsAdicional, setObsAdicional] = useState("");
-	const [selectedBodega, setSelectedBodega] = useState("");
-	const [bodegas, setBodegas] = useState<BodegaDTO[]>([]);
-	const [medicion, setMedicion] = useState<MedicionDTO[]>([]);
-	const { sucursal, user } = useAppContext();
-	const [blockHeader, setBlockHeader] = useState(false);
+// ---------------------------------------------------------------------------
+// Tipo extendido interno
+// El DTO público solo tiene id_bodega y descripcion_bodega.
+// Internamente necesitamos idSucursal para filtrar.
+// ---------------------------------------------------------------------------
 
-	/**
-	 * Abre la cámara del dispositivo, solicita permisos si es necesario,
-	 * y agrega la foto capturada (en base64) al estado de imágenes.
-	 * Muestra mensajes de éxito o error según el resultado.
-	 *
-	 * @async
-	 * @function handlePhotoCapture
-	 * @returns {Promise<void>}
-	 */
-	async function handlePhotoCapture(base64: string) {
-		setBase64Images((prev) => [...prev, base64]);
-	}
+type BodegaRow = {
+  id_bodega: string;
+  descripcion_bodega: string;
+  id_sucursal: number;
+  trapaso: boolean;
+};
 
-	/**
-	 * Muestra un alerta de confirmación para eliminar una foto.
-	 * Si el usuario confirma, elimina la foto del estado de imágenes.
-	 *
-	 * @param {number} indexParaRemover - El índice de la foto a eliminar.
-	 */
-	const removerFoto = (indexParaRemover: number) => {
-		Alert.alert("Apagar Foto", "Está seguro de que desea eliminar esta foto?", [
-			{
-				text: "Cancelar",
-				style: "cancel",
-			},
-			{
-				text: "Remover",
-				onPress: () => {
-					setBase64Images((prev) =>
-						prev.filter((_, index) => index !== indexParaRemover)
-					);
-				},
-			},
-		]);
-	};
+// ---------------------------------------------------------------------------
+// saveBodegas
+// Upsert masivo de bodegas recibidas del servidor.
+// ---------------------------------------------------------------------------
 
-	/**
-	 * Procesa el turno actual, recopilando datos de picos y mediciones,
-	 * y enviando un registro al servidor.
-	 * Muestra mensajes de éxito o error según el resultado.
-	 *
-	 * @async
-	 * @function procesarTurno
-	 * @returns {Promise<void>}
-	 */
+export async function saveBodegas(items: BodegaRow[]): Promise<void> {
+  if (items.length === 0) return;
 
-	// A medição pode ter vários tanques não se deve comparar com bodegas.length
-	async function procesarTurno() {
-		if (medicion.length === 0) {
-			Alert.alert(
-				"Medición requerida",
-				"Debe realizar las mediciones de tanque antes de procesar el turno."
-			);
-			return;
-		}
-		try {
-			setIsLoading(true);
-			// 1. Buscar todos los picos de la bodega selecionada
-			const picosResult = await api.get("/api/picos", {
-				params: {
-					id_bodega: selectedBodega,
-				},
-			});
-			const picos = picosResult.data.picos;
-			const resultadosTotalizadores: { pico: number; totalizador: any }[] = [];
-			// 2. Buscar el taxilitro de cada pico
-			// Horustech tiene un id para cada pido y guarda el taxilitro
-			// de forma individual
-			console.log("Bodega Selecionada:", selectedBodega);
-			for (const pico of picos) {
-				const totalizadorResult = await api.get(
-					`/api/totalizador/${pico.id_pico_surtidor}`
-				);
-				resultadosTotalizadores.push({
-					pico: pico.id_pico,
-					totalizador: totalizadorResult.data.totalizador,
-				});
-			}
+  for (const item of items) {
+    await db
+      .insert(bodegas)
+      .values({
+        idBodega: Number(item.id_bodega),
+        descripcionBodega: item.descripcion_bodega,
+        idSucursal: item.id_sucursal,
+        trapaso: item.trapaso ?? false,
+      })
+      .onConflictDoUpdate({
+        target: bodegas.idBodega,
+        set: {
+          descripcionBodega: item.descripcion_bodega,
+          idSucursal: item.id_sucursal,
+          trapaso: item.trapaso ?? false,
+        },
+      });
+  }
 
-			const now = new Date();
-			const fecha = now.toISOString().slice(0, 10);
-			const hora = now.toTimeString().slice(0, 8);
-
-			const totalizadorLitros = medicion.reduce((acc, cur) => {
-				return acc + (cur.litros ?? 0);
-			}, 0);
-
-			// 3. Criar o registro de turno
-			const nuevoTurno: TurnoDTO = {
-				id_suc: Number(sucursal.id_sucursal), // ID da sucursal, deve ser dinâmico
-				id_bod: Number(selectedBodega),
-				fecha,
-				hora,
-				ci_playero: Number(user.cedula),
-				litros: totalizadorLitros,
-				observacion: obs + "|" + obsAdicional,
-				// fotos_observacion: [],
-				fotos_observacion: base64Images,
-				med_tanques: medicion.map((med) => ({
-					id_tanque: Number(med.id_tanque),
-					regla: med.regla,
-					temperatura: med.temperatura,
-					litros: med.litros,
-					// foto_tanque: [],
-					foto_tanque: med.foto_tanque ? [med.foto_tanque] : [],
-				})),
-				med_picos: resultadosTotalizadores.map((result) => ({
-					id_pico: result.pico,
-					taxilitro: result.totalizador,
-				})),
-			};
-
-			await api.post(
-				"/api/registros/turno/" + (inicioTurno ? "inicio" : "fin"),
-				{ json: nuevoTurno }
-			);
-			toastSuccess(
-				"Turno procesado",
-				`El turno ha sido ${inicioTurno ? "iniciado" : "cerrado"} con éxito.`
-			);
-			// Remove a bodega da lista de bodegas
-			const remainBodegas = bodegas.filter(
-				(bodega) => Number(bodega.id_bodega) !== Number(selectedBodega)
-			);
-			setBodegas(remainBodegas);
-			// Si hay más turnos para procesar, se debe bloquear el header
-			setBlockHeader(true);
-			setObs("");
-			setBase64Images([]);
-			setMedicion([]);
-			if (remainBodegas.length === 0) {
-				toastSuccess(
-					"Abertura de Turnos",
-					"Todos los turnos han sido procesados."
-				);
-				navigation.navigate("home");
-			}
-		} catch (error) {
-			console.log("Error al procesar turno:", error);
-			const isAppError = error instanceof AppError;
-			const message = isAppError
-				? error.message
-				: "No se pudo conectar al servidor";
-			toastError("Error al precessar turno", message);
-		} finally {
-			setIsLoading(false);
-		}
-	}
-
-	useEffect(() => {
-		if (route.params?.onMedicion) {
-			setMedicion(route.params.onMedicion);
-		}
-	}, [route.params?.onMedicion]);
-
-	useEffect(() => {
-		fetchTurno();
-	}, []);
-
-	/**
-	 * Obtiene el estado actual del turno y la lista de bodegas.
-	 * Establece el estado de inicioTurno en función de los datos obtenidos.
-	 * Maneja errores y actualiza el estado de carga en consecuencia.
-	 *
-	 * @async
-	 * @function fetchTurno
-	 * @returns {Promise<void>}
-	 */
-	async function fetchTurno() {
-		try {
-			setIsLoading(true);
-			const turno = await api.get(
-				`api/registros/turno/status/${sucursal.id_sucursal}`
-			);
-			const turnoData: StatusTurnoDTO = {
-				status: turno.data.status,
-				Inicio_turno: turno.data.Inicio_turno,
-				Fin_turno: turno.data.Fin_turno,
-				Fin_turno_anterior: turno.data.Fin_turno_anterior,
-			};
-			if (turnoData.status === "falta_anterior") {
-				setListaBodegasFaltaAnterior([]);
-				turnoData.Fin_turno_anterior.falta.map(async (bodega: number) => {
-					await api.get(`/api/bodegas/one/${bodega}`).then((response) => {
-						const bodegaData: BodegaDTO = response.data;
-						setListaBodegasFaltaAnterior((prev) => [...prev, bodegaData]);
-					});
-				});
-				setFaltaAnterior(true);
-			}
-
-			let statusTurnoEstado = false;
-			if (
-				//turnoData.status === "falta_anterior" ||
-				turnoData.status === "iniciado" ||
-				turnoData.status === "falta_cerrar"
-			) {
-				setInicioTurno(false);
-			} else {
-				statusTurnoEstado = true;
-				setInicioTurno(true);
-			}
-
-			const response = await api.get(`/api/bodegas/${sucursal.id_sucursal}`);
-			const sucursalData = response.data;
-			if (sucursalData?.bodegas) {
-				const bodegasFiltradas: BodegaDTO[] = [];
-				sucursalData.bodegas.map((bodega: BodegaDTO) => {
-					if (statusTurnoEstado) {
-						// Iniciar turno
-						if (
-							bodega.id_bodega &&
-							turnoData.Inicio_turno.falta.includes(Number(bodega.id_bodega))
-						) {
-							bodegasFiltradas.push(bodega);
-						}
-					} else {
-						if (
-							bodega.id_bodega &&
-							turnoData.Fin_turno.falta.includes(Number(bodega.id_bodega))
-						) {
-							bodegasFiltradas.push(bodega);
-						}
-					}
-				});
-				setBodegas(bodegasFiltradas);
-			}
-		} catch (error) {
-			toastError(
-				"Error al buscar turno",
-				"No se pudo obtener el estado del turno."
-			);
-		} finally {
-			setIsLoading(false);
-		}
-	}
-
-	return faltaAnterior ? (
-		<View className='flex-1'>
-			<ScreenHeader title='Turno no Cerrado' />
-
-			<View style={styles.overlay}>
-				<View style={styles.modalContent}>
-					<Text className='font-bold text-red-500 text-center text-2xl underline mb-4'>
-						Importente!!!
-					</Text>
-					<Text className='font-medium text-justify text-xl mb-4'>
-						En la fecha anterior no se registró el cierre de turno. Favor
-						indique el motivo por el cual no se realizó el cierre de:
-					</Text>
-					<Text className='font-medium text-justify text-xl mb-4'>
-						{listaBodegasFaltaAnterior.map((bodega) => (
-							<Text
-								key={bodega.id_bodega}
-								className='font-medium text-justify text-xl mb-4'
-							>
-								- {bodega.descripcion_bodega}
-							</Text>
-						))}
-					</Text>
-					<InputCard
-						className='min-h-40'
-						title='Indique el motivo'
-						required
-					>
-						<Input
-							value={obsAdicional}
-							placeholder='Describa el motivo'
-							multiline
-							numberOfLines={4}
-							onChangeText={setObsAdicional}
-						/>
-					</InputCard>
-					<TouchableOpacity
-						style={styles.button}
-						onPress={() => {
-							if (obsAdicional.trim() === "") {
-								Alert.alert(
-									"Motivo requerido",
-									"Por favor describa el motivo."
-								);
-								return;
-							}
-							setFaltaAnterior(false);
-						}}
-					>
-						<Text style={styles.buttonText}>Guardar</Text>
-					</TouchableOpacity>
-				</View>
-			</View>
-		</View>
-	) : (
-		<View className='flex-1'>
-			<ScreenHeader
-				title={`${inicioTurno === true ? "Iniciar Turno" : "Cerrar Turno"}`}
-				disableBackButton={blockHeader}
-			/>
-			<View className='flex-1 p-4 gap-4 items-center'>
-				<InputCard
-					title='Bodega'
-					required
-				>
-					<Select
-						data={bodegas}
-						isLoading={isLoading}
-						setSelectedValue={setSelectedBodega}
-						labelField='descripcion_bodega'
-						valueField='id_bodega'
-					/>
-				</InputCard>
-				<InputCard
-					title='Medición de Tanque'
-					required
-				>
-					<Button
-						disabled={selectedBodega === ""}
-						title='Medir'
-						icon={medicion?.length > 0 ? CheckCheck : RulerDimensionLine}
-						iconColor={medicion?.length > 0 ? "#0af706" : "#000"}
-						iconSize='md'
-						onPress={() => {
-							if (medicion?.length > 0) {
-								// Gere um alerta com as opções de continuar ou não
-								Alert.alert(
-									"Medición existente",
-									"Ya hay una medición inicial cargada. ¿Desea continuar?",
-									[
-										{
-											text: "Cancelar",
-											style: "cancel",
-										},
-										{
-											text: "Continuar",
-											onPress: () => {
-												navigation.navigate("medicion", {
-													fromScreen: "turno",
-													idBodega: selectedBodega,
-												});
-											},
-										},
-									]
-								);
-							} else {
-								navigation.navigate("medicion", {
-									idBodega: selectedBodega,
-								});
-							}
-						}}
-					/>
-				</InputCard>
-				<InputCard
-					title='Observaciones'
-					className='min-h-40'
-				>
-					<Input
-						multiline
-						numberOfLines={4}
-						textAlignVertical='top'
-						className='ml-2'
-						value={obs}
-						onChangeText={setObs}
-						placeholder={"Observaciones de la medicion"}
-					/>
-				</InputCard>
-				<InputCard
-					title='Fotos'
-					className='min-h-64'
-				>
-					<View className='w-full items-center p-4 gap-2'>
-						<ScrollView horizontal={true}>
-							{base64Images.map((img, index) => (
-								<Pressable
-									key={index}
-									onPress={() => removerFoto(index)}
-								>
-									<Image
-										source={{ uri: `data:image/jpeg;base64,${img}` }}
-										className='mr-4 w-56 h-36 rounded-lg border border-gray-300'
-										resizeMode='cover'
-									/>
-								</Pressable>
-							))}
-						</ScrollView>
-						<Photo
-							form='button'
-							iconSize='lg'
-							setImage={handlePhotoCapture}
-							isLoading={isLoading}
-						/>
-					</View>
-				</InputCard>
-				<Button
-					isLoading={isLoading}
-					onPress={procesarTurno}
-					title={`${inicioTurno === true ? "Iniciar Turno" : "Cerrar Turno"}`}
-				/>
-			</View>
-		</View>
-	);
+  // Registrar timestamp de sincronización
+  await db
+    .insert(syncs)
+    .values({ tipo: SYNC_KEY, fecha: Date.now() })
+    .onConflictDoUpdate({
+      target: syncs.tipo,
+      set: { fecha: Date.now() },
+    });
 }
 
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		justifyContent: "center",
-		alignItems: "center",
-		backgroundColor: "#f0f0f0",
-	},
-	overlay: {
-		flex: 1,
-		backgroundColor: "rgba(0, 0, 0, 0.5)",
-		//justifyContent: "center",
-		alignItems: "center",
-	},
-	modalContent: {
-		marginTop: 100,
-		width: 350,
-		padding: 20,
-		backgroundColor: "#fff",
-		borderRadius: 10,
-		elevation: 5, // Android shadow
-	},
-	title: {
-		fontSize: 18,
-		marginBottom: 20,
-		textAlign: "center",
-	},
-	button: {
-		marginTop: 20,
-		backgroundColor: "#007BFF",
-		paddingVertical: 10,
-		paddingHorizontal: 20,
-		borderRadius: 5,
-	},
-	buttonText: {
-		color: "#fff",
-		fontSize: 16,
-		textAlign: "center",
-	},
-});
+// ---------------------------------------------------------------------------
+// getBodegas
+// Devuelve todas las bodegas del catálogo local.
+// ---------------------------------------------------------------------------
+
+export async function getBodegas(): Promise<BodegaDTO[]> {
+  const rows = await db
+    .select({
+      idBodega: bodegas.idBodega,
+      descripcionBodega: bodegas.descripcionBodega,
+    })
+    .from(bodegas);
+
+  return rows.map((r) => ({
+    id_bodega: String(r.idBodega),
+    descripcion_bodega: r.descripcionBodega,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// getBodegasByIdSucursal
+// Devuelve las bodegas que pertenecen a la sucursal activa.
+// Usado en los Select de Turno, Abastecimiento, Traspaso.
+// ---------------------------------------------------------------------------
+
+export async function getBodegasByIdSucursal(
+  idSucursal: number
+): Promise<BodegaDTO[]> {
+  const rows = await db
+    .select({
+      idBodega: bodegas.idBodega,
+      descripcionBodega: bodegas.descripcionBodega,
+    })
+    .from(bodegas)
+    .where(eq(bodegas.idSucursal, idSucursal));
+
+  return rows.map((r) => ({
+    id_bodega: String(r.idBodega),
+    descripcion_bodega: r.descripcionBodega,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// getBodegasTraspaso
+// Devuelve las bodegas habilitadas como destino de traspaso.
+// Usado en el Select de bodega destino en la pantalla Traspaso.
+// ---------------------------------------------------------------------------
+
+export async function getBodegasTraspaso(
+  idSucursal: number
+): Promise<BodegaDTO[]> {
+  const rows = await db
+    .select({
+      idBodega: bodegas.idBodega,
+      descripcionBodega: bodegas.descripcionBodega,
+    })
+    .from(bodegas)
+    .where(eq(bodegas.idSucursal, idSucursal));
+
+  // Filtramos en memoria porque drizzle-orm necesita and() para múltiples where.
+  // Si el volumen es grande se puede usar and(eq(...), eq(...)).
+  return rows
+    .filter((r) => {
+      // trapaso viene como 0/1 desde SQLite; lo evaluamos como boolean
+      return (r as any).trapaso === 1 || (r as any).trapaso === true;
+    })
+    .map((r) => ({
+      id_bodega: String(r.idBodega),
+      descripcion_bodega: r.descripcionBodega,
+    }));
+}
+
+// ---------------------------------------------------------------------------
+// getBodegaById
+// Devuelve una bodega por su ID.
+// ---------------------------------------------------------------------------
+
+export async function getBodegaById(
+  idBodega: number
+): Promise<BodegaDTO | null> {
+  const rows = await db
+    .select({
+      idBodega: bodegas.idBodega,
+      descripcionBodega: bodegas.descripcionBodega,
+    })
+    .from(bodegas)
+    .where(eq(bodegas.idBodega, idBodega))
+    .limit(1);
+
+  if (!rows[0]) return null;
+
+  return {
+    id_bodega: String(rows[0].idBodega),
+    descripcion_bodega: rows[0].descripcionBodega,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// getLastSyncDate
+// ---------------------------------------------------------------------------
+
+export async function getLastSyncDate(): Promise<number | null> {
+  try {
+    const result = await db
+      .select({ fecha: syncs.fecha })
+      .from(syncs)
+      .where(eq(syncs.tipo, SYNC_KEY))
+      .limit(1);
+
+    return result[0] ? result[0].fecha : null;
+  } catch {
+    return null;
+  }
+}
+</file>
+
+<file path="src/backend/db/modules/picoDB.ts">
+// src/backend/db/modules/picoDB.ts
+//
+// Módulo de base de datos para picos (surtidores).
+// Los picos son catálogo de solo lectura sincronizado desde el servidor.
+//
+// REGLAS DE NEGOCIO:
+//   - Los picos no se crean localmente, solo se descargan del servidor.
+//   - Cada pico pertenece a una bodega (idBodega) y tiene un número de surtidor (idPicoSurtidor).
+//   - getPicosByBodega() es la función principal: usada en Salida, Traspaso, CargaCombustible
+//     y Calibracion para poblar el Select de picos disponibles.
+
+import { db } from "@/backend/db/client";
+import { picos, syncs } from "@/backend/db/schema";
+import { eq } from "drizzle-orm";
+import { PicoDTO } from "@/dto/PicosDTO";
+
+// Clave en tabla syncs para registrar la última sincronización de picos.
+const SYNC_KEY = "__last_sync_picos__";
+
+// ---------------------------------------------------------------------------
+// savePicos
+// Upsert masivo de picos recibidos del servidor.
+// ---------------------------------------------------------------------------
+
+export async function savePicos(items: PicoDTO[]): Promise<void> {
+  if (items.length === 0) return;
+
+  for (const item of items) {
+    await db
+      .insert(picos)
+      .values({
+        idPico: item.id_pico,
+        descripcionPico: item.descripcion_pico,
+        idBodega: item.id_bodega,
+        idPicoSurtidor: item.id_pico_surtidor,
+      })
+      .onConflictDoUpdate({
+        target: picos.idPico,
+        set: {
+          descripcionPico: item.descripcion_pico,
+          idBodega: item.id_bodega,
+          idPicoSurtidor: item.id_pico_surtidor,
+        },
+      });
+  }
+
+  // Registrar timestamp de sincronización
+  await db
+    .insert(syncs)
+    .values({ tipo: SYNC_KEY, fecha: Date.now() })
+    .onConflictDoUpdate({
+      target: syncs.tipo,
+      set: { fecha: Date.now() },
+    });
+}
+
+// ---------------------------------------------------------------------------
+// getPicos
+// Devuelve todos los picos del catálogo local.
+// ---------------------------------------------------------------------------
+
+export async function getPicos(): Promise<PicoDTO[]> {
+  const rows = await db
+    .select({
+      idPico: picos.idPico,
+      descripcionPico: picos.descripcionPico,
+      idBodega: picos.idBodega,
+      idPicoSurtidor: picos.idPicoSurtidor,
+    })
+    .from(picos);
+
+  return rows.map((r) => ({
+    id_pico: r.idPico,
+    descripcion_pico: r.descripcionPico,
+    id_bodega: r.idBodega,
+    id_pico_surtidor: r.idPicoSurtidor,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// getPicosByBodega
+// Devuelve los picos de una bodega específica.
+// Usado en los Select de Salida, Traspaso, CargaCombustible y Calibracion.
+// ---------------------------------------------------------------------------
+
+export async function getPicosByBodega(idBodega: number): Promise<PicoDTO[]> {
+  const rows = await db
+    .select({
+      idPico: picos.idPico,
+      descripcionPico: picos.descripcionPico,
+      idBodega: picos.idBodega,
+      idPicoSurtidor: picos.idPicoSurtidor,
+    })
+    .from(picos)
+    .where(eq(picos.idBodega, idBodega));
+
+  return rows.map((r) => ({
+    id_pico: r.idPico,
+    descripcion_pico: r.descripcionPico,
+    id_bodega: r.idBodega,
+    id_pico_surtidor: r.idPicoSurtidor,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// getPicoById
+// Devuelve un pico por su ID.
+// Útil para mostrar datos del pico seleccionado en el resumen de operación.
+// ---------------------------------------------------------------------------
+
+export async function getPicoById(idPico: number): Promise<PicoDTO | null> {
+  const rows = await db
+    .select({
+      idPico: picos.idPico,
+      descripcionPico: picos.descripcionPico,
+      idBodega: picos.idBodega,
+      idPicoSurtidor: picos.idPicoSurtidor,
+    })
+    .from(picos)
+    .where(eq(picos.idPico, idPico))
+    .limit(1);
+
+  if (!rows[0]) return null;
+
+  return {
+    id_pico: rows[0].idPico,
+    descripcion_pico: rows[0].descripcionPico,
+    id_bodega: rows[0].idBodega,
+    id_pico_surtidor: rows[0].idPicoSurtidor,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// getLastSyncDate
+// ---------------------------------------------------------------------------
+
+export async function getLastSyncDate(): Promise<number | null> {
+  try {
+    const result = await db
+      .select({ fecha: syncs.fecha })
+      .from(syncs)
+      .where(eq(syncs.tipo, SYNC_KEY))
+      .limit(1);
+
+    return result[0] ? result[0].fecha : null;
+  } catch {
+    return null;
+  }
+}
+</file>
+
+<file path="src/backend/db/modules/tanqueDB.ts">
+// src/backend/db/modules/tanqueDB.ts
+//
+// Módulo de base de datos para tanques.
+// Los tanques son catálogo de solo lectura sincronizado desde el servidor.
+//
+// REGLAS DE NEGOCIO:
+//   - Los tanques no se crean localmente, solo se descargan del servidor.
+//   - Cada tanque pertenece a una bodega (idBodega).
+//   - getTanquesByBodega() es la función principal: usada en Medicion y MedicionAbastecimiento
+//     para poblar el Select de tanques disponibles en la bodega activa.
+
+import { db } from "@/backend/db/client";
+import { tanques, syncs } from "@/backend/db/schema";
+import { eq } from "drizzle-orm";
+import { TanqueDTO } from "@/dto/TanqueDTO";
+
+// Clave en tabla syncs para registrar la última sincronización de tanques.
+const SYNC_KEY = "__last_sync_tanques__";
+
+// ---------------------------------------------------------------------------
+// Tipo extendido para el upsert
+// El DTO público tiene id_tanque, descripcion_tanque, capacidad_litros.
+// Internamente también necesitamos idBodega para poder filtrar.
+// ---------------------------------------------------------------------------
+
+type TanqueInput = TanqueDTO & { id_bodega: number };
+
+// ---------------------------------------------------------------------------
+// saveTanques
+// Upsert masivo de tanques recibidos del servidor.
+// ---------------------------------------------------------------------------
+
+export async function saveTanques(items: TanqueInput[]): Promise<void> {
+  if (items.length === 0) return;
+
+  for (const item of items) {
+    await db
+      .insert(tanques)
+      .values({
+        idTanque: item.id_tanque,
+        descripcionTanque: item.descripcion_tanque,
+        idBodega: item.id_bodega,
+        capacidadLitros: item.capacidad_litros ?? null,
+      })
+      .onConflictDoUpdate({
+        target: tanques.idTanque,
+        set: {
+          descripcionTanque: item.descripcion_tanque,
+          idBodega: item.id_bodega,
+          capacidadLitros: item.capacidad_litros ?? null,
+        },
+      });
+  }
+
+  // Registrar timestamp de sincronización
+  await db
+    .insert(syncs)
+    .values({ tipo: SYNC_KEY, fecha: Date.now() })
+    .onConflictDoUpdate({
+      target: syncs.tipo,
+      set: { fecha: Date.now() },
+    });
+}
+
+// ---------------------------------------------------------------------------
+// getTanques
+// Devuelve todos los tanques del catálogo local.
+// ---------------------------------------------------------------------------
+
+export async function getTanques(): Promise<TanqueDTO[]> {
+  const rows = await db
+    .select({
+      idTanque: tanques.idTanque,
+      descripcionTanque: tanques.descripcionTanque,
+      capacidadLitros: tanques.capacidadLitros,
+    })
+    .from(tanques);
+
+  return rows.map((r) => ({
+    id_tanque: r.idTanque,
+    descripcion_tanque: r.descripcionTanque,
+    capacidad_litros: r.capacidadLitros ?? 0,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// getTanquesByBodega
+// Devuelve los tanques de una bodega específica.
+// Usado en los Select de las pantallas Medicion y MedicionAbastecimiento.
+// ---------------------------------------------------------------------------
+
+export async function getTanquesByBodega(
+  idBodega: number
+): Promise<TanqueDTO[]> {
+  const rows = await db
+    .select({
+      idTanque: tanques.idTanque,
+      descripcionTanque: tanques.descripcionTanque,
+      capacidadLitros: tanques.capacidadLitros,
+    })
+    .from(tanques)
+    .where(eq(tanques.idBodega, idBodega));
+
+  return rows.map((r) => ({
+    id_tanque: r.idTanque,
+    descripcion_tanque: r.descripcionTanque,
+    capacidad_litros: r.capacidadLitros ?? 0,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// getTanqueById
+// Devuelve un tanque por su ID.
+// Útil para mostrar detalles del tanque seleccionado en la pantalla de medición.
+// ---------------------------------------------------------------------------
+
+export async function getTanqueById(
+  idTanque: number
+): Promise<TanqueDTO | null> {
+  const rows = await db
+    .select({
+      idTanque: tanques.idTanque,
+      descripcionTanque: tanques.descripcionTanque,
+      capacidadLitros: tanques.capacidadLitros,
+    })
+    .from(tanques)
+    .where(eq(tanques.idTanque, idTanque))
+    .limit(1);
+
+  if (!rows[0]) return null;
+
+  return {
+    id_tanque: rows[0].idTanque,
+    descripcion_tanque: rows[0].descripcionTanque,
+    capacidad_litros: rows[0].capacidadLitros ?? 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// getLastSyncDate
+// ---------------------------------------------------------------------------
+
+export async function getLastSyncDate(): Promise<number | null> {
+  try {
+    const result = await db
+      .select({ fecha: syncs.fecha })
+      .from(syncs)
+      .where(eq(syncs.tipo, SYNC_KEY))
+      .limit(1);
+
+    return result[0] ? result[0].fecha : null;
+  } catch {
+    return null;
+  }
+}
 </file>
 
 </codebase>
@@ -7534,8 +5088,8 @@ const styles = StyleSheet.create({
 # ========================================================================
 #
 #  Modelo           : Genérico (sin modelo específico)
-#  Caracteres       : 230.825
-#  Tokens estimados : ~57.706
+#  Caracteres       : 160.626
+#  Tokens estimados : ~40.156
 #  Costo estimado   : no disponible (varía según proveedor)
 #  Context window   : no especificado para este modelo
 #

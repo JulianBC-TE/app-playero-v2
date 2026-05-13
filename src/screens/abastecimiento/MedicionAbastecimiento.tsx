@@ -15,7 +15,7 @@ import { toastError, toastSuccess } from "@utils/toastMessage";
 import { useCallback, useEffect, useState } from "react";
 import { InputCard } from "@/components/InputCard";
 import { Input } from "@/components/Input";
-import { api } from "@/services/api";
+//import { api } from "@/services/api";
 import { TanqueDTO } from "@/dto/TanqueDTO";
 import { MedicionDTO } from "@/dto/MedicionDTO";
 import { Select } from "@/components/Select";
@@ -31,6 +31,7 @@ import {
   removeMedicionAbastecimiento,
   saveMedicionAbastecimiento,
 } from "@/storage/storageMedicionAbastecimiento";
+import { getTanquesByBodega } from "@/backend/db/modules/tanqueDB";
 
 type FormData = {
   alturaInicial: string;
@@ -111,59 +112,59 @@ export function MedicionAbastecimiento({
   });
 
   const alturaInicialWatch = watch("alturaInicial");
-const litrosInicialWatch = watch("litrosInicial");
-const tempInicialWatch = watch("tempInicial");
+  const litrosInicialWatch = watch("litrosInicial");
+  const tempInicialWatch = watch("tempInicial");
 
-const alturaFinalWatch = watch("alturaFinal");
-const litrosFinalWatch = watch("litrosFinal");
-const tempFinalWatch = watch("tempFinal");
+  const alturaFinalWatch = watch("alturaFinal");
+  const litrosFinalWatch = watch("litrosFinal");
+  const tempFinalWatch = watch("tempFinal");
 
-const litros_inicial = Number(litrosInicialWatch);
-const litros_final = Number(litrosFinalWatch);
+  const litros_inicial = Number(litrosInicialWatch);
+  const litros_final = Number(litrosFinalWatch);
 
-const capacidadeRestante = litrosTanque - litros_inicial;
+  const capacidadeRestante = litrosTanque - litros_inicial;
 
   // ─── Persistencia: guardar estado cuando cambia algo relevante ───
   const guardarEstado = useCallback(async () => {
-  if (!estadoRestaurado) return;
+    if (!estadoRestaurado) return;
 
-  try {
-    await saveMedicionAbastecimiento({
-      medicionInicial,
-      medicionFinal,
-      base64ImageInicial,
-      base64ImageFinal,
-      selectedTanques,
-      idBodega,
+    try {
+      await saveMedicionAbastecimiento({
+        medicionInicial,
+        medicionFinal,
+        base64ImageInicial,
+        base64ImageFinal,
+        selectedTanques,
+        idBodega,
 
-      alturaInicial: alturaInicialWatch,
-      litrosInicial: litrosInicialWatch,
-      tempInicial: tempInicialWatch,
+        alturaInicial: alturaInicialWatch,
+        litrosInicial: litrosInicialWatch,
+        tempInicial: tempInicialWatch,
 
-      alturaFinal: alturaFinalWatch,
-      litrosFinal: litrosFinalWatch,
-      tempFinal: tempFinalWatch,
-    });
-  } catch (error) {
-    console.log("[MedicionAbastecimiento] Error al guardar estado:", error);
-  }
-}, [
-  estadoRestaurado,
-  medicionInicial,
-  medicionFinal,
-  base64ImageInicial,
-  base64ImageFinal,
-  selectedTanques,
-  idBodega,
+        alturaFinal: alturaFinalWatch,
+        litrosFinal: litrosFinalWatch,
+        tempFinal: tempFinalWatch,
+      });
+    } catch (error) {
+      console.log("[MedicionAbastecimiento] Error al guardar estado:", error);
+    }
+  }, [
+    estadoRestaurado,
+    medicionInicial,
+    medicionFinal,
+    base64ImageInicial,
+    base64ImageFinal,
+    selectedTanques,
+    idBodega,
 
-  alturaInicialWatch,
-  litrosInicialWatch,
-  tempInicialWatch,
+    alturaInicialWatch,
+    litrosInicialWatch,
+    tempInicialWatch,
 
-  alturaFinalWatch,
-  litrosFinalWatch,
-  tempFinalWatch,
-]);
+    alturaFinalWatch,
+    litrosFinalWatch,
+    tempFinalWatch,
+  ]);
 
   useEffect(() => {
     guardarEstado();
@@ -181,15 +182,15 @@ const capacidadeRestante = litrosTanque - litros_inicial;
           setBase64ImageInicial(guardado.base64ImageInicial);
           setBase64ImageFinal(guardado.base64ImageFinal);
           setSelectedTanques(guardado.selectedTanques);
-		  reset({
-  alturaInicial: guardado.alturaInicial || "",
-  litrosInicial: guardado.litrosInicial || "",
-  tempInicial: guardado.tempInicial || "",
+          reset({
+            alturaInicial: guardado.alturaInicial || "",
+            litrosInicial: guardado.litrosInicial || "",
+            tempInicial: guardado.tempInicial || "",
 
-  alturaFinal: guardado.alturaFinal || "",
-  litrosFinal: guardado.litrosFinal || "",
-  tempFinal: guardado.tempFinal || "",
-});
+            alturaFinal: guardado.alturaFinal || "",
+            litrosFinal: guardado.litrosFinal || "",
+            tempFinal: guardado.tempFinal || "",
+          });
           // Los tanques ya medidos se filtran DESPUÉS de que fetchTanques cargue
           // — ver el useEffect que combina tanques + medicionInicial restaurada
         }
@@ -308,19 +309,11 @@ const capacidadeRestante = litrosTanque - litros_inicial;
   };
 
   async function fetchTanques() {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const response = await api.get("/api/tanques", {
-        params: {
-          id_bodega: idBodega,
-        },
-      });
-
-      const data = response.data;
-      if (data?.tanques?.length) {
-        setTanques(data.tanques);
-      }
-    } catch (error) {
+      const data = await getTanquesByBodega(Number(idBodega));
+      setTanques(data);
+    } catch {
       toastError(
         "Error al buscar tanques",
         "No se pudieron cargar los tanques.",

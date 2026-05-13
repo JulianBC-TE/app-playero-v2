@@ -14,6 +14,7 @@ import { savePersonaLocal } from "../../backend/db/modules/personaDB"
 
 import { Save, UserRoundPlus } from "lucide-react-native";
 import axios from "axios";
+import { createNavigatorFactory } from "@react-navigation/native";
 
 type FormData = {
 	cedula: string;
@@ -57,7 +58,7 @@ export function CrearPersona() {
 	async function handleNewPersona({ cedula, nombre }: FormData) {
 		try {
 			setIsLoading(true);
-			await api.post("/api/personas", {
+			await savePersonaLocal({
 				cedula: +cedula,
 				nombre_apellido: nombre.toUpperCase(),
 			});

@@ -6,7 +6,8 @@ import { AppError } from "@utils/AppError";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
-import { api } from "@services/api";
+//import { api } from "@services/api";
+import { saveClienteLocal } from "@/backend/db/modules/clienteDB";
 import { ClienteDTO } from "@dto/ClienteDTO";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { View } from "react-native";
@@ -51,7 +52,7 @@ export function CrearCliente() {
 				descripcion_cliente: nombre.toUpperCase(),
 			};
 
-			await api.post("/api/clientes", clienteData);
+			await saveClienteLocal(clienteData);
 
 			toastSuccess("Cliente creado exitosamente", "");
 		} catch (error) {
