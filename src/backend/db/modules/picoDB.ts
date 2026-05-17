@@ -1,4 +1,4 @@
-// src/backend/db/modules/picoDB.ts
+// srcDBmodules/picoDB.ts
 //
 // Módulo de base de datos para picos (surtidores).
 // Los picos son catálogo de solo lectura sincronizado desde el servidor.

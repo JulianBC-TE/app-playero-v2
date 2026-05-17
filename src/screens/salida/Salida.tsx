@@ -36,11 +36,11 @@ import {
   saveSalida,
   SalidaStorageDTO,
 } from "@/storage/storageSalida";
-import { crearTicketLocal } from "@/backend/db/modules/ticketDB";
+import { crearTicketLocal } from "@DBmodules/ticketDB";
 import { normalizarFecha } from "@/backend/db/services/turnoStatusService";
-import { getPicosByBodega } from "@/backend/db/modules/picoDB";
-import { getBodegasByIdSucursal } from "@/backend/db/modules/bodegaDB";
-import { getTurnoStatusLocal } from "@/backend/db/modules/turnoBD";
+import { getPicosByBodega } from "@DBmodules/picoDB";
+import { getBodegasByIdSucursal } from "@DBmodules/bodegaDB";
+import { getTurnoStatusLocal } from "@DBmodules/turnoBD";
 
 // ─── Form & Schema ────────────────────────────────────────────────────────────
 
@@ -80,7 +80,9 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   // ─── UI State ───────────────────────────────────────────────────────────────
   const [isLoading, setIsLoading] = useState(false);
   const [estadoRestaurado, setEstadoRestaurado] = useState(false);
-  const [estadoInicial, setEstadoInicial] = useState<SalidaStorageDTO | null>(null);
+  const [estadoInicial, setEstadoInicial] = useState<SalidaStorageDTO | null>(
+    null,
+  );
   const [turnoCerrado, setTurnoCerrado] = useState(false);
   const [motivoConfirmado, setMotivoConfirmado] = useState(false);
 
@@ -90,7 +92,9 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   const [persona, setPersona] = useState<PersonaDTO | null>(null);
   const [vehiculo, setVehiculo] = useState<VehiculoDTO | null>(null);
   const [firma, setFirma] = useState<string | null>(null);
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
+  const [location, setLocation] = useState<Location.LocationObject | null>(
+    null,
+  );
 
   // ─── Selecciones ────────────────────────────────────────────────────────────
   const [selectedBodega, setSelectedBodega] = useState<string>("");
@@ -104,21 +108,21 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   const [base64Obs, setBase64Obs] = useState<string>("");
 
   const {
-  control,
-  handleSubmit,
-  reset,
-  setValue,
-  watch,
-  formState: { errors },
-} = useForm<FormData>({
-  resolver: yupResolver(registrarSalidaSchema) as any,
-  defaultValues: {
-    horometro: "",
-    kilometraje: "",
-    litros: "",
-    observaciones: "",
-  },
-});
+    control,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<FormData>({
+    resolver: yupResolver(registrarSalidaSchema) as any,
+    defaultValues: {
+      horometro: "",
+      kilometraje: "",
+      litros: "",
+      observaciones: "",
+    },
+  });
 
   // watch() en lugar de control._formValues (API pública de RHF)
   const watchedValues = watch();
@@ -144,7 +148,9 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 
       // Bodegas de la sucursal — local
       try {
-        const bodegasLocales = await getBodegasByIdSucursal(sucursal.id_sucursal);
+        const bodegasLocales = await getBodegasByIdSucursal(
+          sucursal.id_sucursal,
+        );
         setBodegas(bodegasLocales);
       } catch (err) {
         console.error("[Salida] Error al obtener bodegas:", err);
@@ -194,11 +200,20 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
     if (route.params?.onPersona) setPersona(route.params.onPersona);
     if (route.params?.onVehiculo) setVehiculo(route.params.onVehiculo);
     if (route.params?.onFirma) setFirma(route.params.onFirma);
-  }, [route.params?.onPersona, route.params?.onVehiculo, route.params?.onFirma]);
+  }, [
+    route.params?.onPersona,
+    route.params?.onVehiculo,
+    route.params?.onFirma,
+  ]);
 
   // ─── Guardar ticket ───────────────────────────────────────────────────────
 
-  async function handleSaveAll({ horometro, kilometraje, litros, observaciones }: FormData) {
+  async function handleSaveAll({
+    horometro,
+    kilometraje,
+    litros,
+    observaciones,
+  }: FormData) {
     if (!persona) {
       Alert.alert("Persona requerida", "Debe seleccionar un operador.");
       return;
@@ -208,7 +223,10 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       return;
     }
     if (!base64Vehiculo) {
-      Alert.alert("Foto requerida", "Debe capturar una foto de la chapa o código del vehículo.");
+      Alert.alert(
+        "Foto requerida",
+        "Debe capturar una foto de la chapa o código del vehículo.",
+      );
       return;
     }
     if (!selectedBodega) {
@@ -220,7 +238,10 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       return;
     }
     if (!kilometraje && !horometro) {
-      Alert.alert("Campos requeridos", "Debe completar al menos Horómetro o Kilometraje.");
+      Alert.alert(
+        "Campos requeridos",
+        "Debe completar al menos Horómetro o Kilometraje.",
+      );
       return;
     }
     if (horometro && !base64Horometro) {
@@ -312,8 +333,8 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
         firma,
         selectedBodega,
         selectedPico,
-        idPico_surtidor: 0,       // obsoleto, se mantiene por compatibilidad del tipo
-        salida: 0,                // obsoleto, se mantiene por compatibilidad del tipo
+        idPico_surtidor: 0, // obsoleto, se mantiene por compatibilidad del tipo
+        salida: 0, // obsoleto, se mantiene por compatibilidad del tipo
         cargaCombustible: watchedValues.litros ?? "",
         totalizadorPicoInicial: 0,
         totalizadorPicoFinal: 0,
@@ -469,7 +490,11 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                   El turno se encuentra cerrado. Indique el motivo de esta
                   salida excepcional.
                 </Text>
-                <InputCard className="min-h-40" title="Indique el motivo" required>
+                <InputCard
+                  className="min-h-40"
+                  title="Indique el motivo"
+                  required
+                >
                   <Input
                     value={obsAdicional}
                     placeholder="Describa el motivo"
@@ -484,7 +509,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                     if (!obsAdicional.trim()) {
                       Alert.alert(
                         "Motivo requerido",
-                        "Por favor describa el motivo."
+                        "Por favor describa el motivo.",
                       );
                       return;
                     }
@@ -517,7 +542,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
           showsVerticalScrollIndicator={false}
         >
           <View className="flex-1 items-center p-4 gap-4">
-
             {/* Chofer/Operador */}
             <InputCard title="Chofer/Operador" required>
               <TextSearch
@@ -699,7 +723,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                 />
               )}
             </View>
-
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

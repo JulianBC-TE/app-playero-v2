@@ -1,4 +1,4 @@
-// src/backend/db/modules/bodegaDB.ts
+// srcDBmodules/bodegaDB.ts
 //
 // Módulo de base de datos para bodegas.
 // Las bodegas son catálogo de solo lectura sincronizado desde el servidor.
@@ -93,7 +93,7 @@ export async function getBodegas(): Promise<BodegaDTO[]> {
 // ---------------------------------------------------------------------------
 
 export async function getBodegasByIdSucursal(
-  idSucursal: number
+  idSucursal: number,
 ): Promise<BodegaDTO[]> {
   const rows = await db
     .select({
@@ -116,7 +116,7 @@ export async function getBodegasByIdSucursal(
 // ---------------------------------------------------------------------------
 
 export async function getBodegasTraspaso(
-  idSucursal: number
+  idSucursal: number,
 ): Promise<BodegaDTO[]> {
   const rows = await db
     .select({
@@ -145,7 +145,7 @@ export async function getBodegasTraspaso(
 // ---------------------------------------------------------------------------
 
 export async function getBodegaById(
-  idBodega: number
+  idBodega: number,
 ): Promise<BodegaDTO | null> {
   const rows = await db
     .select({

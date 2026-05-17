@@ -1,4 +1,4 @@
-// src/backend/db/modules/vehiculoDB.ts
+// srcDBmodules/vehiculoDB.ts
 //
 // Módulo de base de datos local para la entidad Vehículo.
 //
@@ -13,7 +13,7 @@
 
 import { db } from "@/backend/db/client";
 import { vehiculos, syncs } from "@/backend/db/schema";
-import { eq, like, or } from "drizzle-orm"
+import { eq, like, or } from "drizzle-orm";
 import { VehiculoDTO } from "@/dto/VehiculoDTO";
 import { AppError } from "@/utils/AppError";
 
@@ -77,7 +77,10 @@ export async function saveVehiculoLocal(data: VehiculoDTO): Promise<void> {
     });
   } catch (error: any) {
     // Verificamos si es un error de restricción de unicidad (SQLITE_CONSTRAINT_PRIMARYKEY)
-    if (error.message?.includes("UNIQUE") || error.code === "SQLITE_CONSTRAINT") {
+    if (
+      error.message?.includes("UNIQUE") ||
+      error.code === "SQLITE_CONSTRAINT"
+    ) {
       throw new AppError("Ya existe un vehiculo con este registro", 409);
     }
     throw error;
@@ -113,7 +116,7 @@ interface PaginatedVehiculos {
 export async function getVehiculosPaginado(
   filter: string,
   page: number,
-  limit: number
+  limit: number,
 ): Promise<PaginatedVehiculos> {
   // Calculamos el offset (salto de registros) para la paginación
   const offset = (page - 1) * limit;
@@ -127,12 +130,12 @@ export async function getVehiculosPaginado(
     })
     .from(vehiculos)
     .where(
-      filter 
+      filter
         ? or(
             like(vehiculos.descripcionVehiculo, `%${filter}%`),
-            like(vehiculos.ruc, `%${filter}%`)
+            like(vehiculos.ruc, `%${filter}%`),
           )
-        : undefined
+        : undefined,
     )
     .limit(limit)
     .offset(offset);
@@ -155,7 +158,9 @@ export async function getVehiculosPaginado(
 // Devuelve un vehículo por su id. Devuelve null si no existe.
 // ---------------------------------------------------------------------------
 
-export async function getVehiculoById(idVehiculo: string): Promise<VehiculoDTO | null> {
+export async function getVehiculoById(
+  idVehiculo: string,
+): Promise<VehiculoDTO | null> {
   const rows = await db
     .select({
       idVehiculo: vehiculos.idVehiculo,
@@ -204,7 +209,9 @@ export async function getVehiculosByRuc(ruc: string): Promise<VehiculoDTO[]> {
 // Útil para resultados offline en BuscarVehiculo.tsx.
 // ---------------------------------------------------------------------------
 
-export async function buscarVehiculosLocal(query: string): Promise<VehiculoDTO[]> {
+export async function buscarVehiculosLocal(
+  query: string,
+): Promise<VehiculoDTO[]> {
   const rows = await db
     .select({
       idVehiculo: vehiculos.idVehiculo,
@@ -218,7 +225,7 @@ export async function buscarVehiculosLocal(query: string): Promise<VehiculoDTO[]
     .filter(
       (r) =>
         r.idVehiculo.toLowerCase().includes(q) ||
-        r.descripcionVehiculo.toLowerCase().includes(q)
+        r.descripcionVehiculo.toLowerCase().includes(q),
     )
     .map((r) => ({
       id_vehiculo: r.idVehiculo,
@@ -270,7 +277,7 @@ export async function markVehiculoAsSynced(idVehiculo: string): Promise<void> {
 export async function actualizarVehiculoLocal(
   idVehiculo: string,
   data: Partial<VehiculoDTO>,
-  synced = false
+  synced = false,
 ): Promise<void> {
   await db
     .update(vehiculos)

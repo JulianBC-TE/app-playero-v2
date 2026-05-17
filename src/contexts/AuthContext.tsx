@@ -6,7 +6,11 @@
 import { createContext, useEffect, useState } from "react";
 import { UserDTO } from "@dto/userDTO";
 import { saveUser, getStorageUser, removeUser } from "@storage/storageUse";
-import { getAuthToken, saveAuthToken, removeAuthToken } from "@storage/storageAuthToken";
+import {
+  getAuthToken,
+  saveAuthToken,
+  removeAuthToken,
+} from "@storage/storageAuthToken";
 import { getStorageServerUrl, saveServerUrl } from "@storage/storageServer";
 import { ClienteDTO } from "@dto/ClienteDTO";
 import { SucursalDTO } from "@/dto/sucursalDTO";
@@ -17,7 +21,7 @@ import { httpClient } from "@/backend/api/httpClient";
 import { login } from "@/backend/api/authAPI";
 
 // Backend: BD local
-import { saveUserLocally, loginOffline, clearSession } from "@/backend/db/modules/authDB";
+import { saveUserLocally, loginOffline, clearSession } from "@DBmodules/authDB";
 
 // ---------------------------------------------------------------------------
 // Tipos del contexto
@@ -42,7 +46,7 @@ export type AuthContextDataProps = {
 type AuthContextProviderProps = { children: React.ReactNode };
 
 export const AuthContext = createContext<AuthContextDataProps>(
-  {} as AuthContextDataProps
+  {} as AuthContextDataProps,
 );
 
 // ---------------------------------------------------------------------------
@@ -76,27 +80,36 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
         await saveUser(userData);
 
         // Hash de clave → SQLite (persiste para login offline)
-        await saveUserLocally({ cedula, name: data.name, password, refreshToken });
+        await saveUserLocally({
+          cedula,
+          name: data.name,
+          password,
+          refreshToken,
+        });
 
         httpClient.setToken(data.token);
         setUser(userData);
         setIsOffline(false);
-
       } else {
         // ── Login offline ───────────────────────────────────────────────
         const result = await loginOffline(cedula, password);
 
         if (!result.ok) {
           const messages: Record<typeof result.reason, string> = {
-            not_last_user: "Para cambiar de usuario necesitás conexión al servidor.",
+            not_last_user:
+              "Para cambiar de usuario necesitás conexión al servidor.",
             wrong_password: "Contraseña incorrecta.",
-            no_local_user: "No hay datos locales. Conectate al servidor para hacer el primer login.",
+            no_local_user:
+              "No hay datos locales. Conectate al servidor para hacer el primer login.",
             error: "Error al iniciar sesión offline.",
           };
           throw new Error(messages[result.reason]);
         }
 
-        const userData: UserDTO = { cedula: result.user.cedula, name: result.user.name };
+        const userData: UserDTO = {
+          cedula: result.user.cedula,
+          name: result.user.name,
+        };
         await saveUser(userData);
         setUser(userData);
         setIsOffline(true);

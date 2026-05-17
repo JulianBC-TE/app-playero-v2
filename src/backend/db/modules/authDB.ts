@@ -1,4 +1,4 @@
-// src/backend/db/modules/authDB.ts
+// srcDBmodules/authDB.ts
 //
 // Módulo de base de datos para autenticación.
 // Maneja login online y offline, sesión activa y último usuario.
@@ -24,9 +24,24 @@ export type SessionUser = {
 };
 
 export type LoginResult =
-  | { ok: true;  user: SessionUser; token: string; refreshToken: string; offline: false }
-  | { ok: true;  user: SessionUser; token: null;   refreshToken: null;   offline: true  }
-  | { ok: false; reason: "wrong_password" | "not_last_user" | "no_local_user" | "error" };
+  | {
+      ok: true;
+      user: SessionUser;
+      token: string;
+      refreshToken: string;
+      offline: false;
+    }
+  | {
+      ok: true;
+      user: SessionUser;
+      token: null;
+      refreshToken: null;
+      offline: true;
+    }
+  | {
+      ok: false;
+      reason: "wrong_password" | "not_last_user" | "no_local_user" | "error";
+    };
 
 // Clave en tabla syncs para recordar la última cédula autenticada online.
 // Guardamos la cédula numérica en el campo `fecha` (reutilizamos la tabla key-value).
@@ -39,7 +54,7 @@ const LAST_USER_KEY = "__last_online_user__";
 async function hashPassword(password: string, salt: string): Promise<string> {
   return await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
-    salt + password
+    salt + password,
   );
 }
 
@@ -93,7 +108,12 @@ export async function saveUserLocally({
   // Upsert persona
   await db
     .insert(personas)
-    .values({ cedula: cedulaNum, nombreApellido: name, timestamp: Date.now(), sync: 0 })
+    .values({
+      cedula: cedulaNum,
+      nombreApellido: name,
+      timestamp: Date.now(),
+      sync: 0,
+    })
     .onConflictDoUpdate({
       target: personas.cedula,
       set: { nombreApellido: name, timestamp: Date.now() },
@@ -130,7 +150,7 @@ export async function saveUserLocally({
 
 export async function loginOffline(
   cedula: string,
-  password: string
+  password: string,
 ): Promise<LoginResult> {
   try {
     // 1. Verificar que exista un último usuario online

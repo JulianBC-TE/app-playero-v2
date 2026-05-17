@@ -4,16 +4,18 @@ import { turnos } from "../schema";
 import { calcularEstadoTurno } from "../services/turnoStatusService";
 import { getBodegasByIdSucursal } from "./bodegaDB";
 import { BodegaDTO } from "@/dto/BodegaDTO";
+import { TurnoEstado } from "../constants/turnoEstado";
 
-
-export enum TurnoEstado {
-  ACTIVO = 1,
-  ANULADO = 0,
-  CERRADO = 2,
-  ANULADO_ADMIN = 3, // ← nombrar el estado 3
-}
 /**
- * Crear turno local (offline)
+ * Inserta un turno (apertura o cierre) en la BD local con `sync = 0`.
+ *
+ * @param params - Datos del turno a registrar
+ * @param params.idBodega - ID de la bodega asociada al turno
+ * @param params.json - Payload completo del turno (idealmente `TurnoDTO`)
+ * @param params.tipo - Tipo de turno: `"APERTURA"` o `"CIERRE"`
+ * @param params.fecha - Fecha en formato numérico `YYYYMMDD` (opcional)
+ * @param params.hora - Hora en formato numérico `HHMM` (opcional)
+ * @returns Resultado del insert de Drizzle con el `insertedRowId`
  */
 export async function crearTurnoLocal({
   idBodega,
@@ -23,7 +25,7 @@ export async function crearTurnoLocal({
   hora,
 }: {
   idBodega: number;
-  json: unknown; // idealmente TurnoDTO
+  json: unknown;
   tipo: string;
   fecha?: number;
   hora?: number;
@@ -42,7 +44,10 @@ export async function crearTurnoLocal({
 }
 
 /**
- * Obtener turno por id
+ * Devuelve un turno por su ID con el campo `json` ya deserializado.
+ *
+ * @param idTurno - ID del turno a buscar
+ * @returns El turno con `json` parseado, o `null` si no existe
  */
 export async function getTurnoById(idTurno: number) {
   const result = await db
@@ -59,13 +64,13 @@ export async function getTurnoById(idTurno: number) {
 }
 
 /**
- * Obtener turnos pendientes de sincronización
+ * Devuelve todos los turnos pendientes de sincronización (`sync = 0`)
+ * con el campo `json` ya deserializado.
+ *
+ * @returns Lista de turnos pendientes listos para enviar al servidor
  */
 export async function getTurnosPendientes() {
-  const result = await db
-    .select()
-    .from(turnos)
-    .where(eq(turnos.sync, 0));
+  const result = await db.select().from(turnos).where(eq(turnos.sync, 0));
 
   return result.map((t) => ({
     ...t,
@@ -74,27 +79,29 @@ export async function getTurnosPendientes() {
 }
 
 /**
- * Marcar turno como sincronizado
+ * Marca un turno como sincronizado exitosamente (`sync = 1`).
+ *
+ * @param idTurno - ID del turno a marcar
  */
 export async function marcarTurnoSync(idTurno: number) {
-  await db
-    .update(turnos)
-    .set({ sync: 1 })
-    .where(eq(turnos.idTurno, idTurno));
+  await db.update(turnos).set({ sync: 1 }).where(eq(turnos.idTurno, idTurno));
 }
 
 /**
- * Marcar turno con error de sync
+ * Marca un turno con error de sincronización (`sync = -1`).
+ * Se usa cuando el intento de envío al servidor falla.
+ *
+ * @param idTurno - ID del turno a marcar
  */
 export async function marcarTurnoErrorSync(idTurno: number) {
-  await db
-    .update(turnos)
-    .set({ sync: -1 })
-    .where(eq(turnos.idTurno, idTurno));
+  await db.update(turnos).set({ sync: -1 }).where(eq(turnos.idTurno, idTurno));
 }
 
 /**
- * Cerrar turno localmente
+ * Cierra un turno localmente cambiando su estado a `2` y marcándolo
+ * con `sync = 0` para que sea enviado al servidor en la próxima sincronización.
+ *
+ * @param idTurno - ID del turno a cerrar
  */
 export async function cerrarTurnoLocal(idTurno: number) {
   await db
@@ -104,12 +111,13 @@ export async function cerrarTurnoLocal(idTurno: number) {
 }
 
 /**
- * Anular turno
+ * Anula un turno localmente cambiando su estado a `3`, guardando
+ * la observación de anulación y marcándolo con `sync = 0`.
+ *
+ * @param idTurno - ID del turno a anular
+ * @param observacion - Motivo de la anulación
  */
-export async function anularTurnoLocal(
-  idTurno: number,
-  observacion: string
-) {
+export async function anularTurnoLocal(idTurno: number, observacion: string) {
   await db
     .update(turnos)
     .set({
@@ -120,7 +128,20 @@ export async function anularTurnoLocal(
     .where(eq(turnos.idTurno, idTurno));
 }
 
-// Wrapper que usa Turno.tsx
+/**
+ * Punto de entrada principal para consultar el estado del turno de una sucursal.
+ * Obtiene todas las bodegas asociadas y delega el cálculo a {@link calcularEstadoTurno}.
+ *
+ * Los posibles estados retornados son:
+ * - `normal` — no hay turno abierto ni pendiente
+ * - `iniciado` — hay un turno abierto activo
+ * - `cerrado` — el turno fue cerrado correctamente
+ * - `falta_cerrar` — hay bodegas sin cierre de turno
+ * - `falta_anterior` — hay un turno del día anterior sin cerrar
+ *
+ * @param idSucursal - ID de la sucursal a consultar
+ * @returns Resultado de {@link calcularEstadoTurno} con el estado y las bodegas involucradas
+ */
 export async function getTurnoStatusLocal(idSucursal: number) {
   const bodegas = await getBodegasByIdSucursal(idSucursal);
   const ids = bodegas.map((b: BodegaDTO) => Number(b.id_bodega));

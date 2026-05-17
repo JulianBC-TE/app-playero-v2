@@ -1,6 +1,6 @@
 import { db } from "@/backend/db/client";
 import { turnos } from "@/backend/db/schema";
-import { TurnoEstado } from "../modules/turnoBD";
+import { TurnoEstado } from "../constants/turnoEstado";
 import { eq, and, lt, inArray, desc } from "drizzle-orm";
 
 /**
@@ -77,7 +77,7 @@ export async function calcularEstadoTurno(
       .map((t) => t.idBodega),
   );
 
-  // Reemplazar "FIN-TURNO" por "fin" para ser consistente con lo que inserta crearTurnoLocal
+  // Reemplazar "FIN" por "fin" para ser consistente con lo que inserta crearTurnoLocal
   const cierreHoyOK = new Set(
     turnosHoy
       .filter((t) => t.tipo === "fin" && t.estado === TurnoEstado.ACTIVO)
@@ -137,7 +137,7 @@ export async function calcularEstadoTurno(
         and(
           inArray(turnos.idBodega, idsBodegas),
           eq(turnos.fecha, fechaAnterior),
-          eq(turnos.tipo, "FIN-TURNO"),
+          eq(turnos.tipo, "FIN"),
         ),
       );
 

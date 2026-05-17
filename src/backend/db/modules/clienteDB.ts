@@ -1,4 +1,4 @@
-// src/backend/db/modules/clienteDB.ts
+// srcDBmodules/clienteDB.ts
 //
 // Módulo de base de datos local para la entidad Cliente.
 //
@@ -90,8 +90,6 @@ export async function getClientes(): Promise<ClienteDTO[]> {
   }));
 }
 
-
-
 // ---------------------------------------------------------------------------
 // getClienteByRuc
 // Devuelve un cliente por su RUC. Devuelve null si no existe.
@@ -121,7 +119,9 @@ export async function getClienteByRuc(ruc: string): Promise<ClienteDTO | null> {
 // Útil para resultados offline en BuscarCliente.tsx.
 // ---------------------------------------------------------------------------
 
-export async function buscarClientesLocal(query: string): Promise<ClienteDTO[]> {
+export async function buscarClientesLocal(
+  query: string,
+): Promise<ClienteDTO[]> {
   const rows = await db
     .select({
       ruc: clientes.ruc,
@@ -134,7 +134,7 @@ export async function buscarClientesLocal(query: string): Promise<ClienteDTO[]> 
     .filter(
       (r) =>
         r.ruc.toLowerCase().includes(q) ||
-        r.descripcionCliente.toLowerCase().includes(q)
+        r.descripcionCliente.toLowerCase().includes(q),
     )
     .map((r) => ({
       ruc: r.ruc,
@@ -168,10 +168,7 @@ export async function getClientesPendientesSync(): Promise<ClienteDTO[]> {
 // ---------------------------------------------------------------------------
 
 export async function markClienteAsSynced(ruc: string): Promise<void> {
-  await db
-    .update(clientes)
-    .set({ sync: 1 })
-    .where(eq(clientes.ruc, ruc));
+  await db.update(clientes).set({ sync: 1 }).where(eq(clientes.ruc, ruc));
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +180,7 @@ export async function markClienteAsSynced(ruc: string): Promise<void> {
 export async function actualizarClienteLocal(
   ruc: string,
   data: Partial<ClienteDTO>,
-  synced = false
+  synced = false,
 ): Promise<void> {
   await db
     .update(clientes)

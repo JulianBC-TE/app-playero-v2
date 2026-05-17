@@ -28,15 +28,9 @@ import { useAppContext } from "@/hooks/useAppContext";
 import { AppError } from "@/utils/AppError";
 import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
 import { Photo } from "@/components/Photo";
-import {
-  crearTurnoLocal,
-  getTurnoStatusLocal,
-} from "@/backend/db/modules/turnoBD";
-import {
-  getBodegasByIdSucursal,
-  getBodegaById,
-} from "@/backend/db/modules/bodegaDB";
-import { getPicosByBodega } from "@/backend/db/modules/picoDB";
+import { crearTurnoLocal, getTurnoStatusLocal } from "@DBmodules/turnoBD";
+import { getBodegasByIdSucursal, getBodegaById } from "@DBmodules/bodegaDB";
+import { getPicosByBodega } from "@DBmodules/picoDB";
 import { normalizarFecha } from "@/backend/db/services/turnoStatusService";
 
 /**

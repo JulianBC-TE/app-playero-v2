@@ -1,8 +1,12 @@
+// src/screens/vehiculo/CrearVehiculo.tsx
+//
+// MIGRACIÓN OFFLINE-FIRST:
+//   Eliminado: import axios (no se usaba, era residuo de la versión con API)
+//   Sin otros cambios — ya usaba saveVehiculoLocal desde vehiculoDB
+
 import { Text, TouchableOpacity, View } from "react-native";
 import { useEffect, useState } from "react";
-import axios from "axios";
 import { StackRoutesProps } from "@/route/app.routes";
-
 import { toastError, toastSuccess } from "@utils/toastMessage";
 import { Input } from "@components/Input";
 import { InputCard } from "@components/InputCard";
@@ -11,8 +15,7 @@ import { AppError } from "@utils/AppError";
 import { Controller, useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
-//import { api } from "@services/api";
-import { saveVehiculoLocal } from "../../backend/db/modules/vehiculoDB";
+import { saveVehiculoLocal } from "@DBmodules/vehiculoDB";
 import { SaveIcon, SquarePlus } from "lucide-react-native";
 import { useCliente } from "@/hooks/useCliente";
 
@@ -63,14 +66,12 @@ export function CrearVehiculo({
     try {
       setIsLoading(true);
 
-      // Preparamos el objeto siguiendo el formato VehiculoDTO esperado por el módulo
       const nuevoVehiculo = {
         id_vehiculo: id_vehiculo.toUpperCase().replace(/\s+/g, ""),
         descripcion_vehiculo: descripcion_vehiculo.toUpperCase(),
-        ruc: cliente?.ruc || "", // Aseguramos que no sea undefined
+        ruc: cliente?.ruc || "",
       };
 
-      // Llamamos a la función del módulo local
       await saveVehiculoLocal(nuevoVehiculo);
 
       setIsSaved(true);
@@ -83,7 +84,6 @@ export function CrearVehiculo({
 
       let message = "Error al crear vehículo, intente nuevamente";
 
-      // El error 409 que lanzamos en el módulo será capturado aquí
       if (error instanceof AppError) {
         message = error.message;
       }

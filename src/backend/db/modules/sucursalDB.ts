@@ -1,4 +1,4 @@
-// src/backend/db/modules/sucursalDB.ts
+// srcDBmodules/sucursalDB.ts
 //
 // Módulo de base de datos para sucursales.
 // Las sucursales son un catálogo de solo lectura que se sincroniza desde el servidor.
@@ -76,7 +76,7 @@ export async function getSucursales(): Promise<SucursalDTO[]> {
 // ---------------------------------------------------------------------------
 
 export async function getSucursalById(
-  idSucursal: number
+  idSucursal: number,
 ): Promise<SucursalDTO | null> {
   const rows = await db
     .select({

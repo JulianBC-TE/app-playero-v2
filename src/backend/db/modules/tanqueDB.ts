@@ -1,4 +1,4 @@
-// src/backend/db/modules/tanqueDB.ts
+// srcDBmodules/tanqueDB.ts
 //
 // Módulo de base de datos para tanques.
 // Los tanques son catálogo de solo lectura sincronizado desde el servidor.
@@ -90,7 +90,7 @@ export async function getTanques(): Promise<TanqueDTO[]> {
 // ---------------------------------------------------------------------------
 
 export async function getTanquesByBodega(
-  idBodega: number
+  idBodega: number,
 ): Promise<TanqueDTO[]> {
   const rows = await db
     .select({
@@ -115,7 +115,7 @@ export async function getTanquesByBodega(
 // ---------------------------------------------------------------------------
 
 export async function getTanqueById(
-  idTanque: number
+  idTanque: number,
 ): Promise<TanqueDTO | null> {
   const rows = await db
     .select({

@@ -1,0 +1,411 @@
+<context_metadata>
+  generated_at: 2026-05-17T19:03:08
+  project_root: C:\dev\app-playero-v2\src\dto
+  file_count: 17
+  extensions_included: .css, .html, .js, .jsx, .py, .ts, .tsx
+  recent_commits:
+    - 6ebc83d migracion no probadas de abastecimiento, calibracion, cliente, persona, salida, turno para comunicarse con bd local en lugar de api externa
+    - 8a7820a añadidos modulos de bd y manejadores apra http
+    - c89e659 añadidas carpeta backend y bd - SQLite-drizzle
+    - ddc250b Primer commit Playero Movil V2: copia de Playero Mobil v1
+    - 36856b5 Actualizar dependencias y corregir el texto mostrado en MedicionesCard
+</context_metadata>
+
+<task>
+  agregar comentarios estandarizados para TypeDoc
+</task>
+
+<file_index>
+  <file path="BodegaDTO.ts" lines="4" ext=".ts" />
+  <file path="CargaZetaDTO.ts" lines="6" ext=".ts" />
+  <file path="ClienteDTO.ts" lines="4" ext=".ts" />
+  <file path="HistoryByDayDTO.ts" lines="6" ext=".ts" imports="./HistoryDTO" />
+  <file path="HistoryDTO.ts" lines="7" ext=".ts" />
+  <file path="MedicionDTO.ts" lines="8" ext=".ts" />
+  <file path="MenuItens.tsx" lines="74" ext=".tsx" imports="@/route/app.routes" />
+  <file path="PersonaDTO.ts" lines="4" ext=".ts" />
+  <file path="PicosDTO.ts" lines="6" ext=".ts" />
+  <file path="SequenciaCalibracionDTO.tsx" lines="15" ext=".tsx" />
+  <file path="statusTurnoDTO.ts" lines="28" ext=".ts" />
+  <file path="sucursalDTO.ts" lines="4" ext=".ts" />
+  <file path="TanqueDTO.ts" lines="5" ext=".ts" />
+  <file path="TraspasoDTO.ts" lines="59" ext=".ts" imports="./PersonaDTO" />
+  <file path="TurnoDTO.ts" lines="57" ext=".ts" />
+  <file path="userDTO.ts" lines="4" ext=".ts" />
+  <file path="VehiculoDTO.ts" lines="5" ext=".ts" />
+</file_index>
+
+<codebase>
+
+<file path="BodegaDTO.ts">
+export type BodegaDTO = {
+	id_bodega: string;
+	descripcion_bodega: string;
+};
+</file>
+
+<file path="CargaZetaDTO.ts">
+export type CargaZetaDTO = {
+	id_pico_para_zeta: number;
+	taxilitro_inicial: number;
+	taxilitro_final: number;
+	litros_zeta: number;
+};
+</file>
+
+<file path="ClienteDTO.ts">
+export type ClienteDTO = {
+	ruc: string;
+	descripcion_cliente: string;
+};
+</file>
+
+<file path="HistoryByDayDTO.ts">
+import { HistoryDTO } from "./HistoryDTO";
+
+export type HistoryByDayDTO = {
+	title: string;
+	data: HistoryDTO[];
+};
+</file>
+
+<file path="HistoryDTO.ts">
+export type HistoryDTO = {
+	id: string;
+	name: string;
+	group: string;
+	hour: string;
+	created_at: string;
+};
+</file>
+
+<file path="MedicionDTO.ts">
+export type MedicionDTO = {
+	// tanque: string;
+	id_tanque: string;
+	regla: number;
+	temperatura: number;
+	litros: number;
+	foto_tanque: string;
+};
+</file>
+
+<file path="MenuItens.tsx">
+import { StackRoutesList } from "@/route/app.routes";
+
+import {
+	ArrowRightLeft,
+	Container,
+	Users,
+	Fuel,
+	DraftingCompass,
+	Replace,
+	Tractor,
+	LucideIcon,
+} from "lucide-react-native";
+
+export type menuItemType = {
+	name: string;
+	icon: LucideIcon;
+	route: keyof StackRoutesList;
+	enabled?: boolean;
+	turno?: "abierto" | "cerrado" | "pendiente" | "iniciar" | "falta_cerrar";
+	params: object;
+};
+
+export const baseMenuItems: menuItemType[] = [
+	{
+		name: "Turno",
+		icon: ArrowRightLeft,
+		route: "turno",
+		enabled: true,
+		turno: "iniciar",
+		params: {},
+	},
+	{
+		name: "Salida",
+		icon: Fuel,
+		route: "salida",
+		enabled: false,
+		params: {},
+	},
+	{
+		name: "Traspaso",
+		icon: Container,
+		route: "traspaso",
+		enabled: false,
+		params: {},
+	},
+	{
+		name: "Abastecimiento",
+		icon: Replace,
+		route: "abastecimiento",
+		enabled: false,
+		params: {},
+	},
+	{
+		name: "Equipo/Vehículo",
+		icon: Tractor,
+		route: "vehiculo",
+		enabled: true,
+		params: {},
+	},
+	{
+		name: "Personas",
+		icon: Users,
+		route: "persona",
+		enabled: true,
+		params: {},
+	},
+	{
+		name: "Calibración",
+		icon: DraftingCompass,
+		route: "calibracion",
+		enabled: false,
+		params: {},
+	},
+];
+</file>
+
+<file path="PersonaDTO.ts">
+export type PersonaDTO = {
+	cedula: number;
+	nombre_apellido: string;
+};
+</file>
+
+<file path="PicosDTO.ts">
+export type PicoDTO = {
+	id_pico: number;
+	id_pico_surtidor: number;
+	id_bodega: number;
+	descripcion_pico: string;
+};
+</file>
+
+<file path="SequenciaCalibracionDTO.tsx">
+// src/dto/SequenciaCalibracionDTO.tsx
+
+export type SequenciaItem = {
+  taxilitro: number; // taxilitro final de la carga
+  litros_cargados?: number; // litros ingresados manualmente por el usuario
+  valor_medicion: string; // valor en ml seleccionado (-200 a +200)
+  foto_medicion: string; // base64 de la foto
+};
+
+export type SequenciaCalibracionDTO = {
+  taxilitroInicial: number; // taxilitro del primer despacho
+  taxilitroFinal: number; // taxilitro del último despacho
+  totalMediciones: number;
+  sequencias: SequenciaItem[];
+};
+</file>
+
+<file path="statusTurnoDTO.ts">
+// {
+//     "Fin_turno":
+//     {
+//         "falta": [1016, 1017],
+//         "ok": false
+//     },
+//     "Inicio_turno":
+//     {
+//         "falta": [1016, 1017],
+//         "ok": false
+//     }
+// }
+
+export type StatusTurnoDTO = {
+	status: string;
+	Inicio_turno: {
+		ok: boolean;
+		falta: number[];
+	};
+	Fin_turno: {
+		ok: boolean;
+		falta: number[];
+	};
+	Fin_turno_anterior: {
+		ok: boolean;
+		falta: number[];
+	};
+};
+</file>
+
+<file path="sucursalDTO.ts">
+export type SucursalDTO = {
+	id_sucursal: number;
+	descripcion_sucursal: string;
+};
+</file>
+
+<file path="TanqueDTO.ts">
+export type TanqueDTO = {
+	id_tanque: number;
+	descripcion_tanque: string;
+	capacidad_litros: number;
+};
+</file>
+
+<file path="TraspasoDTO.ts">
+// const data = {
+// 	json: {
+// 		bod_origem: Number(selectedBodegaOrigem),
+// 		bod_destino: Number(selectedBodegaDestino),
+// 		id_tamque_destino: Number(medicionInicial[0].id_tanque),
+// 		regla_altura_inicial: medicionInicial[0].regla.toString(),
+// 		regla_altura_final: medicionFinal[0].regla.toString(),
+// 		litros_tanque_inicial: medicionInicial[0].litros,
+// 		litros_tanque_final: medicionFinal[0].litros,
+// 		temp_inicial: medicionInicial[0].temperatura,
+// 		temp_final: medicionFinal[0].temperatura,
+// 		id_pico: Number(selectedPico),
+// 		taxilitro_inicial: totalizadorPicoInicial, // Este valor debe ser calculado o enviado
+// 		taxilitro_final: totalizadorPicoFinal, // Este valor debe ser calculado o enviado
+// 		litros_pico: Number(cargaCombustible),
+// 		obs_traspaso: obs + " >>" + obsAdicional || "",
+// 		foto_obs: base64Obs ? [base64Obs] : [],
+// 		foto_medicion_inicial: medicionInicial[0].foto_tanque || [],
+// 		foto_medicion_final: medicionFinal[0].foto_tanque || [],
+// 		fecha: fecha,
+// 		hora: hora,
+// 		firma_receptor: firma ? [firma] : [],
+// 		id_playero: user.cedula,
+// 		id_encargado_receptor: Number(persona?.cedula),
+// 	},
+// };
+
+import { PersonaDTO } from "./PersonaDTO";
+
+export type TraspasoDTO = {
+	json: {
+		bod_origen: number;
+		bod_destino: number;
+		id_tanque_destino: number;
+		regla_altura_inicial: string;
+		regla_altura_final: string;
+		litros_tanque_inicial: number;
+		litros_tanque_final: number;
+		temp_inicial: number;
+		temp_final: number;
+		id_pico: number;
+		taxilitro_inicial: number;
+		taxilitro_final: number;
+		litros_pico: number;
+		last_id_salida?: number;
+		obs_traspaso: string;
+		obs_adicional: string;
+		foto_obs_traspaso: string[];
+		foto_medicion_inicial: string[] | [];
+		foto_medicion_final: string[] | [];
+		fecha: string;
+		hora: string;
+		firma_receptor: string[];
+		id_playero: number;
+		id_encargado_receptor: number;
+		id_autorizado?: number;
+		corte_id?: number;
+	};
+};
+</file>
+
+<file path="TurnoDTO.ts">
+/*
+Interface Turno
+{
+  "json": {
+    "id_suc": 1070,
+    "id_bod": 1016,
+    "fecha": "2025-05-22",
+    "hora": "12:30:00",
+    "ci_playero": 4147891,
+    "litros": 20500,
+    "observacion": "prueba",
+    "fotos_observacion": [
+      "base64",
+      "base64"
+    ],
+    "med_tanques": [
+      {
+        "id_tanque": 1,
+        "regla": 83.75,
+        "temperatura": 20,
+        "litros": 16750,
+        "foto_tanque": [
+          "base64"
+        ]
+      }
+    ],
+    "med_picos": [
+      {
+        "id_pico": 1,
+        "taxilitro": 1845011
+      }
+    ]
+  }
+}
+*/
+
+export type TurnoDTO = {
+	id_suc: number;
+	id_bod: number;
+	fecha: string;
+	hora: string;
+	ci_playero: number;
+	litros: number;
+	observacion: string;
+	fotos_observacion: string[];
+	med_tanques: {
+		id_tanque: number;
+		regla: number;
+		temperatura: number;
+		litros: number;
+		foto_tanque: string[];
+	}[];
+	med_picos: {
+		id_pico: number;
+		taxilitro: number;
+	}[];
+};
+</file>
+
+<file path="userDTO.ts">
+export type UserDTO = {
+	cedula: string;
+	name: string;
+};
+</file>
+
+<file path="VehiculoDTO.ts">
+export type VehiculoDTO = {
+	id_vehiculo: string;
+	descripcion_vehiculo: string;
+	ruc: string;
+};
+</file>
+
+</codebase>
+
+<response_instructions>
+  You are receiving the full codebase for the project described above.
+  Your task is defined in <task>.
+
+  STEP 1 — Identify missing context:
+    If you need additional files not present in <codebase> to complete
+    the task, list each one with a one-sentence reason.
+
+  STEP 2 — Provide a follow-up command:
+    If additional files are needed, output EXACTLY this block
+    (copy-paste ready, no surrounding text):
+
+    <follow_up_command>
+    contexto C:\dev\app-playero-v2\src\dto --objetivo "agregar comentarios estandarizados para TypeDoc" --archivos [ruta/archivo1] [ruta/archivo2] ...
+    </follow_up_command>
+
+    Replace the placeholder paths with real relative paths.
+    Use forward slashes. Paths are relative to project_root.
+
+  STEP 3 — If you already have enough context:
+    State that explicitly, then proceed directly with your response.
+    Do not output <follow_up_command>.
+</response_instructions>

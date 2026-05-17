@@ -24,7 +24,6 @@ import {
 } from "lucide-react-native";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { useAppContext } from "@/hooks/useAppContext";
-import { api } from "@/services/api";
 import { PicoDTO } from "@/dto/PicosDTO";
 import { Select } from "@/components/Select";
 import { Button } from "@/components/Button";
@@ -44,7 +43,15 @@ import {
   savePersona,
 } from "@/storage/storagePersona";
 import { Photo } from "@/components/Photo";
-import { set } from "react-hook-form";
+// BD — reemplaza api
+import {
+  getBodegasByIdSucursal,
+  getBodegasTraspaso,
+} from "@DBmodules/bodegaDB";
+import { getPicosByBodega } from "@DBmodules/picoDB";
+import { getTurnoStatusLocal } from "@DBmodules/turnoBD";
+import { saveTraspasoLocal } from "@DBmodules/traspasoDB";
+import { getNuevoDespachoByPico } from "@DBmodules/despachoDB";
 
 //let idAutorizado = 0;
 //let continuarCarga = false;
@@ -53,6 +60,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   const idAutorizadoRef = useRef<number>(0);
   const continuarCargaRef = useRef<boolean>(false);
   const lastIdProcesadoRef = useRef<number>(0);
+  const timestampReferenciaRef = useRef<number>(0);
   const n = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
   const [selectedBodegaOrigem, setSelectedBodegaOrigem] = useState<string>("");
   const [selectedBodegaDestino, setSelectedBodegaDestino] =
@@ -112,26 +120,16 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   async function fetchPicos() {
     setIsLoading(true);
     try {
-      const turno = await api.get(
-        `api/registros/turno/status/${sucursal.id_sucursal}`,
-      );
-
-      const turnoData: StatusTurnoDTO = {
-        status: turno.data.status,
-        // status: "falta_cerrar", // For testing purposes, set to "normal"
-        Inicio_turno: turno.data.Inicio_turno,
-        Fin_turno: turno.data.Fin_turno,
-        Fin_turno_anterior: turno.data.Fin_turno_anterior,
-      };
-      if (turnoData.status === "cerrado" || turnoData.status === "falta_cerrar")
+      const turnoStatus = await getTurnoStatusLocal(sucursal.id_sucursal);
+      if (
+        turnoStatus.status === "cerrado" ||
+        turnoStatus.status === "falta_cerrar"
+      ) {
         setTurnoCerrado(true);
-
-      const data = await api.get("/api/picos/", {
-        params: { id_bodega: selectedBodegaOrigem },
-      });
-      const picos: PicoDTO[] = data.data.picos;
-      setPicos(picos);
-      setSelectedPico(picos[0]?.id_pico.toString() || "");
+      }
+      const picosDB = await getPicosByBodega(Number(selectedBodegaOrigem));
+      setPicos(picosDB);
+      setSelectedPico(picosDB[0]?.id_pico.toString() || "");
       setEstadoRestaurado(true);
     } catch (error) {
       toastError("Error al buscar picos", "Intente nuevamente.");
@@ -143,18 +141,13 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   async function fetchBodegas() {
     try {
       setIsLoading(true);
-      // Obtem las bodegas de origen. Si hay solo una bodega, no se muestra el select
-      const origen = await api.get(`api/bodegas/${sucursal.id_sucursal}`);
-      setBodegaOrigem(origen.data.bodegas);
-      if (origen.data.bodegas.length === 1) {
-        setSelectedBodegaOrigem(origen.data.bodegas[0].id_bodega);
+      const bodegasOrigen = await getBodegasByIdSucursal(sucursal.id_sucursal);
+      setBodegaOrigem(bodegasOrigen);
+      if (bodegasOrigen.length === 1) {
+        setSelectedBodegaOrigem(bodegasOrigen[0].id_bodega);
       }
-
-      // Obtem las bodegas para traspaso
-      const destino = await api.get(
-        `api/bodegas/traspaso/${sucursal.id_sucursal}`,
-      );
-      setBodegaDestino(destino.data.bodegas);
+      const bodegasDestino = await getBodegasTraspaso(sucursal.id_sucursal);
+      setBodegaDestino(bodegasDestino);
     } catch (error) {
       toastError("Error al buscar bodega", "Intente nuevamente más tarde.");
     } finally {
@@ -166,6 +159,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     if (continuarCargaRef.current) return;
 
     const now = new Date();
+
     const fecha = now.toISOString().slice(0, 10);
     const hora = now.toTimeString().slice(0, 8);
 
@@ -279,7 +273,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
               // Solo navegamos — el storage ya tiene lo último guardado
               //saveState();
               if (medicionInicial?.length > 0) {
-                console.log("guardando medicion inicial")
+                console.log("guardando medicion inicial");
                 saveState();
               }
               navigation.dispatch(e.data.action);
@@ -316,7 +310,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     try {
       const data: TraspasoDTO = await getStorageTraspaso();
 
-      // Completa datos finales
       data.json.firma_receptor = firma ? [firma] : [];
       data.json.regla_altura_final = medicionFinal[0].regla.toString();
       data.json.litros_tanque_final = medicionFinal[0].litros;
@@ -331,20 +324,15 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       data.json.taxilitro_inicial = totalizadorPicoInicial;
       data.json.taxilitro_final = totalizadorPicoFinal;
 
-      // ⚠️ NO ENVIAR last_id_salida (solo cliente)
-      // OJO: no mutes "data" directo; clona y limpia:
-      const payload: TraspasoDTO = {
-        ...data,
-        json: { ...data.json },
-      };
-      delete (payload.json as any).last_id_salida;
-      delete (payload.json as any).obs_adicional;
-
-      console.log("Aqui");
-      console.log("[SAVE] Litros cargaCombustible:", cargaCombustible);
+      // Clonar y limpiar campos internos
+      const payload = { ...data.json };
+      delete (payload as any).last_id_salida;
+      delete (payload as any).obs_adicional;
 
       setIsLoading(true);
-      await api.post("/api/traspasos", payload);
+
+      // Guardar en BD local (pendiente de sync con el servidor)
+      await saveTraspasoLocal(payload);
 
       toastSuccess("Traspaso", "Traspaso guardado exitosamente.");
       await removeTraspaso();
@@ -370,7 +358,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       );
       return;
     }
-
     if (!selectedBodegaDestino) {
       Alert.alert(
         "Bodega de destino requerida",
@@ -378,7 +365,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       );
       return;
     }
-
     if (!selectedPico) {
       Alert.alert("Pico requerido", "Debe seleccionar un pico expedidor.");
       return;
@@ -403,37 +389,15 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       );
       return;
     }
-    try {
-      setIsLoading(true);
 
-      setIdPicoSurtidor(Number(picoSurtidor.id_pico_surtidor));
-      const response = await api.post("/api/autorizar", {
-        pico: Number(picoSurtidor.id_pico_surtidor),
-      });
-      if (response.data.respuesta === "NoCargo") {
-        toastError(
-          "Pico no Retirado",
-          "El pico no se ha retirado del surtidor.",
-        );
-        return;
-      } else if (response.data.respuesta !== "Cargando") {
-        toastError(
-          "Pico no disponible",
-          "El pico no está disponible para la carga.",
-        );
-        return;
-      }
-      //idAutorizadoRef.current = response.data.idUltimaCarga;
-      if (!continuarCargaRef.current) saveState();
-      setSalida(1);
-      setAndRefShouldContinue(true);
-    } catch (error) {
-      setSalida(0);
-      setAndRefShouldContinue(false);
-      toastError("Registro de Salida", "Intente nuevamente.");
-      setIsLoading(false);
-      return;
-    }
+    // Guardar estado antes de iniciar la espera
+    if (!continuarCargaRef.current) saveState();
+
+    // Marca el momento de inicio del despacho
+    timestampReferenciaRef.current = Date.now();
+
+    setSalida(1);
+    setAndRefShouldContinue(true);
   }
 
   const promptStartIfNeeded = (stored: TraspasoDTO) => {
@@ -627,21 +591,22 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   }, [medicionInicial]);
 
   useEffect(() => {
-  if (medicionFinal.length > 0) {  // ← sacar estadoRestaurado
-    (async () => {
-      const stored = await getStorageTraspaso();
-      if (stored?.json) {
-        stored.json.regla_altura_final = medicionFinal[0].regla.toString();
-        stored.json.litros_tanque_final = medicionFinal[0].litros;
-        stored.json.temp_final = medicionFinal[0].temperatura;
-        stored.json.foto_medicion_final = medicionFinal[0].foto_tanque
-          ? [medicionFinal[0].foto_tanque]
-          : [];
-        await saveTraspaso(stored);
-      }
-    })();
-  }
-}, [medicionFinal]);
+    if (medicionFinal.length > 0) {
+      // ← sacar estadoRestaurado
+      (async () => {
+        const stored = await getStorageTraspaso();
+        if (stored?.json) {
+          stored.json.regla_altura_final = medicionFinal[0].regla.toString();
+          stored.json.litros_tanque_final = medicionFinal[0].litros;
+          stored.json.temp_final = medicionFinal[0].temperatura;
+          stored.json.foto_medicion_final = medicionFinal[0].foto_tanque
+            ? [medicionFinal[0].foto_tanque]
+            : [];
+          await saveTraspaso(stored);
+        }
+      })();
+    }
+  }, [medicionFinal]);
 
   useEffect(() => {
     if (selectedBodegaOrigem) {
@@ -650,134 +615,57 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   }, [selectedBodegaOrigem]);
 
   const fetchBox = useCallback(async () => {
-    if (!estadoRestaurado || !shouldContinue) return;
-
     try {
-      let idPicoBox = Number(idPico_surtidor);
-      if (idPicoBox === 0) {
-        const picoSurtidor = picos.find(
-          (p) => p.id_pico === Number(selectedPico),
-        );
-        setIdPicoSurtidor(Number(picoSurtidor?.id_pico_surtidor));
-        idPicoBox = Number(picoSurtidor?.id_pico_surtidor);
-      }
+      const despacho = await getNuevoDespachoByPico(
+        idPico_surtidor,
+        timestampReferenciaRef.current,
+      );
 
-      const response = await api.get(`/api/salida-control/${idPicoBox}`);
-      const dataResp = response?.data ?? {};
-      console.log("[FETCH BOX] Respuesta salida-control:", dataResp);
-
-      const estado = dataResp.estado as string | undefined;
-      const idResp = n(dataResp.id);
-
-      // Solo procesar al finalizar tanda
-      if (estado !== "B") return;
-
-      // ✅ ÚNICA guard: evitar procesar el mismo id dos veces
-      if (idResp && idResp === lastIdProcesadoRef.current) {
-        console.log("[FETCH BOX] ID ya procesado, ignorando:", idResp);
-        setAndRefShouldContinue(false);
-        setIsLoading(false);
-
-        Alert.alert(
-          "Sin nueva carga",
-          "El surtidor no registró un nuevo despacho. ¿Desea intentar cargar nuevamente?",
-          [
-            {
-              text: "Sí",
-              onPress: () => {
-                continuarCargaRef.current = true;
-                handleTraspaso();
-              },
-            },
-            {
-              text: "No",
-              onPress: () => {
-                // ← Limpiar timeout pendiente antes de cambiar estado
-                if (intervalRef.current) {
-                  clearTimeout(intervalRef.current);
-                  intervalRef.current = null;
-                }
-                setSalida(2);
-                setAndRefShouldContinue(false);
-                continuarCargaRef.current = false;
-              },
-            },
-          ],
-        );
+      if (!despacho) {
+        // No hay despacho nuevo todavía → seguir esperando
         return;
       }
 
-      // Marcamos este id como procesado antes del Alert
-      lastIdProcesadoRef.current = idResp;
-      setAndRefShouldContinue(false);
+      // Llegó un despacho nuevo → la carga finalizó
+      const litros = despacho.litros;
+      const taxIni = despacho.taxilitroInicial;
+      const taxFin = despacho.taxilitroFinal;
 
-      // ===== BLOQUE ÚNICO: acumulado + UI + persistencia =====
-      const storageData = (await getStorageTraspaso()) ?? saveState();
-      const prev = n(storageData?.json?.litros_pico);
-      const vol = n(dataResp.volumenDespachado);
+      // Actualizar acumulados (soporte para múltiples tandas)
+      const nuevosCargados =
+        litros + (continuarCargaRef.current ? toNumber(cargaCombustible) : 0);
+      const nuevoTaxIni = continuarCargaRef.current
+        ? totalizadorPicoInicial
+        : taxIni;
 
-      // Guard contra re-proceso desde storage
-      const lastId = n(storageData?.json?.last_id_salida) || 0;
-      if (idResp && idResp <= lastId) {
-        console.log(
-          "[FETCH BOX] ID ya contabilizado en storage, no se acumula:",
-          idResp,
-        );
-        setTotalizadorPicoInicial(
-          n(storageData?.json?.taxilitro_inicial) ||
-            n(dataResp.taxiltroInicioDespacho),
-        );
-        setTotalizadorPicoFinal(n(dataResp.taxiltroFinDespacho));
-        return;
-      }
-
-      const nuevoAcum = prev + vol;
-      const taxIni =
-        n(storageData?.json?.taxilitro_inicial) ||
-        n(dataResp.taxiltroInicioDespacho);
-      const taxFin = n(dataResp.taxiltroFinDespacho);
-
-      setTotalizadorPicoInicial(taxIni);
+      setTotalizadorPicoInicial(nuevoTaxIni);
       setTotalizadorPicoFinal(taxFin);
-      setCargaCombustible(nuevoAcum.toFixed(2));
+      setCargaCombustible(
+        nuevosCargados.toLocaleString("es-PY", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+      );
 
-      storageData.json.litros_pico = nuevoAcum;
-      if (!storageData.json.taxilitro_inicial) {
-        storageData.json.taxilitro_inicial = n(dataResp.taxiltroInicioDespacho);
+      // Guardar en storage incluyendo los totalizadores actualizados
+      const existing = await getStorageTraspaso();
+      if (existing?.json) {
+        existing.json.taxilitro_inicial = nuevoTaxIni;
+        existing.json.taxilitro_final = taxFin;
+        existing.json.litros_pico = nuevosCargados;
+        existing.json.last_id_salida = despacho.id;
+        await saveTraspaso(existing);
       }
-      storageData.json.taxilitro_final = taxFin;
-      storageData.json.last_id_salida = idResp;
-      await saveTraspaso(storageData);
 
-      Alert.alert("Carga registrada", "¿Desea continuar la misma carga?", [
-        {
-          text: "Sí",
-          onPress: () => {
-            continuarCargaRef.current = true;
-            handleTraspaso();
-          },
-        },
-        {
-          text: "No",
-          onPress: () => {
-            if (intervalRef.current) {
-              clearTimeout(intervalRef.current);
-              intervalRef.current = null;
-            }
-            setSalida(2);
-            setIsLoading(false);
-            continuarCargaRef.current = false;
-          },
-        },
-      ]);
+      setAndRefShouldContinue(false);
+      setSalida(2);
+      setIsLoading(false);
+      setLitrosCarga(true);
+      continuarCargaRef.current = false;
     } catch (error) {
-      console.error("[FETCH BOX] error:", error);
-      if (idPico_surtidor === 0) {
-        setSalida(0);
-        setAndRefShouldContinue(false);
-      }
+      console.error("Error al consultar despacho en BD:", error);
     }
-  }, [estadoRestaurado, shouldContinue, idPico_surtidor, picos, selectedPico]);
+  }, [idPico_surtidor, cargaCombustible, totalizadorPicoInicial]);
 
   // DESPUÉS:
   const fetchLoop = useCallback(async () => {

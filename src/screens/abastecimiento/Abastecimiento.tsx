@@ -22,7 +22,7 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { Select } from "@/components/Select";
 import { useAppContext } from "@/hooks/useAppContext";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
-import { api } from "@/services/api";
+//import { api } from "@/services/api";
 import { Input } from "@/components/Input";
 import { BodegaDTO } from "@/dto/BodegaDTO";
 import { Photo } from "@/components/Photo";
@@ -36,8 +36,10 @@ import {
   saveAbastecimiento,
   AbastecimientoStorageDTO,
 } from "@/storage/storageAbastecimiento";
-import { removeMedicionAbastecimiento } from "@/storage/storageMedicionAbastecimiento";  // ← agregar
-
+import { removeMedicionAbastecimiento } from "@/storage/storageMedicionAbastecimiento"; // ← agregar
+import { getBodegasByIdSucursal } from "@DBmodules/bodegaDB";
+import { getTurnoStatusLocal } from "@DBmodules/turnoBD";
+import { saveAbastecimientoLocal } from "@DBmodules/abastecimientoDB";
 
 export function Abastecimiento({
   navigation,
@@ -228,7 +230,7 @@ export function Abastecimiento({
           setBase64FotoObs(guardado.base64FotoObs);
           setObs(guardado.obs);
           setObsAdicional(guardado.obsAdicional);
-          if(guardado.obsAdicional)setMotivoConfirmado(true);
+          if (guardado.obsAdicional) setMotivoConfirmado(true);
           if (guardado.cargaZeta) {
             setCargaZeta({
               ...guardado.cargaZeta,
@@ -296,14 +298,17 @@ export function Abastecimiento({
   async function fetchBodegas() {
     try {
       setIsLoading(true);
-      // Verificar estado del turno
-      const turno = await api.get(
-        `api/registros/turno/status/${sucursal.id_sucursal}`,
-      );
-      if (turno.data.status === "cerrado" || turno.data.status === "falta_cerrar") setTurnoCerrado(true);
-      const response = await api.get(`/api/bodegas/${sucursal.id_sucursal}`);
-      setBodegas(response.data.bodegas);
-      setIsLoading(false);
+      // Estado del turno desde BD local
+      const turnoStatus = await getTurnoStatusLocal(sucursal.id_sucursal);
+      if (
+        turnoStatus.status === "cerrado" ||
+        turnoStatus.status === "falta_cerrar"
+      ) {
+        setTurnoCerrado(true);
+      }
+      // Bodegas desde BD local
+      const bodegasDB = await getBodegasByIdSucursal(sucursal.id_sucursal);
+      setBodegas(bodegasDB);
     } catch (error) {
       toastError("Bodegas", "Error al cargar las bodegas");
     } finally {
@@ -379,53 +384,51 @@ export function Abastecimiento({
     const litrosTotalMedicionFinal =
       medicionFinal?.reduce((acc, med) => acc + med.litros, 0) || 0;
 
-    const data = {
-      json: {
-        id_suc: sucursal.id_sucursal,
-        id_bod: Number(selectedBodega),
-        fecha: fecha,
-        hora: hora,
-        nro_oc: Number(ordenCompra),
-        nro_remision: remision,
-        litros_remision: Number(litros),
-        playero: Number(user.cedula),
-        foto_rev_docs: base64Images,
-        zeta_no_llega: Number(tipoOperacionSeleccionado),
-        id_pico_para_zeta: Number(cargaZeta?.id_pico_para_zeta) || 0,
-        taxilitro_inicial: Number(cargaZeta?.taxilitro_inicial) || 0,
-        taxilitro_final: Number(cargaZeta?.taxilitro_final) || 0,
-        litros_zeta: Number(cargaZeta?.litros_zeta) || 0,
-        obs_repos: obs + "|" + obsAdicional,
-        foto_obs_repos: base64FotoObs,
-        litros_total_repos: String(
-          litrosTotalMedicionFinal -
-            litrosTotalMedicionInicial -
-            (Number(cargaZeta?.litros_zeta) || 0),
-        ),
-        mediciones_tanque: medicionInicial?.map((med, index) => ({
-          id_tanque: Number(med.id_tanque),
-          inicio: {
-            regla: String(med.regla),
-            temperatura: med.temperatura,
-            litros: med.litros,
-            foto_medicion: med.foto_tanque,
-          },
-          fin: {
-            regla: String(medicionFinal[index].regla),
-            temperatura: medicionFinal[index]?.temperatura,
-            litros: medicionFinal[index]?.litros,
-            foto_medicion: medicionFinal[index]?.foto_tanque,
-          },
-        })),
-      },
+    const payload = {
+      id_suc: sucursal.id_sucursal,
+      id_bod: Number(selectedBodega),
+      fecha,
+      hora,
+      nro_oc: Number(ordenCompra),
+      nro_remision: remision,
+      litros_remision: Number(litros),
+      playero: Number(user.cedula),
+      foto_rev_docs: base64Images,
+      zeta_no_llega: Number(tipoOperacionSeleccionado),
+      id_pico_para_zeta: Number(cargaZeta?.id_pico_para_zeta) || 0,
+      taxilitro_inicial: Number(cargaZeta?.taxilitro_inicial) || 0,
+      taxilitro_final: Number(cargaZeta?.taxilitro_final) || 0,
+      litros_zeta: Number(cargaZeta?.litros_zeta) || 0,
+      obs_repos: obs + "|" + obsAdicional,
+      foto_obs_repos: base64FotoObs,
+      litros_total_repos: String(
+        litrosTotalMedicionFinal -
+          litrosTotalMedicionInicial -
+          (Number(cargaZeta?.litros_zeta) || 0),
+      ),
+      mediciones_tanque: medicionInicial?.map((med, index) => ({
+        id_tanque: Number(med.id_tanque),
+        inicio: {
+          regla: String(med.regla),
+          temperatura: med.temperatura,
+          litros: med.litros,
+          foto_medicion: med.foto_tanque,
+        },
+        fin: {
+          regla: String(medicionFinal[index].regla),
+          temperatura: medicionFinal[index]?.temperatura,
+          litros: medicionFinal[index]?.litros,
+          foto_medicion: medicionFinal[index]?.foto_tanque,
+        },
+      })),
     };
+
     try {
       setIsLoading(true);
-      await api.post("/api/Abastecimientos-V2", data);
-
-      // Limpiar storage al grabar exitosamente
+      // Guardar en BD local (pendiente de sync con el servidor)
+      await saveAbastecimientoLocal(payload);
+      // Limpiar storage temporal
       await removeAbastecimiento();
-
       toastSuccess("Abastecimiento", "Abastecimiento registrado con éxito");
       navigation.navigate("home");
     } catch (error) {

@@ -1,4 +1,4 @@
-// src/backend/db/modules/personaDB.ts
+// srcDBmodules/personaDB.ts
 //
 // Módulo de base de datos local para la entidad Persona.
 //

@@ -31,7 +31,7 @@ import {
   removeMedicionAbastecimiento,
   saveMedicionAbastecimiento,
 } from "@/storage/storageMedicionAbastecimiento";
-import { getTanquesByBodega } from "@/backend/db/modules/tanqueDB";
+import { getTanquesByBodega } from "@DBmodules/tanqueDB";
 
 type FormData = {
   alturaInicial: string;

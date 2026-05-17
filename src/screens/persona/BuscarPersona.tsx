@@ -3,7 +3,7 @@ import { InputCard } from "@components/InputCard";
 import { PersonaCard } from "@components/PersonaCard";
 import { use, useCallback, useEffect, useRef, useState } from "react";
 //import { api } from "@services/api";
-import { getPersonasPaginado } from "../../backend/db/modules/personaDB";
+import { getPersonasPaginado } from "@DBmodules/personaDB";
 import { PersonaDTO } from "@dto/PersonaDTO";
 import {
   ActivityIndicator,

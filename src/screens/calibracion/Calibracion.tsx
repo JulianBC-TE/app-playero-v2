@@ -1,9 +1,4 @@
 // src/screens/calibracion/Calibracion.tsx
-// ─── MIGRADO: ya no usa api.ts ────────────────────────────────────────────────
-//  - fetchPicos()      → getPicosByBodega / getPicos()  desde picoDB
-//  - turno/status      → turnoStatusService.getTurnoStatus()
-//  - POST /calibraciones → db.insert(calibraciones) desde calibracionDB
-// ─────────────────────────────────────────────────────────────────────────────
 import {
   StyleSheet,
   Text,
@@ -40,9 +35,9 @@ import {
 } from "@/storage/storageCalibracion";
 
 // ── BD ────────────────────────────────────────────────────────────────────────
-import { getPicosByBodega, getPicos } from "@/backend/db/modules/picoDB";
-import { getBodegasByIdSucursal } from "@/backend/db/modules/bodegaDB";
-import { getTurnoStatusLocal } from "@/backend/db/modules/turnoBD";
+import { getPicosByBodega, getPicos } from "@DBmodules/picoDB";
+import { getBodegasByIdSucursal } from "@DBmodules/bodegaDB";
+import { getTurnoStatusLocal } from "@DBmodules/turnoBD";
 import { db } from "@/backend/db/client";
 import { calibraciones } from "@/backend/db/schema";
 
@@ -198,7 +193,9 @@ export function Calibracion({
       try {
         const estadoGuardado = await getStorageCalibracion();
         if (estadoGuardado) {
-          setTipoOperacionSeleccionado(estadoGuardado.tipoOperacionSeleccionado);
+          setTipoOperacionSeleccionado(
+            estadoGuardado.tipoOperacionSeleccionado,
+          );
           setSelectedPico(estadoGuardado.selectedPico);
           setObs(estadoGuardado.obs);
           setObsAdicional(estadoGuardado.obsAdicional);
@@ -302,24 +299,39 @@ export function Calibracion({
   // ─── Validación antes de ir a secuencias ──────────────────────────────────
   async function handleVerificacion() {
     if (tipoOperacionSeleccionado === "") {
-      Alert.alert("Tipo de operación requerido", "Debe seleccionar un tipo de operación.");
+      Alert.alert(
+        "Tipo de operación requerido",
+        "Debe seleccionar un tipo de operación.",
+      );
       return;
     }
     if (tipoOperacionSeleccionado === "2") {
       if (!numeroPrecintoAtual) {
-        Alert.alert("Precinto", "Debe ingresar el número de precinto a retirar.");
+        Alert.alert(
+          "Precinto",
+          "Debe ingresar el número de precinto a retirar.",
+        );
         return;
       }
       if (!photoPrecintoAtual) {
-        Alert.alert("Precinto", "Debe capturar una foto del precinto retirado.");
+        Alert.alert(
+          "Precinto",
+          "Debe capturar una foto del precinto retirado.",
+        );
         return;
       }
       if (!numeroPrecintoColocado) {
-        Alert.alert("Precinto", "Debe ingresar el número de precinto a colocar.");
+        Alert.alert(
+          "Precinto",
+          "Debe ingresar el número de precinto a colocar.",
+        );
         return;
       }
       if (!photoPrecintoColocado) {
-        Alert.alert("Precinto", "Debe capturar una foto del precinto colocado.");
+        Alert.alert(
+          "Precinto",
+          "Debe capturar una foto del precinto colocado.",
+        );
         return;
       }
     }
@@ -331,7 +343,10 @@ export function Calibracion({
       (pico) => pico.id_pico_surtidor === Number(selectedPico),
     );
     if (!picoSurtidor) {
-      Alert.alert("ID Pico Surtidor", "El valor para el pico surtidor no fue encontrado.");
+      Alert.alert(
+        "ID Pico Surtidor",
+        "El valor para el pico surtidor no fue encontrado.",
+      );
       return;
     }
     navigation.navigate("sequencias", { pico_surtidor: Number(selectedPico) });
@@ -343,7 +358,10 @@ export function Calibracion({
     try {
       // Estado del turno desde BD
       const turnoStatus = await getTurnoStatusLocal(sucursal.id_sucursal);
-      if (turnoStatus === "cerrado" || turnoStatus === "falta_cerrar") {
+      if (
+        turnoStatus.status === "cerrado" ||
+        turnoStatus.status === "falta_cerrar"
+      ) {
         setTurnoCerrado(true);
       }
 
@@ -374,7 +392,10 @@ export function Calibracion({
   // ─── Guardar todo en BD local (reemplaza api.post /api/calibraciones) ─────
   async function saveAllData() {
     if (!persona) {
-      Alert.alert("Persona requerida", "Debe seleccionar una persona encargada.");
+      Alert.alert(
+        "Persona requerida",
+        "Debe seleccionar una persona encargada.",
+      );
       return;
     }
     if (!firma) {
@@ -422,13 +443,15 @@ export function Calibracion({
           val_medicion: medicion.valor_medicion,
           foto_med_balde: medicion.foto_medicion,
           taxilitro_carga: medicion.taxilitro.toString(),
+          litros_cargados: medicion.litros_cargados ?? 0,
         })),
       };
 
       // Guardar en BD local (tabla calibraciones, pendiente de sync)
       await db.insert(calibraciones).values({
         json: JSON.stringify(payload),
-        tipo: tipoOperacionSeleccionado === "1" ? "VERIFICACION" : "CALIBRACION",
+        tipo:
+          tipoOperacionSeleccionado === "1" ? "VERIFICACION" : "CALIBRACION",
         sync: 0,
         fecha: Date.now(),
         hora: Date.now(),
@@ -472,7 +495,11 @@ export function Calibracion({
                 encuentra cerrado. Una vez finalizada se debe realizar el cierre
                 correspondiente de las bodegas correspondientes.
               </Text>
-              <InputCard className="min-h-40" title="Indique el motivo" required>
+              <InputCard
+                className="min-h-40"
+                title="Indique el motivo"
+                required
+              >
                 <Input
                   value={obsAdicional}
                   placeholder="Describa el motivo"
@@ -485,7 +512,10 @@ export function Calibracion({
                 style={styles.button}
                 onPress={() => {
                   if (obsAdicional.trim() === "") {
-                    Alert.alert("Motivo requerido", "Por favor describa el motivo.");
+                    Alert.alert(
+                      "Motivo requerido",
+                      "Por favor describa el motivo.",
+                    );
                     return;
                   }
                   setMotivoConfirmado(true);
@@ -526,7 +556,11 @@ export function Calibracion({
               />
             </InputCard>
 
-            <InputCard title="Seleccione el pico:" required locked={salida !== 0}>
+            <InputCard
+              title="Seleccione el pico:"
+              required
+              locked={salida !== 0}
+            >
               {salida === 0 && (
                 <Select
                   data={picos}
@@ -545,7 +579,10 @@ export function Calibracion({
             </InputCard>
 
             {tipoOperacionSeleccionado === "2" && (
-              <InputCard title="Número de Precinto a retirar" locked={salida !== 0}>
+              <InputCard
+                title="Número de Precinto a retirar"
+                locked={salida !== 0}
+              >
                 <View className="flex-row items-center p-2 gap-2">
                   <Input
                     editable={salida === 0}
@@ -566,7 +603,10 @@ export function Calibracion({
               </InputCard>
             )}
             {tipoOperacionSeleccionado === "2" && (
-              <InputCard title="Número de Precinto colocado" locked={salida !== 0}>
+              <InputCard
+                title="Número de Precinto colocado"
+                locked={salida !== 0}
+              >
                 <View className="flex-row items-center p-2 gap-2">
                   <Input
                     editable={!isLoading}
