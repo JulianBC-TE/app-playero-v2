@@ -13,6 +13,8 @@ import { db } from "@/backend/db/client";
 import { picos, syncs } from "@/backend/db/schema";
 import { eq } from "drizzle-orm";
 import { PicoDTO } from "@/dto/PicosDTO";
+import { SYNC_CONFIG } from "../constants/syncConfig";
+import { bodegas } from "../schema";   // ← Agregar esta línea
 
 // Clave en tabla syncs para registrar la última sincronización de picos.
 const SYNC_KEY = "__last_sync_picos__";
@@ -145,5 +147,44 @@ export async function getLastSyncDate(): Promise<number | null> {
     return result[0] ? result[0].fecha : null;
   } catch {
     return null;
+  }
+}
+
+// ====================== SINCRONIZACIÓN ======================
+
+/**
+ * Trae TODOS los picos desde el servidor y filtra localmente
+ * solo aquellos cuya bodega ya esté guardada en la BD local.
+ */
+export async function syncPicosFromCentral(): Promise<number> {
+  try {
+    console.log("🔄 Sincronizando picos desde central...");
+
+    const { data: todosPicos } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.picos);
+
+    if (!Array.isArray(todosPicos) || todosPicos.length === 0) {
+      console.log("📭 No se recibieron picos");
+      return 0;
+    }
+
+    // Obtener IDs de bodegas que tenemos guardadas localmente
+    const bodegasLocales = await db
+      .select({ idBodega: bodegas.idBodega })
+      .from(bodegas);
+
+    const bodegasSet = new Set(bodegasLocales.map(b => b.idBodega));
+
+    // Filtrar solo picos de bodegas que tenemos
+    const picosFiltrados = todosPicos.filter((p: any) => {
+      return bodegasSet.has(Number(p.id_bodega));
+    });
+
+    await savePicos(picosFiltrados);
+
+    console.log(`✅ ${picosFiltrados.length} picos guardados (de ${todosPicos.length} totales)`);
+    return picosFiltrados.length;
+  } catch (error) {
+    console.error("❌ Error en syncPicosFromCentral:", error);
+    throw error;
   }
 }

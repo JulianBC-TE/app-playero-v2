@@ -13,6 +13,8 @@ import { db } from "@/backend/db/client";
 import { sucursales, syncs } from "@/backend/db/schema";
 import { eq } from "drizzle-orm";
 import { SucursalDTO } from "@/dto/sucursalDTO";
+import { SYNC_CONFIG } from "../constants/syncConfig";
+import axios from "axios"; // solo como fallback
 
 // Clave en tabla syncs para registrar la última sincronización de sucursales.
 const SYNC_KEY = "__last_sync_sucursales__";
@@ -112,5 +114,18 @@ export async function getLastSyncDate(): Promise<number | null> {
     return result[0] ? result[0].fecha : null;
   } catch {
     return null;
+  }
+}
+
+//Sync
+export async function syncSucursalesFromCentral() {
+  try {
+    const { data } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.sucursales);
+    await saveSucursales(data);
+    console.log(`✅ ${data.length} sucursales sincronizadas`);
+    return data.length;
+  } catch (error) {
+    console.error("❌ Error sync sucursales:", error);
+    throw error;
   }
 }

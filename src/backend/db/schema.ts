@@ -1,6 +1,7 @@
 // src/backend/db/schema.ts
-import { sqliteTable, integer, text, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, integer, text, real, primaryKey } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
+
 
 export const personas = sqliteTable("personas", {
   cedula: integer("cedula").primaryKey(),
@@ -10,10 +11,17 @@ export const personas = sqliteTable("personas", {
 });
 
 export const usuariosApp = sqliteTable("usuarios_app", {
-  cedula: integer("cedula").primaryKey(),   // FK → personas.cedula
+  cedula: integer("cedula").primaryKey(), // FK → personas.cedula
   clave: text("clave").notNull(),
   refreshToken: text("refresh_token"),
   salt: text("salt"),
+  // nuevo: usuario bloqueado o no
+  bloqueado: integer("bloqueado", { mode: "boolean" })
+    .notNull()
+    .default(false),
+
+  // nuevo: sucursal asignada
+  idSucursal: integer("id_sucursal").notNull(),
 });
 
 export const clientes = sqliteTable("clientes", {
@@ -146,6 +154,27 @@ export const usuariosAdmin = sqliteTable("usuarios_admin", {
   timestamp: integer("timestamp"),
 });
 
+export const habilitadosTrapaso = sqliteTable(
+  "habilitados_trapaso",
+  {
+    // sucursal que consulta / realiza el traspaso
+    idSucursal: integer("id_sucursal").notNull(),
+
+    // bodega relacionada
+    idBodega: integer("id_bodega").notNull(),
+
+    // permiso explícito
+    permitido: integer("permitido", { mode: "boolean" })
+      .notNull()
+      .default(false),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.idSucursal, table.idBodega],
+    }),
+  })
+);
+
 // ==================== RELACIONES ====================
 
 export const personasRelations = relations(personas, ({ one }) => ({
@@ -170,3 +199,33 @@ export const bodegasRelations = relations(bodegas, ({ one, many }) => ({
   picos: many(picos),
   tanques: many(tanques),
 }));
+
+export const habilitadosTrapasoRelations = relations(
+  habilitadosTrapaso,
+  ({ one }) => ({
+    sucursal: one(sucursales, {
+      fields: [habilitadosTrapaso.idSucursal],
+      references: [sucursales.idSucursal],
+    }),
+
+    bodega: one(bodegas, {
+      fields: [habilitadosTrapaso.idBodega],
+      references: [bodegas.idBodega],
+    }),
+  })
+);
+
+export const usuariosAppRelations = relations(
+  usuariosApp,
+  ({ one }) => ({
+    persona: one(personas, {
+      fields: [usuariosApp.cedula],
+      references: [personas.cedula],
+    }),
+
+    sucursal: one(sucursales, {
+      fields: [usuariosApp.idSucursal],
+      references: [sucursales.idSucursal],
+    }),
+  })
+);

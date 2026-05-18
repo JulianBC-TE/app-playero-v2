@@ -16,6 +16,8 @@ import { vehiculos, syncs } from "@/backend/db/schema";
 import { eq, like, or } from "drizzle-orm";
 import { VehiculoDTO } from "@/dto/VehiculoDTO";
 import { AppError } from "@/utils/AppError";
+import { SYNC_CONFIG } from "../constants/syncConfig";
+import axios from "axios"; // solo como fallback
 
 // Clave en tabla syncs para registrar la última sincronización de vehículos.
 const SYNC_KEY = "__last_sync_vehiculos__";
@@ -317,5 +319,47 @@ export async function getLastSyncDate(): Promise<number | null> {
     return result[0] ? result[0].fecha : null;
   } catch {
     return null;
+  }
+}
+
+// ====================== SINCRONIZACIÓN ======================
+
+export async function syncVehiculosFromCentral(lastTimestamp: number = 0) {
+  try {
+    const { data } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.clientesGet, {
+      params: { createdAt: lastTimestamp },
+    });
+
+    const items = Array.isArray(data) ? data : [];
+    
+    if (items.length > 0) {
+      await saveVehiculos(items);
+      console.log(`✅ ${items.length} clientes sincronizados desde central`);
+    }
+    return items.length;
+  } catch (error) {
+    console.error("❌ Error syncClientesFromCentral:", error);
+    throw error;
+  }
+}
+
+export async function syncVehiculosToCentral() {
+  const pendientes = await getVehiculosPendientesSync();
+  if (pendientes.length === 0) return 0;
+
+  try {
+    await SYNC_CONFIG.http.post(SYNC_CONFIG.endpoints.clientesPost, {
+      clientes: pendientes,
+    });
+
+    for (const c of pendientes) {
+      await markVehiculoAsSynced(c.ruc);
+    }
+
+    console.log(`✅ ${pendientes.length} clientes enviados al central`);
+    return pendientes.length;
+  } catch (error) {
+    console.error("❌ Error syncClientesToCentral:", error);
+    throw error;
   }
 }

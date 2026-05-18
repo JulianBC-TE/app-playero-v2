@@ -14,6 +14,8 @@ import { db } from "@/backend/db/client";
 import { clientes, syncs } from "@/backend/db/schema";
 import { eq, and } from "drizzle-orm";
 import { ClienteDTO } from "@/dto/ClienteDTO";
+import { SYNC_CONFIG } from "../constants/syncConfig";
+import axios from "axios"; // solo como fallback
 
 // Clave en tabla syncs para registrar la última sincronización de clientes.
 const SYNC_KEY = "__last_sync_clientes__";
@@ -219,5 +221,47 @@ export async function getLastSyncDate(): Promise<number | null> {
     return result[0] ? result[0].fecha : null;
   } catch {
     return null;
+  }
+}
+
+// ====================== SINCRONIZACIÓN ======================
+
+export async function syncClientesFromCentral(lastTimestamp: number = 0) {
+  try {
+    const { data } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.clientesGet, {
+      params: { createdAt: lastTimestamp },
+    });
+
+    const items = Array.isArray(data) ? data : [];
+    
+    if (items.length > 0) {
+      await saveClientes(items);
+      console.log(`✅ ${items.length} clientes sincronizados desde central`);
+    }
+    return items.length;
+  } catch (error) {
+    console.error("❌ Error syncClientesFromCentral:", error);
+    throw error;
+  }
+}
+
+export async function syncClientesToCentral() {
+  const pendientes = await getClientesPendientesSync();
+  if (pendientes.length === 0) return 0;
+
+  try {
+    await SYNC_CONFIG.http.post(SYNC_CONFIG.endpoints.clientesPost, {
+      clientes: pendientes,
+    });
+
+    for (const c of pendientes) {
+      await markClienteAsSynced(c.ruc);
+    }
+
+    console.log(`✅ ${pendientes.length} clientes enviados al central`);
+    return pendientes.length;
+  } catch (error) {
+    console.error("❌ Error syncClientesToCentral:", error);
+    throw error;
   }
 }

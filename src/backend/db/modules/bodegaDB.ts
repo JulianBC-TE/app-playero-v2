@@ -13,6 +13,8 @@ import { db } from "@/backend/db/client";
 import { bodegas, syncs } from "@/backend/db/schema";
 import { eq } from "drizzle-orm";
 import { BodegaDTO } from "@/dto/BodegaDTO";
+import { SYNC_CONFIG } from "../constants/syncConfig";
+import axios from "axios"; // solo como fallback
 
 // Clave en tabla syncs para registrar la última sincronización de bodegas.
 const SYNC_KEY = "__last_sync_bodegas__";
@@ -179,5 +181,57 @@ export async function getLastSyncDate(): Promise<number | null> {
     return result[0] ? result[0].fecha : null;
   } catch {
     return null;
+  }
+}
+
+// ====================== SINCRONIZACIÓN ESPECIAL BODEGAS ======================
+
+/**
+ * Sincroniza bodegas según reglas de negocio:
+ * - Todas las bodegas de la sucursal actual
+ * - + Bodegas de otras sucursales que estén habilitadas para traspaso
+ */
+export async function syncBodegasFromCentral(idSucursalActual: number): Promise<number> {
+  try {
+    console.log(`🔄 Sincronizando bodegas para sucursal ${idSucursalActual}...`);
+
+    // 1. Traer todas las bodegas
+    const { data: todasBodegas } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.bodegas);
+
+    // 2. Traer habilitados para traspaso
+    const { data: habilitados } = await SYNC_CONFIG.http.get('/api/habilitados-traspaso');
+
+    if (!Array.isArray(todasBodegas)) {
+      console.warn("⚠️ No se recibieron bodegas del servidor");
+      return 0;
+    }
+
+    // Convertir habilitados a un Set para búsqueda rápida
+    const habilitadosSet = new Set(
+      Array.isArray(habilitados) 
+        ? habilitados.map((h: any) => Number(h.id_bodega)) 
+        : []
+    );
+
+    // 3. Filtrar según reglas
+    const bodegasAFiltrar = todasBodegas.filter((b: any) => {
+      const idBodega = Number(b.id_bodega);
+      const idSucursalBodega = Number(b.id_sucursal);
+
+      return (
+        idSucursalBodega === idSucursalActual ||           // Bodegas de mi sucursal
+        habilitadosSet.has(idBodega)                       // Bodegas habilitadas para traspaso
+      );
+    });
+
+    // 4. Guardar en local
+    await saveBodegas(bodegasAFiltrar);
+
+    console.log(`✅ ${bodegasAFiltrar.length} bodegas guardadas localmente (de ${todasBodegas.length} totales)`);
+    return bodegasAFiltrar.length;
+
+  } catch (error) {
+    console.error("❌ Error en syncBodegasFromCentral:", error);
+    throw error;
   }
 }
