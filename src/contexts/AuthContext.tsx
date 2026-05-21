@@ -1,26 +1,17 @@
 // src/contexts/AuthContext.tsx
-//
-// AuthContext limpio: no conoce axios, no conoce endpoints, no conoce AsyncStorage de tokens.
-// Solo orquesta authAPI (llamadas HTTP) y authDB (BD local) a través de funciones tipadas.
 
 import { createContext, useEffect, useState } from "react";
 import { UserDTO } from "@dto/userDTO";
 import { saveUser, getStorageUser, removeUser } from "@storage/storageUse";
-import {
-  getAuthToken,
-  saveAuthToken,
-  removeAuthToken,
-} from "@storage/storageAuthToken";
-import { getStorageServerUrl, saveServerUrl } from "@storage/storageServer";
+import { getAuthToken, saveAuthToken, removeAuthToken } from "@storage/storageAuthToken";
+import axios from "axios";
+import { getStorageServerUrl, saveServerUrl, removeServerUrl } from "@storage/storageServer";
 import { ClienteDTO } from "@dto/ClienteDTO";
 import { SucursalDTO } from "@/dto/sucursalDTO";
 import { getStorageSucursal, saveSucursal } from "@/storage/storageSucursal";
 
-// Backend: HTTP
 import { httpClient } from "@/backend/api/httpClient";
 import { login } from "@/backend/api/authAPI";
-
-// Backend: BD local
 import { saveUserLocally, loginOffline, clearSession } from "@DBmodules/authDB";
 
 // ---------------------------------------------------------------------------
@@ -30,7 +21,9 @@ import { saveUserLocally, loginOffline, clearSession } from "@DBmodules/authDB";
 export type AuthContextDataProps = {
   user: UserDTO;
   updateUserProfile: (userUpdated: UserDTO) => Promise<void>;
-  signIn: (cedula: string, password: string) => Promise<void>;
+  // Devuelve true si el login fue online, false si fue offline.
+  // SignIn usa este valor para saber si debe llamar al hook de sync.
+  signIn: (cedula: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
   isLoadingUserData: boolean;
   isOffline: boolean;
@@ -63,44 +56,37 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
   const [isOffline, setIsOffline] = useState(false);
 
   // ── signIn ────────────────────────────────────────────────────────────────
+  // Retorna true si el login fue online (para que el caller decida si sincronizar).
 
-  async function signIn(cedula: string, password: string): Promise<void> {
+  async function signIn(cedula: string, password: string): Promise<boolean> {
     setIsLoadingUserData(true);
     try {
       const online = await httpClient.isOnline();
 
       if (online) {
-        // ── Login online ────────────────────────────────────────────────
+        // ── Login online ──────────────────────────────────────────────────
         const data = await login(cedula, password);
         const refreshToken = data.refresh_token ?? "";
         const userData: UserDTO = { cedula, name: data.name };
 
-        // Token JWT → AsyncStorage (efímero)
         await saveAuthToken({ token: data.token, refresh_token: refreshToken });
         await saveUser(userData);
-
-        // Hash de clave → SQLite (persiste para login offline)
-        await saveUserLocally({
-          cedula,
-          name: data.name,
-          password,
-          refreshToken,
-        });
+        await saveUserLocally({ cedula, name: data.name, password, refreshToken, idSucursal: data.idSucursal });
 
         httpClient.setToken(data.token);
         setUser(userData);
         setIsOffline(false);
+
+        return true; // ← online
       } else {
-        // ── Login offline ───────────────────────────────────────────────
+        // ── Login offline ─────────────────────────────────────────────────
         const result = await loginOffline(cedula, password);
 
         if (!result.ok) {
           const messages: Record<typeof result.reason, string> = {
-            not_last_user:
-              "Para cambiar de usuario necesitás conexión al servidor.",
+            not_last_user: "Para cambiar de usuario necesitás conexión al servidor.",
             wrong_password: "Contraseña incorrecta.",
-            no_local_user:
-              "No hay datos locales. Conectate al servidor para hacer el primer login.",
+            no_local_user: "No hay datos locales. Conectate al servidor para hacer el primer login.",
             error: "Error al iniciar sesión offline.",
           };
           throw new Error(messages[result.reason]);
@@ -113,6 +99,8 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
         await saveUser(userData);
         setUser(userData);
         setIsOffline(true);
+
+        return false; // ← offline
       }
     } finally {
       setIsLoadingUserData(false);
@@ -164,13 +152,32 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
     }
   }
 
-  async function loadServerIP(): Promise<void> {
-    const ip = await getStorageServerUrl();
-    const suc = await getStorageSucursal();
-    setServerIPState(ip);
-    setSucursalState(suc);
-    setIsLoadingServerIP(false);
-  }
+  async function loadServerIP() {
+    try {
+        const ip = await getStorageServerUrl();
+        const sucursal = await getStorageSucursal();
+
+        if (ip) {
+            // Verificar que el servidor realmente responde
+            try {
+                await axios.get(`http://${ip}/ping`, { timeout: 5000 });
+                // Si llegó acá, el servidor responde → todo bien
+                setServerIPState(ip);
+                setSucursal(sucursal);
+            } catch {
+                // El servidor no responde → limpiar la IP guardada
+                await removeServerUrl();
+                setServerIPState(null);
+            }
+        } else {
+            setServerIPState(null);
+        }
+    } catch (error) {
+        setServerIPState(null);
+    } finally {
+        setIsLoadingServerIP(false);
+    }
+}
 
   // ── Setters ───────────────────────────────────────────────────────────────
 

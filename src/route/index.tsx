@@ -8,7 +8,7 @@ import { Loading } from "@/components/Loading";
 export function Routes() {
 	const { user, isLoadingUserData, serverIP, isLoadingServerIP } = useAuth();
 
-	if (isLoadingUserData) {
+	if (isLoadingUserData || isLoadingServerIP) {
 		return <Loading />;
 	}
 

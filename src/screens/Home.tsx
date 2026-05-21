@@ -16,12 +16,16 @@ import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
 import { useFocusEffect } from "@react-navigation/native";
 import { getTurnoStatusLocal } from "@DBmodules/turnoBD";
 import { toastError } from "@/utils/toastMessage";
+import { seedLocalDB } from "@/backend/db/seeds/seedLocalDB";
+import { getSucursalUsuarioActivoLocal } from "@DBmodules/sucursalDB";
 
 export function Home({ navigation }: StackRoutesProps<"home">) {
   const [isLoading, setIsLoading] = useState(true);
   const [menuItems, setMenuItems] = useState<menuItemType[]>(baseMenuItems);
-  const { sucursal } = useAppContext();
-
+  const [sucursal, setSucursal] = useState<{
+    id_sucursal: number;
+    descripcion_sucursal: string;
+  } | null>(null);
   function handleOpenMenu(route: keyof StackRoutesList, params: object) {
     navigation.navigate(route, params as any);
   }
@@ -29,9 +33,21 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
   async function fetchTurno() {
     try {
       setIsLoading(true);
+      const sucursalLocal = await getSucursalUsuarioActivoLocal();
+
+      if (!sucursalLocal) {
+        // Si no hay usuario o sucursal cargada, se bloquea el menú por seguridad
+        setMenuItems(
+          baseMenuItems.map((item) => ({ ...item, enabled: false })),
+        );
+        setSucursal(null);
+        return;
+      }
+
+      setSucursal(sucursalLocal);
 
       // Lee el estado del turno directamente desde SQLite local
-      const turnoStatus = await getTurnoStatusLocal(sucursal.id_sucursal);
+      const turnoStatus = await getTurnoStatusLocal(sucursalLocal.id_sucursal);
 
       const turnoData: StatusTurnoDTO = {
         status: turnoStatus.status as StatusTurnoDTO["status"],

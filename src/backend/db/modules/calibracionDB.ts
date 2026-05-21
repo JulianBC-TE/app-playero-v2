@@ -1,13 +1,13 @@
-// srcDBmodules/calibracionDB.ts
-//
-// Módulo de base de datos para calibraciones / verificaciones.
-// Reemplaza la llamada api.post("/api/calibraciones") en Calibracion.tsx.
-//
-// REGLAS DE NEGOCIO:
-//   - Las calibraciones se crean localmente con sync=0.
-//   - Un proceso de sincronización posterior las envía al servidor.
-//   - tipo puede ser "VERIFICACION" o "CALIBRACION".
-
+/**
+ * Módulo de acceso a datos para calibraciones y verificaciones de picos.
+ *
+ * @remarks
+ * - Las calibraciones se crean offline con `sync = 0`.
+ * - `tipo` puede ser `"VERIFICACION"` o `"CALIBRACION"`.
+ *
+ * @module Backend/DB/Modules/Calibracion
+ * @category Database Modules
+ */
 import { db } from "@/backend/db/client";
 import { calibraciones, syncs } from "@/backend/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -17,13 +17,14 @@ const SYNC_KEY = "__last_sync_calibraciones__";
 // ---------------------------------------------------------------------------
 // Tipos
 // ---------------------------------------------------------------------------
-
+/** Detalle de una medición individual de calibración (balde de prueba). */
 export type CalibracionDetalleInput = {
   val_medicion: string;
   foto_med_balde: string;
   taxilitro_carga: string;
 };
 
+/** Payload completo de una calibración para persistir y enviar al servidor. */
 export type CalibracionInput = {
   fecha_hora: string;
   hora: string;
@@ -43,12 +44,12 @@ export type CalibracionInput = {
   detalles: CalibracionDetalleInput[];
 };
 
-// ---------------------------------------------------------------------------
-// saveCalibracionLocal
-// Inserta un registro de calibración pendiente de sincronización.
-// Devuelve el ID generado por SQLite.
-// ---------------------------------------------------------------------------
-
+/**
+ * Inserta un registro de calibración pendiente de sincronización.
+ *
+ * @param input - Datos de la calibración.
+ * @returns ID generado por SQLite.
+ */
 export async function saveCalibracionLocal(
   input: CalibracionInput,
 ): Promise<number> {
@@ -64,11 +65,12 @@ export async function saveCalibracionLocal(
   return (result as any).lastInsertRowId ?? 0;
 }
 
-// ---------------------------------------------------------------------------
-// getCalibracionesPendientes
-// Devuelve los registros aún no sincronizados (sync = 0).
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve las calibraciones pendientes de sincronización (`sync = 0`),
+ * ordenadas por fecha descendente.
+ *
+ * @returns Lista con `json` parseado a {@link CalibracionInput}.
+ */
 export async function getCalibracionesPendientes() {
   const rows = await db
     .select()
@@ -82,11 +84,11 @@ export async function getCalibracionesPendientes() {
   }));
 }
 
-// ---------------------------------------------------------------------------
-// marcarCalibracionSync
-// Marca una calibración como sincronizada con el servidor.
-// ---------------------------------------------------------------------------
-
+/**
+ * Marca una calibración como sincronizada (`sync = 1`).
+ *
+ * @param idCalibracion - ID del registro en la tabla local.
+ */
 export async function marcarCalibracionSync(
   idCalibracion: number,
 ): Promise<void> {
@@ -96,11 +98,11 @@ export async function marcarCalibracionSync(
     .where(eq(calibraciones.idCalibracion, idCalibracion));
 }
 
-// ---------------------------------------------------------------------------
-// marcarCalibracionErrorSync
-// Marca una calibración con error de sincronización.
-// ---------------------------------------------------------------------------
-
+/**
+ * Marca una calibración con error de sincronización (`sync = -1`).
+ *
+ * @param idCalibracion - ID del registro en la tabla local.
+ */
 export async function marcarCalibracionErrorSync(
   idCalibracion: number,
 ): Promise<void> {
@@ -110,10 +112,11 @@ export async function marcarCalibracionErrorSync(
     .where(eq(calibraciones.idCalibracion, idCalibracion));
 }
 
-// ---------------------------------------------------------------------------
-// getLastSyncDate
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve el timestamp de la última sincronización de calibraciones.
+ *
+ * @returns Timestamp Unix en ms, o `null` si nunca se sincronizó.
+ */
 export async function getLastSyncDate(): Promise<number | null> {
   try {
     const result = await db

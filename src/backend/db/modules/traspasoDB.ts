@@ -1,5 +1,7 @@
-// srcDBmodules/traspasoDB.ts
-//
+/**
+ * @module Backend/DB/Modules/Traspaso
+ * @category Database Modules
+ */
 // Módulo de base de datos para traspasos.
 // Reemplaza las llamadas a:
 //   - api.get("api/registros/turno/status/...")  → usar getTurnoStatusLocal()

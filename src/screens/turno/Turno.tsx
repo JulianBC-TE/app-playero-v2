@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   Text,
 } from "react-native";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StackRoutesProps } from "@/route/app.routes";
 
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -24,7 +24,6 @@ import { TurnoDTO } from "@/dto/TurnoDTO";
 import { PicoDTO } from "@/dto/PicosDTO";
 
 import { RulerDimensionLine, CheckCheck } from "lucide-react-native";
-import { useAppContext } from "@/hooks/useAppContext";
 import { AppError } from "@/utils/AppError";
 import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
 import { Photo } from "@/components/Photo";
@@ -32,13 +31,15 @@ import { crearTurnoLocal, getTurnoStatusLocal } from "@DBmodules/turnoBD";
 import { getBodegasByIdSucursal, getBodegaById } from "@DBmodules/bodegaDB";
 import { getPicosByBodega } from "@DBmodules/picoDB";
 import { normalizarFecha } from "@/backend/db/services/turnoStatusService";
+import { getSucursalUsuarioActivoLocal } from "@DBmodules/sucursalDB";
 
-/**
- * Componente para gestionar el turno de trabajo.
- *
- * @param param0 - Props de navegación y ruta.
- * @returns Componente de turno.
- */
+// Definimos la interfaz estricta de la sesión
+interface SesionLocalType {
+  cedula: number;
+  id_sucursal: number;
+  descripcion_sucursal: string;
+}
+
 export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
   const [isLoading, setIsLoading] = useState(false);
   const [faltaAnterior, setFaltaAnterior] = useState(false);
@@ -53,35 +54,23 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
   const [bodegas, setBodegas] = useState<BodegaDTO[]>([]);
   const [medicion, setMedicion] = useState<MedicionDTO[]>([]);
   const [picosList, setPicosList] = useState<PicoDTO[]>([]);
-  const [taxilitros, setTaxilitros] = useState<Record<number, string>>({});
-  const { sucursal, user } = useAppContext();
+
   const [blockHeader, setBlockHeader] = useState(false);
+  const [taxilitros, setTaxilitros] = useState<Record<number, string>>({});
+
+  // Estado de sesión tipado correctamente
+  const [sesionLocal, setSesionLocal] = useState<SesionLocalType | null>(null);
 
   // ---------------------------------------------------------------------------
-  // handlePhotoCapture
+  // handlePhotoCapture y removerFoto
   // ---------------------------------------------------------------------------
-
-  /**
-   * Agrega la foto capturada (en base64) al estado de imágenes.
-   */
   async function handlePhotoCapture(base64: string) {
     setBase64Images((prev) => [...prev, base64]);
   }
 
-  // ---------------------------------------------------------------------------
-  // removerFoto
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Muestra un alerta de confirmación para eliminar una foto.
-   * Si el usuario confirma, elimina la foto del estado de imágenes.
-   */
   const removerFoto = (indexParaRemover: number) => {
     Alert.alert("Apagar Foto", "Está seguro de que desea eliminar esta foto?", [
-      {
-        text: "Cancelar",
-        style: "cancel",
-      },
+      { text: "Cancelar", style: "cancel" },
       {
         text: "Remover",
         onPress: () => {
@@ -96,33 +85,30 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
   // ---------------------------------------------------------------------------
   // handleBodegaChange
   // ---------------------------------------------------------------------------
-
-  /**
-   * Actualiza la bodega seleccionada y carga los picos correspondientes
-   * desde la BD local. Limpia taxilitros y picos anteriores.
-   */
-  async function handleBodegaChange(idBodega: string) {
-    setSelectedBodega(idBodega);
-    setTaxilitros({});
-    if (idBodega) {
-      const picos = await getPicosByBodega(Number(idBodega));
-      setPicosList(picos);
-    } else {
-      setPicosList([]);
-    }
+  // Reemplazá la función handleBodegaChange por esto:
+const handleBodegaChange = useCallback(async (idBodega: string) => {
+  setSelectedBodega(idBodega);
+  setTaxilitros({});
+  if (idBodega) {
+    const picos = await getPicosByBodega(Number(idBodega));
+    setPicosList(picos);
+  } else {
+    setPicosList([]);
   }
+}, []); // sin dependencias porque solo usa setters y funciones externas estables
 
   // ---------------------------------------------------------------------------
   // procesarTurno
   // ---------------------------------------------------------------------------
-
-  /**
-   * Valida los datos ingresados, construye el DTO del turno y lo guarda
-   * localmente en la BD (offline-first). Los taxilitros son ingresados
-   * manualmente por el usuario.
-   */
   async function procesarTurno() {
-    // Validar mediciones
+    if (!sesionLocal) {
+      Alert.alert(
+        "Error de sesión",
+        "No se encontró información del usuario activo localmente.",
+      );
+      return;
+    }
+
     if (medicion.length === 0) {
       Alert.alert(
         "Medición requerida",
@@ -131,16 +117,13 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
       return;
     }
 
-    // Validar taxilitros: todos los picos deben tener valor ingresado
     const taxilitrosFaltantes = picosList.filter(
       (p) => !taxilitros[p.id_pico] || taxilitros[p.id_pico].trim() === "",
     );
     if (taxilitrosFaltantes.length > 0) {
       Alert.alert(
         "Taxilitros requeridos",
-        `Faltan taxilitros para: ${taxilitrosFaltantes
-          .map((p) => p.descripcion_pico)
-          .join(", ")}`,
+        `Faltan taxilitros para: ${taxilitrosFaltantes.map((p) => p.descripcion_pico).join(", ")}`,
       );
       return;
     }
@@ -148,7 +131,6 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
     try {
       setIsLoading(true);
 
-      // Construir med_picos desde el ingreso manual del usuario
       const resultadosTotalizadores = picosList.map((pico) => ({
         pico: pico.id_pico,
         totalizador: Number(taxilitros[pico.id_pico]),
@@ -158,16 +140,17 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
       const fecha = now.toISOString().slice(0, 10);
       const hora = now.toTimeString().slice(0, 8);
 
-      const totalizadorLitros = medicion.reduce((acc, cur) => {
-        return acc + (cur.litros ?? 0);
-      }, 0);
+      const totalizadorLitros = medicion.reduce(
+        (acc, cur) => acc + (cur.litros ?? 0),
+        0,
+      );
 
       const nuevoTurno: TurnoDTO = {
-        id_suc: Number(sucursal.id_sucursal),
+        id_suc: Number(sesionLocal.id_sucursal),
         id_bod: Number(selectedBodega),
         fecha,
         hora,
-        ci_playero: Number(user.cedula),
+        ci_playero: Number(sesionLocal.cedula),
         litros: totalizadorLitros,
         observacion: obs + "|" + obsAdicional,
         fotos_observacion: base64Images,
@@ -197,13 +180,11 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
         `El turno ha sido ${inicioTurno ? "iniciado" : "cerrado"} con éxito.`,
       );
 
-      // Remover la bodega procesada de la lista
       const remainBodegas = bodegas.filter(
         (bodega) => Number(bodega.id_bodega) !== Number(selectedBodega),
       );
       setBodegas(remainBodegas);
 
-      // Limpiar estado para la siguiente bodega
       setBlockHeader(true);
       setSelectedBodega("");
       setPicosList([]);
@@ -235,98 +216,125 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
   // Effects
   // ---------------------------------------------------------------------------
 
+  // Captura parámetros de navegación de forma segura sin reactividad infinita
+  const medicionFromParamsApplied = useRef(false);
+
   useEffect(() => {
-    if (route.params?.onMedicion) {
+    if (route.params?.onMedicion && !medicionFromParamsApplied.current) {
+      medicionFromParamsApplied.current = true;
       setMedicion(route.params.onMedicion);
     }
   }, [route.params?.onMedicion]);
 
+  // UN SOLO EFECTO AL MONTAR: Inicializa la sesión de la DB local UNA VEZ
+  const inicializado = useRef(false);
+
   useEffect(() => {
-    fetchTurno();
-  }, []);
+    if (inicializado.current) return; // 🛑 corta si ya corrió
+    inicializado.current = true;
+    async function inicializarPantalla() {
+      try {
+        setIsLoading(true);
+        const datosSesion = await getSucursalUsuarioActivoLocal();
+
+        if (!datosSesion || !datosSesion.id_sucursal) {
+          toastError(
+            "Error de sesión",
+            "No se encontró el usuario o sucursal activa localmente.",
+          );
+          setIsLoading(false);
+          return;
+        }
+
+        // Estructuramos el objeto forzando el tipado completo requerido
+        const sesionFormateada: SesionLocalType = {
+          cedula: Number((datosSesion as any).cedula ?? 0),
+          id_sucursal: Number(datosSesion.id_sucursal),
+          descripcion_sucursal: datosSesion.descripcion_sucursal,
+        };
+
+        setSesionLocal(sesionFormateada);
+
+        // Ejecutamos la carga del turno usando directamente los datos frescos obtenidos
+        await cargarDatosTurno(sesionFormateada.id_sucursal);
+      } catch (error) {
+        console.error("Error inicializando turno:", error);
+        toastError("Error", "No se pudieron inicializar los datos locales.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    inicializarPantalla();
+  }, []); // Array de dependencias vacío para que corra EXACTAMENTE UNA VEZ
 
   // ---------------------------------------------------------------------------
-  // fetchTurno
+  // cargarDatosTurno (Función pura aislada de estados intermedios)
   // ---------------------------------------------------------------------------
+  async function cargarDatosTurno(idSucursal: number) {
+    const data = await getTurnoStatusLocal(idSucursal);
+    const turnoData: StatusTurnoDTO = {
+      status: data.status,
+      Inicio_turno: data.Inicio_turno,
+      Fin_turno: data.Fin_turno,
+      Fin_turno_anterior: data.Fin_turno_anterior,
+    };
 
-  /**
-   * Obtiene el estado actual del turno desde la BD local y determina
-   * si se debe iniciar o cerrar turno. Filtra las bodegas pendientes.
-   */
-  async function fetchTurno() {
-    try {
-      setIsLoading(true);
+    if (turnoData.status === "falta_anterior") {
+      setListaBodegasFaltaAnterior([]);
+      const bodegasFaltantes: BodegaDTO[] = [];
+      for (const idBodega of turnoData.Fin_turno_anterior.falta) {
+        const bodegaData = await getBodegaById(idBodega);
+        if (bodegaData) {
+          bodegasFaltantes.push(bodegaData);
+        }
+      }
+      setListaBodegasFaltaAnterior(bodegasFaltantes); // UN solo setState
+      setFaltaAnterior(true);
+    }
 
-      const data = await getTurnoStatusLocal(sucursal.id_sucursal);
-      const turnoData: StatusTurnoDTO = {
-        status: data.status,
-        Inicio_turno: data.Inicio_turno,
-        Fin_turno: data.Fin_turno,
-        Fin_turno_anterior: data.Fin_turno_anterior,
-      };
+    let statusTurnoEstado = false;
+    if (
+      turnoData.status === "iniciado" ||
+      turnoData.status === "falta_cerrar"
+    ) {
+      statusTurnoEstado = false;
+      setInicioTurno(false);
+    } else {
+      statusTurnoEstado = true;
+      setInicioTurno(true);
+    }
 
-      // Si hay turno anterior sin cerrar, cargar las bodegas faltantes desde BD local
-      if (turnoData.status === "falta_anterior") {
-        setListaBodegasFaltaAnterior([]);
-        for (const idBodega of turnoData.Fin_turno_anterior.falta) {
-          const bodegaData = await getBodegaById(idBodega);
-          if (bodegaData) {
-            setListaBodegasFaltaAnterior((prev) => [...prev, bodegaData]);
+    const todasBodegas = await getBodegasByIdSucursal(idSucursal);
+    if (todasBodegas) {
+      const bodegasFiltradas: BodegaDTO[] = [];
+      todasBodegas.forEach((bodega: BodegaDTO) => {
+        if (statusTurnoEstado) {
+          if (
+            bodega.id_bodega &&
+            turnoData.Inicio_turno.falta.includes(Number(bodega.id_bodega))
+          ) {
+            bodegasFiltradas.push(bodega);
+          }
+        } else {
+          if (
+            bodega.id_bodega &&
+            turnoData.Fin_turno.falta.includes(Number(bodega.id_bodega))
+          ) {
+            bodegasFiltradas.push(bodega);
           }
         }
-        setFaltaAnterior(true);
-      }
-
-      let statusTurnoEstado = false;
-      if (
-        turnoData.status === "iniciado" ||
-        turnoData.status === "falta_cerrar"
-      ) {
-        statusTurnoEstado = false;
-        setInicioTurno(false);
-      } else {
-        statusTurnoEstado = true;
-        setInicioTurno(true);
-      }
-
-      const todasBodegas = await getBodegasByIdSucursal(sucursal.id_sucursal);
-      if (todasBodegas) {
-        const bodegasFiltradas: BodegaDTO[] = [];
-        todasBodegas.forEach((bodega: BodegaDTO) => {
-          if (statusTurnoEstado) {
-            // Iniciar turno: mostrar bodegas que faltan inicio
-            if (
-              bodega.id_bodega &&
-              turnoData.Inicio_turno.falta.includes(Number(bodega.id_bodega))
-            ) {
-              bodegasFiltradas.push(bodega);
-            }
-          } else {
-            // Cerrar turno: mostrar bodegas que faltan fin
-            if (
-              bodega.id_bodega &&
-              turnoData.Fin_turno.falta.includes(Number(bodega.id_bodega))
-            ) {
-              bodegasFiltradas.push(bodega);
-            }
-          }
-        });
-        setBodegas(bodegasFiltradas);
-      }
-    } catch (error) {
-      toastError(
-        "Error al buscar turno",
-        "No se pudo obtener el estado del turno.",
-      );
-    } finally {
-      setIsLoading(false);
+      });
+      setBodegas(bodegasFiltradas);
     }
   }
 
   // ---------------------------------------------------------------------------
+  // Render (Se mantiene intacto)
+  // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
-
   return faltaAnterior ? (
     // Pantalla de advertencia: turno anterior sin cerrar
     <View className="flex-1">
@@ -334,23 +342,24 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
       <View style={styles.overlay}>
         <View style={styles.modalContent}>
           <Text className="font-bold text-red-500 text-center text-2xl underline mb-4">
-            Importente!!!
+            Importante!!!
           </Text>
           <Text className="font-medium text-justify text-xl mb-4">
             En la fecha anterior no se registró el cierre de turno. Favor
             indique el motivo por el cual no se realizó el cierre de:
           </Text>
-          <Text className="font-medium text-justify text-xl mb-4">
-            {listaBodegasFaltaAnterior.map((bodega) => (
-              <Text
-                key={bodega.id_bodega}
-                className="font-medium text-justify text-xl mb-4"
-              >
-                - {bodega.descripcion_bodega}
-              </Text>
-            ))}
-          </Text>
-          <InputCard className="min-h-40" title="Indique el motivo" required>
+          
+          {/* CORRECCIÓN: Eliminado el contenedor <Text> externo duplicado que envolvía al map */}
+          {listaBodegasFaltaAnterior.map((bodega) => (
+            <Text
+              key={bodega.id_bodega}
+              className="font-medium text-justify text-xl mb-2 ml-2"
+            >
+              - {bodega.descripcion_bodega}
+            </Text>
+          ))}
+
+          <InputCard className="min-h-40 mt-4" title="Indique el motivo" required>
             <Input
               value={obsAdicional}
               placeholder="Describa el motivo"
@@ -369,7 +378,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
                 );
                 return;
               }
-              setFaltaAnterior(false);
+                setFaltaAnterior(false);
             }}
           >
             <Text style={styles.buttonText}>Guardar</Text>
@@ -378,13 +387,17 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
       </View>
     </View>
   ) : (
-    // Pantalla principal de turno
+    // SOLUCIÓN: Pantalla principal envuelta en ScrollView para evitar que el contenido y el botón se corten abajo
     <View className="flex-1">
       <ScreenHeader
         title={`${inicioTurno === true ? "Iniciar Turno" : "Cerrar Turno"}`}
         disableBackButton={blockHeader}
       />
-      <View className="flex-1 p-4 gap-4 items-center">
+      <ScrollView 
+        className="flex-1" 
+        contentContainerStyle={{ padding: 16, gap: 16, alignItems: "center" }}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Selección de bodega */}
         <InputCard title="Bodega" required>
           <Select
@@ -410,10 +423,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
                   "Medición existente",
                   "Ya hay una medición inicial cargada. ¿Desea continuar?",
                   [
-                    {
-                      text: "Cancelar",
-                      style: "cancel",
-                    },
+                    { text: "Cancelar", style: "cancel" },
                     {
                       text: "Continuar",
                       onPress: () => {
@@ -438,9 +448,9 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
         {picosList.length > 0 && (
           <InputCard title="Taxilitros por Pico" required>
             {picosList.map((pico) => (
-              <InputCard // ← InputCard anidado por cada pico
+              <InputCard
                 key={pico.id_pico}
-                title={pico.descripcion_pico} // ← el "label" va acá
+                title={pico.descripcion_pico}
                 className="mb-2"
               >
                 <Input
@@ -475,7 +485,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
         {/* Fotos */}
         <InputCard title="Fotos" className="min-h-64">
           <View className="w-full items-center p-4 gap-2">
-            <ScrollView horizontal={true}>
+            <ScrollView horizontal={true} showsHorizontalScrollIndicator={false}>
               {base64Images.map((img, index) => (
                 <Pressable key={index} onPress={() => removerFoto(index)}>
                   <Image
@@ -495,13 +505,13 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
           </View>
         </InputCard>
 
-        {/* Botón principal */}
+        {/* Botón principal (Ahora siempre será accesible escroleando) */}
         <Button
           isLoading={isLoading}
           onPress={procesarTurno}
           title={`${inicioTurno === true ? "Iniciar Turno" : "Cerrar Turno"}`}
         />
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -526,11 +536,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     elevation: 5,
   },
-  title: {
-    fontSize: 18,
-    marginBottom: 20,
-    textAlign: "center",
-  },
+  title: { fontSize: 18, marginBottom: 20, textAlign: "center" },
   button: {
     marginTop: 20,
     backgroundColor: "#007BFF",
@@ -538,9 +544,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 5,
   },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    textAlign: "center",
-  },
+  buttonText: { color: "#fff", fontSize: 16, textAlign: "center" },
 });

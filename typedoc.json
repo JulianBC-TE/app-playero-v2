@@ -1,0 +1,21 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "./src/backend/db/index.ts",
+    "./src/backend/db/services/index.ts",
+    "./src/backend/db/constants/index.ts",
+    "./src/backend/db/seeds/index.ts"
+  ],
+  "entryPointStrategy": "expand",
+  "out": "docs",
+  "name": "Documentación Local DB - Playero",
+  "includeVersion": true,
+  "exclude": [
+    "**/node_modules/**",
+    "**/drizzle/**",
+    "**/*.js"
+  ],
+  "cleanOutputDir": true,
+  "hideGenerator": true,
+  "searchInComments": true
+}

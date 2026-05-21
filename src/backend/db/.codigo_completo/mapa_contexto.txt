@@ -1,0 +1,322 @@
+# Generado: 2026-05-21 10:43:11
+# MAPA DE CONTEXTO (sin código)
+# Carpeta origen: C:\dev\playero_2\mobile-playero\src\backend\db
+# Extensiones incluidas : .css, .html, .js, .jsx, .py, .ts, .tsx
+# Ignorados             : .env, .git, .next, .nuxt, .venv, __pycache__, build, coverage, dist, node_modules, venv
+# Total de archivos     : 28
+
+# ========================================================================
+
+# ÚLTIMOS COMMITS
+# ========================================================================
+#   84558b1 primera version de sync, no testeado
+#   48bf431 Enlazar y utilizar los modulos de db en lugar de api en las llamadas en las pantallas
+#   6ebc83d migracion no probadas de abastecimiento, calibracion, cliente, persona, salida, turno para comunicarse con bd local en lugar de api externa
+#   8a7820a añadidos modulos de bd y manejadores apra http
+#   c89e659 añadidas carpeta backend y bd - SQLite-drizzle
+
+# ÁRBOL DE ARCHIVOS
+# ========================================================================
+
+db/
+  index.ts
+  client.tsx
+  schema.ts
+  constants/
+    index.ts
+  modules/
+    index.ts
+  seeds/
+    index.ts
+  services/
+    index.ts
+    abastecimientoDB.ts
+    authDB.ts
+    bodegaDB.ts
+    calibracionDB.ts
+    clienteDB.ts
+    despachoDB.ts
+  drizzle/
+    migrations.js
+    personaDB.ts
+    picoDB.ts
+    seedLocalDB.ts
+    sucursalDB.ts
+    syncConfig.ts
+    syncService.ts
+    tanqueDB.ts
+    ticketDB.ts
+    traspasoDB.ts
+    turnoBD.ts
+    turnoEstado.ts
+    turnoStatusService.ts
+    usuarioDB.ts
+    vehiculoDB.ts
+
+# ========================================================================
+# FICHA POR ARCHIVO
+# ========================================================================
+
+## index.ts
+   Líneas   : 11
+   Extensión: .ts
+   Importa  : (ninguna detectada)
+
+## client.tsx
+   Líneas   : 57
+   Extensión: .tsx
+   Importa  : react, drizzle-orm/expo-sqlite, expo-sqlite, drizzle-orm/expo-sqlite/migrator, expo-drizzle-studio-plugin, ./drizzle/migrations
+
+## schema.ts
+   Líneas   : 310
+   Extensión: .ts
+   Importa  : drizzle-orm/sqlite-core, drizzle-orm
+
+## constants\index.ts
+   Líneas   : 7
+   Extensión: .ts
+   Importa  : (ninguna detectada)
+
+## modules\index.ts
+   Líneas   : 20
+   Extensión: .ts
+   Importa  : (ninguna detectada)
+
+## seeds\index.ts
+   Líneas   : 6
+   Extensión: .ts
+   Importa  : (ninguna detectada)
+
+## services\index.ts
+   Líneas   : 7
+   Extensión: .ts
+   Importa  : (ninguna detectada)
+
+## modules\abastecimientoDB.ts
+   Líneas   : 146
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, drizzle-orm
+
+## modules\authDB.ts
+   Líneas   : 234
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, drizzle-orm, expo-crypto
+
+## modules\bodegaDB.ts
+   Líneas   : 242
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/BodegaDTO, ../constants/syncConfig, axios
+
+## modules\calibracionDB.ts
+   Líneas   : 132
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, drizzle-orm
+
+## modules\clienteDB.ts
+   Líneas   : 281
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/ClienteDTO, ../constants/syncConfig, axios
+
+## modules\despachoDB.ts
+   Líneas   : 109
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, drizzle-orm
+
+## drizzle\migrations.js
+   Líneas   : 16
+   Extensión: .js
+   Importa  : ./meta/_journal.json, ./0000_parallel_vindicator.sql, ./0001_luxuriant_rattler.sql, ./0002_sudden_princess_powerful.sql
+
+## modules\personaDB.ts
+   Líneas   : 304
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/PersonaDTO, ../constants/syncConfig, axios
+
+## modules\picoDB.ts
+   Líneas   : 190
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/PicosDTO, ../constants/syncConfig, ../schema
+
+## seeds\seedLocalDB.ts
+   Líneas   : 350
+   Extensión: .ts
+   Importa  : @/backend/db/seed/seedLocalDB, @/backend/db/client, expo-crypto, @/storage/storageSucursal, @/storage/storageUse, @/storage/storageAuthToken
+
+## modules\sucursalDB.ts
+   Líneas   : 150
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/sucursalDTO, ../constants/syncConfig, axios
+
+## constants\syncConfig.ts
+   Líneas   : 30
+   Extensión: .ts
+   Importa  : @/backend/api/httpClient
+
+## services\syncService.ts
+   Líneas   : 63
+   Extensión: .ts
+   Importa  : ../constants/syncConfig, ../modules/clienteDB, ../modules/personaDB, ../modules/vehiculoDB, ../modules/sucursalDB, ../modules/bodegaDB, ../modules/picoDB, ../modules/tanqueDB
+
+## modules\tanqueDB.ts
+   Líneas   : 196
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, ../schema, drizzle-orm, @/dto/TanqueDTO, ../constants/syncConfig
+
+## modules\ticketDB.ts
+   Líneas   : 97
+   Extensión: .ts
+   Importa  : drizzle-orm, ../client, ../schema
+
+## modules\traspasoDB.ts
+   Líneas   : 125
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, drizzle-orm
+
+## modules\turnoBD.ts
+   Líneas   : 149
+   Extensión: .ts
+   Importa  : drizzle-orm, ../client, ../schema, ../services/turnoStatusService, ./bodegaDB, @/dto/BodegaDTO, ../constants/turnoEstado
+
+## constants\turnoEstado.ts
+   Líneas   : 12
+   Extensión: .ts
+   Importa  : (ninguna detectada)
+
+## services\turnoStatusService.ts
+   Líneas   : 186
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, ../constants/turnoEstado, drizzle-orm
+
+## modules\usuarioDB.ts
+   Líneas   : 24
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, drizzle-orm
+
+## modules\vehiculoDB.ts
+   Líneas   : 365
+   Extensión: .ts
+   Importa  : @/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/VehiculoDTO, @/utils/AppError, ../constants/syncConfig, axios
+
+# ========================================================================
+# GRAFO DE DEPENDENCIAS INTERNAS
+# ========================================================================
+
+# (Muestra qué archivos del proyecto se importan entre sí)
+
+  client.tsx
+    └─ drizzle\migrations.js
+
+  modules\abastecimientoDB.ts
+    └─ client.tsx
+    └─ schema.ts
+
+  modules\authDB.ts
+    └─ client.tsx
+    └─ schema.ts
+
+  modules\bodegaDB.ts
+    └─ client.tsx
+    └─ schema.ts
+    └─ constants\syncConfig.ts
+
+  modules\calibracionDB.ts
+    └─ client.tsx
+    └─ schema.ts
+
+  modules\clienteDB.ts
+    └─ client.tsx
+    └─ schema.ts
+    └─ constants\syncConfig.ts
+
+  modules\despachoDB.ts
+    └─ client.tsx
+    └─ schema.ts
+
+  modules\personaDB.ts
+    └─ client.tsx
+    └─ schema.ts
+    └─ constants\syncConfig.ts
+
+  modules\picoDB.ts
+    └─ client.tsx
+    └─ schema.ts
+    └─ constants\syncConfig.ts
+    └─ schema.ts
+
+  seeds\seedLocalDB.ts
+    └─ seeds\seedLocalDB.ts
+    └─ client.tsx
+
+  modules\sucursalDB.ts
+    └─ client.tsx
+    └─ schema.ts
+    └─ constants\syncConfig.ts
+
+  services\syncService.ts
+    └─ constants\syncConfig.ts
+    └─ modules\clienteDB.ts
+    └─ modules\personaDB.ts
+    └─ modules\vehiculoDB.ts
+    └─ modules\sucursalDB.ts
+    └─ modules\bodegaDB.ts
+    └─ modules\picoDB.ts
+    └─ modules\tanqueDB.ts
+
+  modules\tanqueDB.ts
+    └─ client.tsx
+    └─ schema.ts
+    └─ schema.ts
+    └─ constants\syncConfig.ts
+
+  modules\ticketDB.ts
+    └─ client.tsx
+    └─ schema.ts
+
+  modules\traspasoDB.ts
+    └─ client.tsx
+    └─ schema.ts
+
+  modules\turnoBD.ts
+    └─ client.tsx
+    └─ schema.ts
+    └─ services\turnoStatusService.ts
+    └─ modules\bodegaDB.ts
+    └─ constants\turnoEstado.ts
+
+  services\turnoStatusService.ts
+    └─ client.tsx
+    └─ schema.ts
+    └─ constants\turnoEstado.ts
+
+  modules\usuarioDB.ts
+    └─ client.tsx
+    └─ schema.ts
+
+  modules\vehiculoDB.ts
+    └─ client.tsx
+    └─ schema.ts
+    └─ constants\syncConfig.ts
+
+# ========================================================================
+# INSTRUCCIONES PARA EL USUARIO
+# ========================================================================
+
+# Este archivo NO contiene código fuente.
+# Úsalo para decidir qué archivos pasarle a la IA.
+# Luego ejecuta el script indicando solo esas carpetas en 'incluir_solo'
+# o usa --solo-cambios si trabajas con git.
+
+
+# ========================================================================
+# ESTIMACIÓN DE TOKENS
+# ========================================================================
+#
+#  Modelo           : Genérico (sin modelo específico)
+#  Caracteres       : 8.192
+#  Tokens estimados : ~2.048
+#  Costo estimado   : no disponible (varía según proveedor)
+#  Context window   : no especificado para este modelo
+#
+#  Nota: los precios y límites pueden haber cambiado. Verificá en
+#  la documentación oficial del modelo antes de tomar decisiones de costo.
+# ========================================================================

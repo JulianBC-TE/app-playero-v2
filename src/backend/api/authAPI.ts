@@ -13,6 +13,7 @@ export type LoginResponse = {
   name: string;
   token: string;
   refresh_token?: string;
+  idSucursal: number;
 };
 
 export type RefreshTokenResponse = {

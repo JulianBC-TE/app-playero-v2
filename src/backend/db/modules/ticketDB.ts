@@ -1,3 +1,7 @@
+/**
+ * @module Backend/DB/Modules/Ticket
+ * @category Database Modules
+ */
 import { eq } from "drizzle-orm";
 import { db } from "../client";
 import { tickets } from "../schema";

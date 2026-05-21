@@ -1,15 +1,14 @@
-// srcDBmodules/clienteDB.ts
-//
-// Módulo de base de datos local para la entidad Cliente.
-//
-// REGLAS DE NEGOCIO:
-//   - Los clientes pueden crearse localmente (offline) y sincronizarse después.
-//   - El campo `sync` indica el estado: 0 = pendiente de sync, 1 = sincronizado.
-//   - saveClientes() hace upsert masivo de datos bajados del servidor (sync=1).
-//   - saveClienteLocal() guarda un cliente creado offline (sync=0).
-//   - getPendientesSync() devuelve los clientes aún no enviados al servidor.
-//   - markAsSynced() marca un cliente como sincronizado tras un POST exitoso.
-
+/**
+ * Módulo de acceso a datos para clientes.
+ *
+ * @remarks
+ * - Los clientes pueden crearse offline (`sync = 0`) y sincronizarse después.
+ * - `saveClientes()` hace upsert masivo de datos del servidor (marca `sync = 1`).
+ * - `saveClienteLocal()` guarda un cliente offline y lanza error si el RUC ya existe.
+ *
+ * @module Backend/DB/Modules/Cliente
+ * @category Database Modules
+ */
 import { db } from "@/backend/db/client";
 import { clientes, syncs } from "@/backend/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -20,12 +19,11 @@ import axios from "axios"; // solo como fallback
 // Clave en tabla syncs para registrar la última sincronización de clientes.
 const SYNC_KEY = "__last_sync_clientes__";
 
-// ---------------------------------------------------------------------------
-// saveClientes
-// Upsert masivo de clientes recibidos del servidor.
-// Todos se marcan como sync=1 (ya están en el servidor).
-// ---------------------------------------------------------------------------
-
+/**
+ * Upsert masivo de clientes recibidos del servidor. Todos quedan con `sync = 1`.
+ *
+ * @param items - Lista de {@link ClienteDTO} a insertar o actualizar.
+ */
 export async function saveClientes(items: ClienteDTO[]): Promise<void> {
   if (items.length === 0) return;
 
@@ -58,12 +56,12 @@ export async function saveClientes(items: ClienteDTO[]): Promise<void> {
     });
 }
 
-// ---------------------------------------------------------------------------
-// saveClienteLocal
-// Guarda un cliente creado offline. Se marca como sync=0 (pendiente).
-// Lanza error si el RUC ya existe.
-// ---------------------------------------------------------------------------
-
+/**
+ * Guarda un cliente creado offline con `sync = 0`.
+ *
+ * @param data - Datos del cliente.
+ * @throws Error si el RUC ya existe en la tabla local.
+ */
 export async function saveClienteLocal(data: ClienteDTO): Promise<void> {
   await db.insert(clientes).values({
     ruc: data.ruc,
@@ -73,11 +71,11 @@ export async function saveClienteLocal(data: ClienteDTO): Promise<void> {
   });
 }
 
-// ---------------------------------------------------------------------------
-// getClientes
-// Devuelve todos los clientes del catálogo local.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve todos los clientes del catálogo local.
+ *
+ * @returns Lista de {@link ClienteDTO}.
+ */
 export async function getClientes(): Promise<ClienteDTO[]> {
   const rows = await db
     .select({
@@ -92,11 +90,12 @@ export async function getClientes(): Promise<ClienteDTO[]> {
   }));
 }
 
-// ---------------------------------------------------------------------------
-// getClienteByRuc
-// Devuelve un cliente por su RUC. Devuelve null si no existe.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve un cliente por su RUC.
+ *
+ * @param ruc - RUC del cliente.
+ * @returns {@link ClienteDTO} o `null` si no existe.
+ */
 export async function getClienteByRuc(ruc: string): Promise<ClienteDTO | null> {
   const rows = await db
     .select({
@@ -115,12 +114,13 @@ export async function getClienteByRuc(ruc: string): Promise<ClienteDTO | null> {
   };
 }
 
-// ---------------------------------------------------------------------------
-// buscarClientes
-// Búsqueda local por RUC o nombre (parcial, case-insensitive).
-// Útil para resultados offline en BuscarCliente.tsx.
-// ---------------------------------------------------------------------------
-
+/**
+ * Búsqueda local por RUC o nombre (parcial, case-insensitive).
+ * Útil para resultados offline en `BuscarCliente.tsx`.
+ *
+ * @param query - Texto a buscar.
+ * @returns Lista de {@link ClienteDTO} que coinciden.
+ */
 export async function buscarClientesLocal(
   query: string,
 ): Promise<ClienteDTO[]> {
@@ -144,11 +144,11 @@ export async function buscarClientesLocal(
     }));
 }
 
-// ---------------------------------------------------------------------------
-// getPendientesSync
-// Devuelve los clientes creados offline que aún no fueron enviados al servidor.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve los clientes creados offline que aún no fueron enviados al servidor.
+ *
+ * @returns Lista de {@link ClienteDTO} con `sync = 0`.
+ */
 export async function getClientesPendientesSync(): Promise<ClienteDTO[]> {
   const rows = await db
     .select({
@@ -164,21 +164,23 @@ export async function getClientesPendientesSync(): Promise<ClienteDTO[]> {
   }));
 }
 
-// ---------------------------------------------------------------------------
-// markAsSynced
-// Marca un cliente como sincronizado (sync=1) tras un POST exitoso al servidor.
-// ---------------------------------------------------------------------------
-
+/**
+ * Marca un cliente como sincronizado (`sync = 1`) tras un POST exitoso al servidor.
+ *
+ * @param ruc - RUC del cliente.
+ */
 export async function markClienteAsSynced(ruc: string): Promise<void> {
   await db.update(clientes).set({ sync: 1 }).where(eq(clientes.ruc, ruc));
 }
 
-// ---------------------------------------------------------------------------
-// actualizarCliente
-// Actualiza los datos de un cliente existente en la BD local.
-// Pone sync=0 si el cambio fue hecho offline (para re-sincronizar).
-// ---------------------------------------------------------------------------
-
+/**
+ * Actualiza los datos de un cliente en la BD local.
+ * Pone `sync = 0` si el cambio fue hecho offline para re-sincronizar posteriormente.
+ *
+ * @param ruc - RUC del cliente a actualizar.
+ * @param data - Campos a modificar (parcial).
+ * @param synced - Si `true`, marca como ya sincronizado (`sync = 1`). Por defecto `false`.
+ */
 export async function actualizarClienteLocal(
   ruc: string,
   data: Partial<ClienteDTO>,
@@ -196,20 +198,20 @@ export async function actualizarClienteLocal(
     .where(eq(clientes.ruc, ruc));
 }
 
-// ---------------------------------------------------------------------------
-// eliminarCliente
-// Elimina un cliente de la BD local.
-// ---------------------------------------------------------------------------
-
+/**
+ * Elimina un cliente de la BD local.
+ *
+ * @param ruc - RUC del cliente a eliminar.
+ */
 export async function eliminarClienteLocal(ruc: string): Promise<void> {
   await db.delete(clientes).where(eq(clientes.ruc, ruc));
 }
 
-// ---------------------------------------------------------------------------
-// getLastSyncDate
-// Devuelve la fecha de la última sincronización con el servidor.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve el timestamp de la última sincronización de clientes.
+ *
+ * @returns Timestamp Unix en ms, o `null` si nunca se sincronizó.
+ */
 export async function getLastSyncDate(): Promise<number | null> {
   try {
     const result = await db
@@ -225,7 +227,13 @@ export async function getLastSyncDate(): Promise<number | null> {
 }
 
 // ====================== SINCRONIZACIÓN ======================
-
+/**
+ * Descarga clientes nuevos/modificados desde el servidor central.
+ *
+ * @param lastTimestamp - Timestamp de la última sync; solo se traen registros posteriores.
+ * @returns Número de clientes sincronizados.
+ * @throws Error si la petición HTTP falla.
+ */
 export async function syncClientesFromCentral(lastTimestamp: number = 0) {
   try {
     const { data } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.clientesGet, {
@@ -245,6 +253,12 @@ export async function syncClientesFromCentral(lastTimestamp: number = 0) {
   }
 }
 
+/**
+ * Envía al servidor central los clientes creados offline pendientes de sync.
+ *
+ * @returns Número de clientes enviados.
+ * @throws Error si la petición HTTP falla.
+ */
 export async function syncClientesToCentral() {
   const pendientes = await getClientesPendientesSync();
   if (pendientes.length === 0) return 0;

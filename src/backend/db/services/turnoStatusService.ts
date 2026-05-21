@@ -1,3 +1,10 @@
+/**
+ * Servicio para consultar y actualizar el estado de los turnos activos.
+ * Encapsula la lógica de negocio de estados (abierto, cerrado, anulado).
+ *
+ * @module Backend/DB/Services
+ * @category Database Services
+ */
 import { db } from "@/backend/db/client";
 import { turnos } from "@/backend/db/schema";
 import { TurnoEstado } from "../constants/turnoEstado";
@@ -137,12 +144,12 @@ export async function calcularEstadoTurno(
         and(
           inArray(turnos.idBodega, idsBodegas),
           eq(turnos.fecha, fechaAnterior),
-          eq(turnos.tipo, "FIN"),
+          eq(turnos.tipo, "fin"),
         ),
       );
 
     const cierrePrevioOK = new Set(
-      turnosPrevios.filter((t) => t.estado === 1).map((t) => t.idBodega),
+      turnosPrevios.filter((t) => t.estado === TurnoEstado.ACTIVO).map((t) => t.idBodega),
     );
 
     finTurnoAnteriorFaltantes = idsBodegas.filter(

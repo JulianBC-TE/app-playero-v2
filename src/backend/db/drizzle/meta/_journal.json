@@ -15,6 +15,13 @@
       "when": 1778508572024,
       "tag": "0001_luxuriant_rattler",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1779191998397,
+      "tag": "0002_sudden_princess_powerful",
+      "breakpoints": true
     }
   ]
 }

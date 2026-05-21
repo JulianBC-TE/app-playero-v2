@@ -1,3 +1,7 @@
+/**
+ * @module Backend/DB/Modules/Turno
+ * @category Database Modules
+ */
 import { eq, desc } from "drizzle-orm";
 import { db } from "../client";
 import { turnos } from "../schema";

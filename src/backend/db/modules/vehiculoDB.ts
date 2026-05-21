@@ -1,5 +1,7 @@
-// srcDBmodules/vehiculoDB.ts
-//
+/**
+ * @module Backend/DB/Modules/Vehiculo
+ * @category Database Modules
+ */
 // Módulo de base de datos local para la entidad Vehículo.
 //
 // REGLAS DE NEGOCIO:

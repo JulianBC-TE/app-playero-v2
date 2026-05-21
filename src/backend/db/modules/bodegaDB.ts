@@ -1,13 +1,15 @@
-// srcDBmodules/bodegaDB.ts
-//
-// Módulo de base de datos para bodegas.
-// Las bodegas son catálogo de solo lectura sincronizado desde el servidor.
-//
-// REGLAS DE NEGOCIO:
-//   - Las bodegas no se crean localmente, solo se descargan del servidor.
-//   - Cada bodega pertenece a una sucursal (idSucursal).
-//   - getBodegasByIdSucursal() filtra por la sucursal activa del contexto.
-//   - El campo `trapaso` indica si la bodega puede ser destino de un traspaso.
+/**
+ * Módulo de acceso a datos para bodegas.
+ * Las bodegas son catálogo de solo lectura descargado desde el servidor.
+ *
+ * @remarks
+ * La sincronización filtra bodegas por reglas de negocio:
+ * se guardan las bodegas de la sucursal activa **y** las habilitadas para traspaso
+ * de otras sucursales.
+ *
+ * @module Backend/DB/Modules/Bodega
+ * @category Database Modules
+ */
 
 import { db } from "@/backend/db/client";
 import { bodegas, syncs } from "@/backend/db/schema";
@@ -19,12 +21,7 @@ import axios from "axios"; // solo como fallback
 // Clave en tabla syncs para registrar la última sincronización de bodegas.
 const SYNC_KEY = "__last_sync_bodegas__";
 
-// ---------------------------------------------------------------------------
-// Tipo extendido interno
-// El DTO público solo tiene id_bodega y descripcion_bodega.
-// Internamente necesitamos idSucursal para filtrar.
-// ---------------------------------------------------------------------------
-
+/** Fila interna extendida con `idSucursal` y `trapaso` para filtrado. */
 type BodegaRow = {
   id_bodega: string;
   descripcion_bodega: string;
@@ -32,11 +29,12 @@ type BodegaRow = {
   trapaso: boolean;
 };
 
-// ---------------------------------------------------------------------------
-// saveBodegas
-// Upsert masivo de bodegas recibidas del servidor.
-// ---------------------------------------------------------------------------
-
+/**
+ * Upsert masivo de bodegas recibidas del servidor.
+ * Registra el timestamp de sincronización en la tabla `syncs`.
+ *
+ * @param items - Array de bodegas a insertar o actualizar.
+ */
 export async function saveBodegas(items: BodegaRow[]): Promise<void> {
   if (items.length === 0) return;
 
@@ -69,11 +67,11 @@ export async function saveBodegas(items: BodegaRow[]): Promise<void> {
     });
 }
 
-// ---------------------------------------------------------------------------
-// getBodegas
-// Devuelve todas las bodegas del catálogo local.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve todas las bodegas del catálogo local.
+ *
+ * @returns Lista de {@link BodegaDTO}.
+ */
 export async function getBodegas(): Promise<BodegaDTO[]> {
   const rows = await db
     .select({
@@ -88,12 +86,13 @@ export async function getBodegas(): Promise<BodegaDTO[]> {
   }));
 }
 
-// ---------------------------------------------------------------------------
-// getBodegasByIdSucursal
-// Devuelve las bodegas que pertenecen a la sucursal activa.
-// Usado en los Select de Turno, Abastecimiento, Traspaso.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve las bodegas que pertenecen a la sucursal activa.
+ * Usado en los selectores de Turno, Abastecimiento y Traspaso.
+ *
+ * @param idSucursal - ID de la sucursal activa del contexto.
+ * @returns Lista de {@link BodegaDTO}.
+ */
 export async function getBodegasByIdSucursal(
   idSucursal: number,
 ): Promise<BodegaDTO[]> {
@@ -111,12 +110,12 @@ export async function getBodegasByIdSucursal(
   }));
 }
 
-// ---------------------------------------------------------------------------
-// getBodegasTraspaso
-// Devuelve las bodegas habilitadas como destino de traspaso.
-// Usado en el Select de bodega destino en la pantalla Traspaso.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve las bodegas habilitadas como destino de traspaso para una sucursal.
+ *
+ * @param idSucursal - ID de la sucursal activa.
+ * @returns Lista de {@link BodegaDTO} con `trapaso = true`.
+ */
 export async function getBodegasTraspaso(
   idSucursal: number,
 ): Promise<BodegaDTO[]> {
@@ -141,11 +140,12 @@ export async function getBodegasTraspaso(
     }));
 }
 
-// ---------------------------------------------------------------------------
-// getBodegaById
-// Devuelve una bodega por su ID.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve una bodega por su ID.
+ *
+ * @param idBodega - ID numérico de la bodega.
+ * @returns {@link BodegaDTO} o `null` si no existe.
+ */
 export async function getBodegaById(
   idBodega: number,
 ): Promise<BodegaDTO | null> {
@@ -166,10 +166,11 @@ export async function getBodegaById(
   };
 }
 
-// ---------------------------------------------------------------------------
-// getLastSyncDate
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve el timestamp de la última sincronización de bodegas.
+ *
+ * @returns Timestamp Unix en ms, o `null` si nunca se sincronizó.
+ */
 export async function getLastSyncDate(): Promise<number | null> {
   try {
     const result = await db
@@ -185,11 +186,15 @@ export async function getLastSyncDate(): Promise<number | null> {
 }
 
 // ====================== SINCRONIZACIÓN ESPECIAL BODEGAS ======================
-
 /**
- * Sincroniza bodegas según reglas de negocio:
- * - Todas las bodegas de la sucursal actual
- * - + Bodegas de otras sucursales que estén habilitadas para traspaso
+ * Sincroniza bodegas desde el servidor central.
+ * Aplica las reglas de negocio:
+ * - Todas las bodegas de la sucursal actual.
+ * - Más las bodegas de otras sucursales habilitadas para traspaso.
+ *
+ * @param idSucursalActual - ID de la sucursal activa.
+ * @returns Número de bodegas guardadas localmente.
+ * @throws Error si la petición HTTP falla.
  */
 export async function syncBodegasFromCentral(idSucursalActual: number): Promise<number> {
   try {

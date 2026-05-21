@@ -1,18 +1,14 @@
-// srcDBmodules/personaDB.ts
-//
-// Módulo de base de datos local para la entidad Persona.
-//
-// REGLAS DE NEGOCIO:
-//   - Las personas pueden crearse localmente (offline) y sincronizarse después.
-//   - El campo `sync` indica el estado: 0 = pendiente de sync, 1 = sincronizado.
-//   - savePersonas() hace upsert masivo de datos bajados del servidor (sync=1).
-//   - savePersonaLocal() guarda una persona creada offline (sync=0).
-//   - getPersonasPendientesSync() devuelve las personas aún no enviadas al servidor.
-//   - markAsSynced() marca una persona como sincronizada tras un POST exitoso.
-//
-// NOTA: La tabla `personas` también es usada por authDB para el login offline.
-//       Este módulo NO toca los campos de autenticación (usuariosApp).
-
+/**
+ * Módulo de acceso a datos para personas físicas.
+ *
+ * @remarks
+ * - Este módulo **no toca** los campos de autenticación (`usuariosApp`).
+ *   Para eso, usar {@link module:Backend/DB/Modules/Auth}.
+ * - `sync = 0` → pendiente; `sync = 1` → sincronizado con el servidor.
+ *
+ * @module Backend/DB/Modules/Persona
+ * @category Database Modules
+ */
 import { db } from "@/backend/db/client";
 import { personas, syncs } from "@/backend/db/schema";
 import { eq, like, or, sql } from "drizzle-orm";
@@ -23,11 +19,10 @@ import axios from "axios"; // solo como fallback
 // Clave en tabla syncs para registrar la última sincronización de personas.
 const SYNC_KEY = "__last_sync_personas__";
 
-// ---------------------------------------------------------------------------
-// savePersonas
-// Upsert masivo de personas recibidas del servidor.
-// Todos se marcan como sync=1 (ya están en el servidor).
-// ---------------------------------------------------------------------------
+/**
+ * Upsert masivo de personas recibidas del servidor.
+ * @param items - Lista de {@link PersonaDTO}.
+ */
 
 export async function savePersonas(items: PersonaDTO[]): Promise<void> {
   if (items.length === 0) return;
@@ -61,11 +56,11 @@ export async function savePersonas(items: PersonaDTO[]): Promise<void> {
     });
 }
 
-// ---------------------------------------------------------------------------
-// savePersonaLocal
-// Guarda una persona creada offline. Se marca como sync=0 (pendiente).
-// Lanza error si la cédula ya existe.
-// ---------------------------------------------------------------------------
+/**
+ * Guarda una persona creada offline con `sync = 0`.
+ * @param data - Datos de la persona.
+ * @throws Error si la cédula ya existe.
+ */
 
 export async function savePersonaLocal(data: PersonaDTO): Promise<void> {
   await db.insert(personas).values({
@@ -76,10 +71,10 @@ export async function savePersonaLocal(data: PersonaDTO): Promise<void> {
   });
 }
 
-// ---------------------------------------------------------------------------
-// getPersonas
-// Devuelve todas las personas del catálogo local.
-// ---------------------------------------------------------------------------
+/**
+ * Devuelve todas las personas del catálogo local.
+ * @returns Lista de {@link PersonaDTO}.
+ */
 
 export async function getPersonas(): Promise<PersonaDTO[]> {
   const rows = await db
@@ -95,10 +90,19 @@ export async function getPersonas(): Promise<PersonaDTO[]> {
   }));
 }
 
+/** Resultado paginado de búsqueda de personas. */
 interface PaginatedPersonas {
   personas: PersonaDTO[];
 }
 
+/**
+ * Devuelve una página de personas filtradas por nombre o cédula.
+ *
+ * @param filter - Texto de búsqueda (vacío = sin filtro).
+ * @param page - Número de página (base 1).
+ * @param limit - Tamaño de página.
+ * @returns Objeto con array `personas` de {@link PersonaDTO}.
+ */
 export async function getPersonasPaginado(
   filter: string,
   page: number,
@@ -131,10 +135,11 @@ export async function getPersonasPaginado(
   return { personas: result };
 }
 
-// ---------------------------------------------------------------------------
-// getPersonaByCedula
-// Devuelve una persona por su cédula. Devuelve null si no existe.
-// ---------------------------------------------------------------------------
+/**
+ * Devuelve una persona por su cédula.
+ * @param cedula - Cédula numérica.
+ * @returns {@link PersonaDTO} o `null`.
+ */
 
 export async function getPersonaByCedula(
   cedula: number,
@@ -156,12 +161,10 @@ export async function getPersonaByCedula(
   };
 }
 
-// ---------------------------------------------------------------------------
-// buscarPersonasLocal
-// Búsqueda local por cédula o nombre (parcial, case-insensitive).
-// Útil para resultados offline en BuscarPersona.tsx.
-// ---------------------------------------------------------------------------
-
+/**
+ * Búsqueda local por cédula o nombre (parcial, case-insensitive).
+ * @param query - Texto a buscar.
+ */
 export async function buscarPersonasLocal(
   query: string,
 ): Promise<PersonaDTO[]> {
@@ -185,11 +188,9 @@ export async function buscarPersonasLocal(
     }));
 }
 
-// ---------------------------------------------------------------------------
-// getPersonasPendientesSync
-// Devuelve las personas creadas offline que aún no fueron enviadas al servidor.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve las personas pendientes de enviar al servidor (`sync = 0`).
+ */
 export async function getPersonasPendientesSync(): Promise<PersonaDTO[]> {
   const rows = await db
     .select({
@@ -205,21 +206,17 @@ export async function getPersonasPendientesSync(): Promise<PersonaDTO[]> {
   }));
 }
 
-// ---------------------------------------------------------------------------
-// markPersonaAsSynced
-// Marca una persona como sincronizada (sync=1) tras un POST exitoso al servidor.
-// ---------------------------------------------------------------------------
-
+/** Marca una persona como sincronizada (`sync = 1`). @param cedula */
 export async function markPersonaAsSynced(cedula: number): Promise<void> {
   await db.update(personas).set({ sync: 1 }).where(eq(personas.cedula, cedula));
 }
 
-// ---------------------------------------------------------------------------
-// actualizarPersonaLocal
-// Actualiza los datos de una persona existente en la BD local.
-// Pone sync=0 si el cambio fue hecho offline (para re-sincronizar).
-// ---------------------------------------------------------------------------
-
+/**
+ * Actualiza una persona en la BD local. Pone `sync = 0` si `synced = false`.
+ * @param cedula - Cédula de la persona.
+ * @param data - Campos a modificar.
+ * @param synced - Si `true`, marca como ya sincronizado. Por defecto `false`.
+ */
 export async function actualizarPersonaLocal(
   cedula: number,
   data: Partial<PersonaDTO>,
@@ -237,21 +234,16 @@ export async function actualizarPersonaLocal(
     .where(eq(personas.cedula, cedula));
 }
 
-// ---------------------------------------------------------------------------
-// eliminarPersonaLocal
-// Elimina una persona de la BD local.
-// ATENCIÓN: No eliminar personas que tengan registros en usuariosApp.
-// ---------------------------------------------------------------------------
-
+/**
+ * Elimina una persona de la BD local.
+ * @remarks No eliminar personas que tengan registros en `usuariosApp`.
+ * @param cedula - Cédula de la persona a eliminar.
+ */
 export async function eliminarPersonaLocal(cedula: number): Promise<void> {
   await db.delete(personas).where(eq(personas.cedula, cedula));
 }
 
-// ---------------------------------------------------------------------------
-// getLastSyncDate
-// Devuelve la fecha de la última sincronización con el servidor.
-// ---------------------------------------------------------------------------
-
+/** Timestamp de la última sync de personas. @returns ms Unix o `null`. */
 export async function getLastSyncDate(): Promise<number | null> {
   try {
     const result = await db
@@ -265,9 +257,11 @@ export async function getLastSyncDate(): Promise<number | null> {
     return null;
   }
 }
-
 // ====================== SINCRONIZACIÓN ======================
-
+/* 
+* Descarga personas nuevas/modificadas desde el servidor central.
+ * @param lastTimestamp - Solo se traen registros posteriores a este timestamp.
+ */
 export async function syncPersonasFromCentral(lastTimestamp: number = 0) {
   try {
     const { data } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.clientesGet, {
@@ -287,6 +281,7 @@ export async function syncPersonasFromCentral(lastTimestamp: number = 0) {
   }
 }
 
+/** Envía al servidor central las personas creadas offline pendientes de sync. */
 export async function syncPersonasToCentral() {
   const pendientes = await getPersonasPendientesSync();
   if (pendientes.length === 0) return 0;

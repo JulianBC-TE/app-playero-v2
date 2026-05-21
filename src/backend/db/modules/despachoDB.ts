@@ -1,29 +1,23 @@
-// srcDBmodules/despachoDB.ts
-//
-// Módulo de lectura de despachos del surtidor desde la BD local.
-// Reemplaza las llamadas a:
-//   - api.post("/api/autorizar", { pico: ... })       → ya no necesaria
-//   - api.get(`/api/salida-control/${idPicoSurtidor}`) → getUltimoDespachoByPico()
-//
-// MAPEO DE COLUMNAS:
-//   totalIni  → taxilitro_inicial (centésimas de litro o unidad del surtidor)
-//   totalFin  → taxilitro_final
-//   volumenMl → volumen despachado en ml → dividir por 1000 para obtener litros
-//   pico      → id del pico surtidor (id_pico_surtidor)
-//
-// REGLAS DE NEGOCIO:
-//   - El surtidor escribe los despachos en la BD local directamente.
-//   - La app lee el despacho más reciente para el pico dado.
-//   - La app hace polling hasta que aparezca un despacho nuevo (fechaHora > referencia).
-
+/**
+ * Módulo de lectura de despachos escritos por el surtidor en la BD local.
+ *
+ * @remarks
+ * El surtidor escribe los despachos directamente en SQLite.
+ * La app hace polling leyendo el despacho más reciente para un pico dado.
+ * Unidades de volumen: mililitros internamente; dividir por 1000 para litros.
+ *
+ * @module Backend/DB/Modules/Despacho
+ * @category Database Modules
+ */
 import { db } from "@/backend/db/client";
 import { despachos } from "@/backend/db/schema";
 import { eq, desc, and, gt } from "drizzle-orm";
 
-// ---------------------------------------------------------------------------
-// DespachoDTO — datos que le interesan a las pantallas de operación
-// ---------------------------------------------------------------------------
-
+/**
+ * DTO de despacho expuesto a las pantallas de operación.
+ * - `litros` = `volumenMl / 1000`
+ * - `taxilitroInicial` / `taxilitroFinal` = lecturas del taxilitro del surtidor
+ */
 export type DespachoDTO = {
   id: number;
   pico: number; // id_pico_surtidor
@@ -33,12 +27,12 @@ export type DespachoDTO = {
   fechaHora: number; // timestamp UNIX ms
 };
 
-// ---------------------------------------------------------------------------
-// getUltimoDespachoByPico
-// Devuelve el despacho más reciente para un pico surtidor.
-// Retorna null si no hay ninguno.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve el despacho más reciente para un pico surtidor.
+ *
+ * @param idPicoSurtidor - ID del pico surtidor (campo `pico` en la tabla).
+ * @returns {@link DespachoDTO} más reciente, o `null` si no hay ninguno.
+ */
 export async function getUltimoDespachoByPico(
   idPicoSurtidor: number,
 ): Promise<DespachoDTO | null> {

@@ -1,4 +1,11 @@
-// src/backend/db/services/syncService.ts
+/**
+ * Servicio de sincronización maestro.
+ * Coordina la ejecución secuencial de todos los módulos de sync
+ * (personas, clientes, vehículos, bodegas, picos, tanques, etc.).
+ *
+ * @module Backend/DB/Services
+ * @category Database Services
+ */
 import { SYNC_CONFIG } from "../constants/syncConfig";
 
 import { syncClientesFromCentral, syncClientesToCentral } from "../modules/clienteDB";

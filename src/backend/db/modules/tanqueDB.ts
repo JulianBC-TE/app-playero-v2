@@ -1,5 +1,7 @@
-// srcDBmodules/tanqueDB.ts
-//
+/**
+ * @module Backend/DB/Modules/Tanque
+ * @category Database Modules
+ */
 // Módulo de base de datos para tanques.
 // Los tanques son catálogo de solo lectura sincronizado desde el servidor.
 //
