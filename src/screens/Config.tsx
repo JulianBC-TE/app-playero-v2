@@ -1,3 +1,7 @@
+/**
+ * @module Playero/Screens/Config
+ * @category Screens
+ */
 import { StackRoutesProps } from "@/route/app.routes";
 import { Button, View } from "react-native";
 import { seedLocalDB } from "@/backend/db/seeds/seedLocalDB";

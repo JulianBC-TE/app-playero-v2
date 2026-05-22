@@ -4,7 +4,7 @@
  *
  * @remarks Solo debe ejecutarse en entornos de desarrollo.
  *
- * @module Backend/DB/Seeds
+ * @module Playero/Backend/DB/Seeds
  * @category Database Seeds
  */
 // Pobla la BD local con datos de prueba que simulan haber hecho una

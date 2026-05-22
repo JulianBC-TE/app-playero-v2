@@ -1,3 +1,7 @@
+/**
+ * @module Playero/Components/EmptyList
+ * @category UI Components
+ */
 import { Text, View } from "react-native";
 import { Frown } from "lucide-react-native";
 

@@ -1,4 +1,9 @@
-// src/backend/db/constants/syncConfig.ts
+/**
+ * Constantes y utilidades relacionadas con el estado de los turnos.
+ *
+ * @module Playero/Backend/DB/Constants/syncConfig
+ * @category Constants
+ */
 import { httpClient } from "@/backend/api/httpClient";
 
 export const SYNC_CONFIG = {

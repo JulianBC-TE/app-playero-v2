@@ -1,5 +1,5 @@
 /**
- * @module Backend/DB/Constants
+ * @module Playero/Backend/DB/Constants
  * @category Constants
  */
 

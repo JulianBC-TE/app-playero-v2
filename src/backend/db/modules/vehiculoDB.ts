@@ -1,5 +1,5 @@
 /**
- * @module Backend/DB/Modules/Vehiculo
+ * @module Playero/Backend/DB/Modules/Vehiculo
  * @category Database Modules
  */
 // Módulo de base de datos local para la entidad Vehículo.
@@ -113,7 +113,7 @@ export async function getVehiculos(): Promise<VehiculoDTO[]> {
 }
 
 // Definimos una interfaz para la respuesta que coincida con lo que espera response.data
-interface PaginatedVehiculos {
+export interface PaginatedVehiculos {
   vehiculos: VehiculoDTO[];
 }
 

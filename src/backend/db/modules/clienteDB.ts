@@ -6,7 +6,7 @@
  * - `saveClientes()` hace upsert masivo de datos del servidor (marca `sync = 1`).
  * - `saveClienteLocal()` guarda un cliente offline y lanza error si el RUC ya existe.
  *
- * @module Backend/DB/Modules/Cliente
+ * @module Playero/Backend/DB/Modules/Cliente
  * @category Database Modules
  */
 import { db } from "@/backend/db/client";
@@ -94,7 +94,7 @@ export async function getClientes(): Promise<ClienteDTO[]> {
  * Devuelve un cliente por su RUC.
  *
  * @param ruc - RUC del cliente.
- * @returns {@link ClienteDTO} o `null` si no existe.
+ * @returns un {@link ClienteDTO} o `null` si no existe.
  */
 export async function getClienteByRuc(ruc: string): Promise<ClienteDTO | null> {
   const rows = await db

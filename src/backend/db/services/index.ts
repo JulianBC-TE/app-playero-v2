@@ -1,7 +1,7 @@
 /**
- * @module Backend/DB/Services
+ * @module Playero/Backend/DB/Services
  * @category Database Services
  */
 
-export * from './syncService';
-export * from './turnoStatusService';
+export * as syncService from './syncService';
+export * as turnoStatusService from './turnoStatusService';

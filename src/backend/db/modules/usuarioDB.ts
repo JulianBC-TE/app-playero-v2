@@ -1,5 +1,5 @@
 /**
- * @module Backend/DB/Modules/Usuario
+ * @module Playero/Backend/DB/Modules/Usuario
  * @category Database Modules
  */
 import { db } from "@/backend/db/client";

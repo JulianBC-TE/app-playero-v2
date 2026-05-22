@@ -1,10 +1,10 @@
 /**
- * @module Backend/API
+ * @module Playero/Backend/API
  * @category HTTP Clients
  */
 
-export * from './httpClient';
-export * from './authAPI';
-export * from './clienteAPI';
-export * from './personaAPI';
-export * from './vehiculoAPI';
+export * as httpClient from './httpClient';
+export * as authApi from './authAPI';
+export * as clientApi from './clienteAPI';
+export * as personaApi from './personaAPI';
+export * as vehiculoApi from './vehiculoAPI';

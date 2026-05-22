@@ -1,3 +1,7 @@
+/**
+ * @module Playero/Components/ScreenHeader
+ * @category UI Components
+ */
 import { useNavigation } from "@react-navigation/native";
 import { ArrowLeftSquare, UserLock } from "lucide-react-native";
 import { Text, TouchableOpacity, View } from "react-native";

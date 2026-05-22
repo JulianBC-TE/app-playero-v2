@@ -1,3 +1,7 @@
+/**
+ * @module Playero/Components/SignatureCapture
+ * @category UI Components
+ */
 import React, { useRef, useState } from "react";
 import Signature, {
 	SignatureViewRef as SignatureRef,

@@ -1,10 +1,8 @@
 /**
- * @module Backend/DB
+ * @module Playero/Backend/DB
  * @category Database
  */
 
-export * from './client';
-export * from './schema';
 export * from './modules';
 export * from './services';
 export * from './constants';

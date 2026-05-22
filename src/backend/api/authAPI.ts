@@ -1,5 +1,7 @@
-// src/backend/api/authAPI.ts
-//
+/**
+ * @module Playero/Backend/API/authApi
+ * @category HTTP Clients
+ */
 // Todas las llamadas HTTP relacionadas a autenticación.
 // Las pantallas y contextos importan de aquí — nunca usan axios directamente.
 

@@ -1,5 +1,5 @@
 /**
- * @module Backend/DB/Seeds
+ * @module Playero/Backend/DB/Seeds
  * @category Database Seeds
  */
 

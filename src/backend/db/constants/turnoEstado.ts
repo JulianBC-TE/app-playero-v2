@@ -1,7 +1,7 @@
 /**
  * Constantes y utilidades relacionadas con el estado de los turnos.
  *
- * @module Backend/DB/Constants
+ * @module Playero/Backend/DB/Constants/TurnoEstado
  * @category Constants
  */
 export enum TurnoEstado {

@@ -5,7 +5,7 @@
  * - Las calibraciones se crean offline con `sync = 0`.
  * - `tipo` puede ser `"VERIFICACION"` o `"CALIBRACION"`.
  *
- * @module Backend/DB/Modules/Calibracion
+ * @module Playero/Backend/DB/Modules/Calibracion
  * @category Database Modules
  */
 import { db } from "@/backend/db/client";

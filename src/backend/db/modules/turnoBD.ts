@@ -1,5 +1,5 @@
 /**
- * @module Backend/DB/Modules/Turno
+ * @module Playero/Backend/DB/Modules/Turno
  * @category Database Modules
  */
 import { eq, desc } from "drizzle-orm";

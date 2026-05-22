@@ -1,5 +1,5 @@
 /**
- * @module Backend/DB/Modules/Traspaso
+ * @module Playero/Backend/DB/Modules/Traspaso
  * @category Database Modules
  */
 // Módulo de base de datos para traspasos.

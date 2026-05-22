@@ -1,5 +1,5 @@
 /**
- * @module Backend/DB/Modules
+ * @module Playero/Backend/DB/Modules
  * @category Database Modules
  */
 

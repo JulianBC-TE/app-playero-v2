@@ -1,5 +1,7 @@
-// src/backend/api/vehiculoAPI.ts
-//
+/**
+ * @module Playero/Backend/API/vehiculoApi
+ * @category HTTP Clients
+ */
 // Todas las llamadas HTTP relacionadas a la entidad Vehículo.
 // Las pantallas y contextos importan de aquí — nunca usan axios directamente.
 //

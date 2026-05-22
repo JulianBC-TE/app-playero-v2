@@ -1,5 +1,7 @@
-// src/backend/api/httpClient.ts
-//
+/**
+ * @module Playero/Backend/API/httpClient
+ * @category HTTP Clients
+ */
 // Cliente HTTP centralizado. Es el único lugar del proyecto que conoce axios.
 // Maneja: baseURL dinámica, token JWT, refresh automático de token, y signOut.
 //

@@ -3,8 +3,9 @@
  * Cada tabla mapea una entidad del dominio y sigue la convención
  * `sync = 0` (pendiente) / `sync = 1` (sincronizado con el servidor).
  *
- * @module Backend/DB/Schema
- * @category Database Schema
+ * @module Playero/Backend/DB/Schema
+ * @category Database
+ * @category Schema
  */
 import { sqliteTable, integer, text, real, primaryKey } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";

@@ -1,5 +1,5 @@
 /**
- * @module Hooks
+ * @module Playero/Hooks
  * @category React Hooks
  */
 

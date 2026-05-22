@@ -1,5 +1,5 @@
 /**
- * @module Backend/DB/Modules/Sucursal
+ * @module Playero/Backend/DB/Modules/Sucursal
  * @category Database Modules
  */
 // Módulo de base de datos para sucursales.

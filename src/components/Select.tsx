@@ -1,9 +1,13 @@
+/**
+ * @module Playero/Components/Select
+ * @category UI Components
+ */
 import { View } from "react-native";
 import { Loading } from "./Loading";
 import { Picker, PickerProps } from "@react-native-picker/picker";
 import { useEffect } from "react";
 
-interface SelectProps<T> extends Partial<PickerProps<string>> {
+export interface SelectProps<T> extends Partial<PickerProps<string>> {
 	isLoading: boolean;
 	data: T[];
 	selectedValue?: string;

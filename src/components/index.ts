@@ -1,5 +1,5 @@
 /**
- * @module Components
+ * @module Playero/Components
  * @category UI Components
  */
 

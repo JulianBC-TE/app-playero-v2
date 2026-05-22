@@ -1,3 +1,7 @@
+/**
+ * @module Playero/Components/Input
+ * @category UI Components
+ */
 import { useState } from "react";
 import { TextInput, View, Text, TextInputProps } from "react-native";
 

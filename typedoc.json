@@ -1,10 +1,12 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "entryPoints": [
-    "./src/backend/db/index.ts",
-    "./src/backend/db/services/index.ts",
-    "./src/backend/db/constants/index.ts",
-    "./src/backend/db/seeds/index.ts"
+    "./src/backend/index.ts",
+    "./src/dto/index.ts",
+    "./src/components/index.ts",
+    "./src/hooks/index.ts",
+    "./src/contexts/index.ts",
+    "./src/screens/index.ts",
   ],
   "entryPointStrategy": "expand",
   "out": "docs",
@@ -17,5 +19,12 @@
   ],
   "cleanOutputDir": true,
   "hideGenerator": true,
-  "searchInComments": true
+  "searchInComments": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "visibilityFilters": {
+    "protected": false,
+    "private": false,
+    "@internal": false
+  }
 }

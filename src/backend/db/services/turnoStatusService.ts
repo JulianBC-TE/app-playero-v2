@@ -2,7 +2,7 @@
  * Servicio para consultar y actualizar el estado de los turnos activos.
  * Encapsula la lógica de negocio de estados (abierto, cerrado, anulado).
  *
- * @module Backend/DB/Services
+ * @module Playero/Backend/DB/Services/turnoStatusService
  * @category Database Services
  */
 import { db } from "@/backend/db/client";
@@ -20,7 +20,7 @@ export type TurnoStatus =
   | "cerrado"
   | "falta_cerrar";
 
-interface StatusResult {
+export interface StatusResult {
   status: TurnoStatus;
   Inicio_turno: {
     ok: boolean;

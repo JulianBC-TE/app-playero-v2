@@ -1,5 +1,5 @@
 /**
- * @module Backend/DB/Modules/Tanque
+ * @module Playero/Backend/DB/Modules/Tanque
  * @category Database Modules
  */
 // Módulo de base de datos para tanques.
@@ -27,7 +27,7 @@ const SYNC_KEY = "__last_sync_tanques__";
 // Internamente también necesitamos idBodega para poder filtrar.
 // ---------------------------------------------------------------------------
 
-type TanqueInput = TanqueDTO & { id_bodega: number };
+export type TanqueInput = TanqueDTO & { id_bodega: number };
 
 // ---------------------------------------------------------------------------
 // saveTanques

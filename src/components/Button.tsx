@@ -1,3 +1,7 @@
+/**
+ * @module Playero/Components/Button
+ * @category UI Components
+ */
 import {
 	TouchableOpacity,
 	Text,

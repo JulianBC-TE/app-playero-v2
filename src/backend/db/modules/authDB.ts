@@ -8,7 +8,7 @@
  * - Login **offline**: solo permitido si la cédula coincide con el último usuario online.
  * - Cambio de usuario en modo offline está bloqueado (requiere conexión).
  *
- * @module Backend/DB/Modules/Auth
+ * @module Playero/Backend/DB/Modules/Auth
  * @category Database Modules
  */
 
@@ -99,25 +99,30 @@ export async function getLastOnlineUser(): Promise<string | null> {
 }
 
 /**
+ * Datos necesarios para guardar el usuario localmente.
+ */
+export type SaveUserLocallyParams = {
+  /** Cédula del usuario. */
+  cedula: string;
+  /** Nombre completo. */
+  name: string;
+  /** Contraseña en texto plano (se hashea internamente). */
+  password: string;
+  /** Token de refresco emitido por el servidor. */
+  refreshToken: string;
+  /** ID de la sucursal asignada al usuario. */
+  idSucursal: number;
+};
+
+/**
  * Persiste los datos del usuario tras un login online exitoso:
  * crea/actualiza `personas` y `usuariosApp` con el hash de contraseña,
  * y registra la cédula como último usuario online.
  *
- * @param params.cedula - Cédula del usuario.
- * @param params.name - Nombre completo.
- * @param params.password - Contraseña en texto plano (se hashea internamente).
- * @param params.refreshToken - Token de refresco emitido por el servidor.
- * @param params.idSucursal - ID de la sucursal asignada al usuario.
+ * @param params - Datos del usuario a guardar.
  */
-export async function saveUserLocally({
-  cedula, name, password, refreshToken, idSucursal,  // ← agregar idSucursal
-}: {
-  cedula:       string;
-  name:         string;
-  password:     string;
-  refreshToken: string;
-  idSucursal:   number;   // ← agregar
-}): Promise<void> {
+export async function saveUserLocally(params: SaveUserLocallyParams): Promise<void> {
+  const { cedula, name, password, refreshToken, idSucursal } = params;
   const salt      = await generateSalt();
   const claveHash = await hashPassword(password, salt);
   const cedulaNum = Number(cedula);

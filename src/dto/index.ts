@@ -1,5 +1,5 @@
 /**
- * @module DTO
+ * @module Playero/DTO
  * @category Data Transfer Objects
  */
 
@@ -16,6 +16,10 @@ export * from './TraspasoDTO';
 export * from './TurnoDTO';
 export * from './userDTO';
 export * from './VehiculoDTO';
+export * from "./CargaZetaDTO";
+export * from "./HistoryByDayDTO";
+export * from "./HistoryDTO";
+export * from "./MenuItens";
 // ⚠️ Estos están mal ubicados actualmente, deberías moverlos aquí:
 // CargaZetaDTO.ts (está en components/)
 // HistoryByDayDTO.ts, HistoryDTO.ts (están en backend/)

@@ -1,3 +1,7 @@
+/**
+ * @module Playero/Components/InputCard
+ * @category UI Components
+ */
 import clsx from "clsx";
 import { View, Text } from "react-native";
 import { LockKeyhole, Check } from "lucide-react-native"; // Importa apenas para garantir que os ícones sejam incluídos no bundle

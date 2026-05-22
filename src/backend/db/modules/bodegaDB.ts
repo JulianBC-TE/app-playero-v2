@@ -7,7 +7,7 @@
  * se guardan las bodegas de la sucursal activa **y** las habilitadas para traspaso
  * de otras sucursales.
  *
- * @module Backend/DB/Modules/Bodega
+ * @module Playero/Backend/DB/Modules/Bodega
  * @category Database Modules
  */
 
@@ -22,7 +22,7 @@ import axios from "axios"; // solo como fallback
 const SYNC_KEY = "__last_sync_bodegas__";
 
 /** Fila interna extendida con `idSucursal` y `trapaso` para filtrado. */
-type BodegaRow = {
+export type BodegaRow = {
   id_bodega: string;
   descripcion_bodega: string;
   id_sucursal: number;
@@ -144,7 +144,7 @@ export async function getBodegasTraspaso(
  * Devuelve una bodega por su ID.
  *
  * @param idBodega - ID numérico de la bodega.
- * @returns {@link BodegaDTO} o `null` si no existe.
+ * @returns un {@link BodegaDTO}. o `null` si no existe.
  */
 export async function getBodegaById(
   idBodega: number,

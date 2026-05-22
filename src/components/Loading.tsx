@@ -1,3 +1,7 @@
+/**
+ * @module Playero/Components/Loading
+ * @category UI Components
+ */
 import { View, ActivityIndicator } from "react-native";
 
 export function Loading() {

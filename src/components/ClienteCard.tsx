@@ -1,3 +1,7 @@
+/**
+ * @module Playero/Components/ClientCard
+ * @category UI Components
+ */
 import {
 	Text,
 	TouchableOpacity,

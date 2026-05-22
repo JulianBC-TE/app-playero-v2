@@ -1,4 +1,7 @@
-// src/backend/api/personaAPI.ts
+/**
+ * @module Playero/Backend/API/personaApi
+ * @category HTTP Clients
+ */// src/backend/api/personaAPI.ts
 //
 // Todas las llamadas HTTP relacionadas a la entidad Persona.
 // Las pantallas y contextos importan de aquí — nunca usan axios directamente.

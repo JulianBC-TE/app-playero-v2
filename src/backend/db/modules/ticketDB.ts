@@ -1,5 +1,5 @@
 /**
- * @module Backend/DB/Modules/Ticket
+ * @module Playero/Backend/DB/Modules/Ticket
  * @category Database Modules
  */
 import { eq } from "drizzle-orm";

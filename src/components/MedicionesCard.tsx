@@ -1,3 +1,7 @@
+/**
+ * @module Playero/Components/MedicionesCard
+ * @category UI Components
+ */
 import {
 	Text,
 	TouchableOpacity,

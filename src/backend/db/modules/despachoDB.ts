@@ -6,7 +6,7 @@
  * La app hace polling leyendo el despacho más reciente para un pico dado.
  * Unidades de volumen: mililitros internamente; dividir por 1000 para litros.
  *
- * @module Backend/DB/Modules/Despacho
+ * @module Playero/Backend/DB/Modules/Despacho
  * @category Database Modules
  */
 import { db } from "@/backend/db/client";

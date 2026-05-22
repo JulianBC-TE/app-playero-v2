@@ -3,7 +3,7 @@
  * Coordina la ejecución secuencial de todos los módulos de sync
  * (personas, clientes, vehículos, bodegas, picos, tanques, etc.).
  *
- * @module Backend/DB/Services
+ * @module Playero/Backend/DB/Services/syncService
  * @category Database Services
  */
 import { SYNC_CONFIG } from "../constants/syncConfig";

@@ -3,10 +3,10 @@
  *
  * @remarks
  * - Este módulo **no toca** los campos de autenticación (`usuariosApp`).
- *   Para eso, usar {@link module:Backend/DB/Modules/Auth}.
+ *   Para eso, usar {@link Playero/Backend.Playero/Backend/DB/Modules/Auth}.
  * - `sync = 0` → pendiente; `sync = 1` → sincronizado con el servidor.
  *
- * @module Backend/DB/Modules/Persona
+ * @module Playero/Backend/DB/Modules/Persona
  * @category Database Modules
  */
 import { db } from "@/backend/db/client";
@@ -91,7 +91,7 @@ export async function getPersonas(): Promise<PersonaDTO[]> {
 }
 
 /** Resultado paginado de búsqueda de personas. */
-interface PaginatedPersonas {
+export interface PaginatedPersonas {
   personas: PersonaDTO[];
 }
 
@@ -138,7 +138,7 @@ export async function getPersonasPaginado(
 /**
  * Devuelve una persona por su cédula.
  * @param cedula - Cédula numérica.
- * @returns {@link PersonaDTO} o `null`.
+ * @returns un {@link PersonaDTO} o `null`.
  */
 
 export async function getPersonaByCedula(

@@ -1,3 +1,7 @@
+/**
+ * @module Playero/Components/MenuCard
+ * @category UI Components
+ */
 import { LucideIcon } from "lucide-react-native";
 import {
 	Text,

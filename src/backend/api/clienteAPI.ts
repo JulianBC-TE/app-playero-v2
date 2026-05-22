@@ -1,5 +1,7 @@
-// src/backend/api/clienteAPI.ts
-//
+/**
+ * @module Playero/Backend/API/clientApi
+ * @category HTTP Clients
+ */
 // Todas las llamadas HTTP relacionadas a la entidad Cliente.
 // Las pantallas y contextos importan de aquí — nunca usan axios directamente.
 //

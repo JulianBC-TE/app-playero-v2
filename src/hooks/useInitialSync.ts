@@ -6,8 +6,15 @@ import { syncSucursalesFromCentral } from "@/backend/db/modules/sucursalDB";
 import { syncBodegasFromCentral } from "@/backend/db/modules/bodegaDB";
 import { syncPicosFromCentral } from "@/backend/db/modules/picoDB";
 import { syncTanquesFromCentral } from "@/backend/db/modules/tanqueDB";
-
-export function useInitialSync(cedula: string, password:string) {
+/**
+ * Hook que provee la función de sincronización inicial de datos desde el servidor central.
+ * Sincroniza sucursales, bodegas, picos, tanques, clientes, personas y vehículos en orden.
+ *
+ * @param cedula - Cédula del usuario autenticado.
+ * @param password - Contraseña del usuario autenticado.
+ * @returns `syncInitialData` función asíncrona que ejecuta la sincronización completa.
+ */
+export function useInitialSync(cedula: string, password: string) {
   async function syncInitialData(): Promise<void> {
     console.log("🚀 Iniciando sincronización inicial completa...");
 

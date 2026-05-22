@@ -1,3 +1,7 @@
+/**
+ * @module Playero/Components/HomeHeaders
+ * @category UI Components
+ */
 import { MaterialIcons } from "@expo/vector-icons";
 import { TouchableOpacity, View, Text } from "react-native";
 import { useAuth } from "@hooks/useAuth";

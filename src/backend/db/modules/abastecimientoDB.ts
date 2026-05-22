@@ -4,7 +4,7 @@
  * Los abastecimientos se crean offline con `sync = 0` y son enviados
  * al servidor por el proceso de sincronización.
  *
- * @module Backend/DB/Modules/Abastecimiento
+ * @module Playero/Backend/DB/Modules/Abastecimiento
  * @category Database Modules
  */
 

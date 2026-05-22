@@ -1,5 +1,5 @@
 /**
- * @module Contexts
+ * @module Playero/Contexts
  * @category React Contexts
  */
 

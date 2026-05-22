@@ -1,6 +1,6 @@
 
 /**
- * @module Backend/DB/Modules/Pico
+ * @module Playero/Backend/DB/Modules/Pico
  * @category Database Modules
  */
 //
