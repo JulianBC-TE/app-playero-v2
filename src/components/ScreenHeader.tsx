@@ -10,6 +10,14 @@ type Props = {
 	disableBackButton?: boolean;
 };
 
+/**
+ * Encabezado estándar para pantallas internas.
+ * Muestra el título y, opcionalmente, un botón para volver a la pantalla anterior.
+ * Cuando el botón de retroceso está deshabilitado, muestra un ícono de candado.
+ *
+ * @param title - Título a mostrar en el encabezado.
+ * @param disableBackButton - Si es `true`, oculta el botón de retroceso y muestra el ícono de bloqueo.
+ */
 export function ScreenHeader({ title, disableBackButton }: Props) {
 	const navigation = useNavigation();
 	return (

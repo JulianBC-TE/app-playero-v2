@@ -5,6 +5,10 @@
 import { Text, View } from "react-native";
 import { Frown } from "lucide-react-native";
 
+/**
+ * Componente de estado vacío que se muestra cuando una lista no tiene resultados.
+ * Renderiza un ícono y el mensaje "No se encontraron resultados".
+ */
 export function EmptyList() {
 	return (
 		<View className='flex-1 items-center justify-center mt-36'>

@@ -12,6 +12,15 @@ export interface TextSearchProps {
 	onPress: () => void;
 }
 
+/**
+ * Campo de búsqueda de solo lectura que actúa como botón.
+ * Al presionarlo dispara un callback, típicamente para abrir una pantalla de búsqueda.
+ *
+ * @param textValue - Texto a mostrar cuando hay un valor seleccionado.
+ * @param placeholder - Texto de placeholder cuando no hay valor. Por defecto `"Buscar..."`.
+ * @param enabled - Si es `false`, deshabilita la interacción. Por defecto `true`.
+ * @param onPress - Callback que se ejecuta al presionar el campo.
+ */
 export function TextSearch({
 	textValue,
 	placeholder,

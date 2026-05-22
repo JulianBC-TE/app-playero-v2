@@ -12,6 +12,14 @@ type Props = TouchableOpacityProps & {
 	data: PersonaDTO;
 };
 
+/**
+ * Tarjeta que muestra el nombre y cédula de una persona.
+ * Acepta todas las props de `TouchableOpacity` para manejar eventos de toque.
+ * Optimizada con `memo` para evitar re-renders innecesarios cuando la cédula
+ * y el nombre no cambian.
+ *
+ * @param data - Objeto {@link PersonaDTO} con los datos de la persona a mostrar.
+ */
 function PersonaCardComponent({ data, ...rest }: Props) {
 	return (
 		<TouchableOpacity {...rest}>

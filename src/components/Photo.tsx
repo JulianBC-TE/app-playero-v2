@@ -35,6 +35,16 @@ const getIconSize = (size: string) => {
   return sizes[size as keyof typeof sizes] || 24;
 };
 
+/**
+ * Botón para capturar fotos desde la cámara del dispositivo.
+ * Comprime y redimensiona la imagen automáticamente antes de devolverla en base64.
+ *
+ * @param form - Forma visual del botón: `"button"` (con fondo) o `"icon"` (solo ícono). Por defecto `"button"`.
+ * @param isLoading - Si es `true`, muestra un spinner y deshabilita el botón.
+ * @param iconSize - Tamaño del ícono de cámara: `"xs"` | `"sm"` | `"md"` | `"lg"` | `"xl"` | `"xxl"` | `"xlg"`. Por defecto `"xl"`.
+ * @param iconColor - Color del ícono en formato hex. Por defecto `"#fff"`.
+ * @param setImage - Callback que recibe la imagen capturada en formato base64.
+ */
 export function Photo({
   form = "button",
   isLoading = false,

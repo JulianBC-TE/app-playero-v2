@@ -15,6 +15,12 @@ type Props = TouchableOpacityProps & {
 	data: ClienteDTO;
 };
 
+/**
+ * Tarjeta que muestra la información de un cliente (nombre y RUC).
+ * Acepta todas las props de `TouchableOpacity` para manejar eventos de toque.
+ *
+ * @param data - Objeto {@link ClienteDTO} con los datos del cliente a mostrar.
+ */
 export function ClienteCard({ data, ...rest }: Props) {
 	return (
 		<TouchableOpacity {...rest}>

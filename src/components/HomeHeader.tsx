@@ -9,6 +9,12 @@ interface HomeHeaderProps {
 	title?: string;
 }
 
+/**
+ * Encabezado de la pantalla de inicio.
+ * Muestra el título de la pantalla y un botón para cerrar sesión.
+ *
+ * @param title - Título a mostrar en el encabezado. Por defecto `"Inicio"`.
+ */
 export function HomeHeader({ title = "Inicio" }: HomeHeaderProps) {
 	const { signOut } = useAuth();
 

@@ -32,6 +32,16 @@ const getIconSize = (size: string) => {
 	return sizes[size as keyof typeof sizes] || 28;
 };
 
+/**
+ * Botón reutilizable con soporte para variantes, estado de carga e ícono opcional.
+ *
+ * @param title - Texto que se muestra en el botón.
+ * @param variant - Estilo visual: `"solid"` (relleno) u `"outline"` (borde). Por defecto `"solid"`.
+ * @param isLoading - Si es `true`, muestra un spinner y deshabilita el botón.
+ * @param icon - Componente de ícono de Lucide a mostrar junto al texto.
+ * @param iconSize - Tamaño del ícono: `"2xs"` | `"xs"` | `"sm"` | `"md"` | `"lg"` | `"xl"`. Por defecto `"xl"`.
+ * @param iconColor - Color del ícono en formato hex. Por defecto `"#fff"`.
+ */
 export function Button({
 	title,
 	variant = "solid",

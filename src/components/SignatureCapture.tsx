@@ -17,6 +17,16 @@ type Props = {
 	persona: PersonaDTO | null;
 };
 
+/**
+ * Componente para capturar la firma digital de una persona.
+ * Muestra un canvas de firma junto al nombre y cédula del firmante.
+ * Permite limpiar y guardar la firma como imagen base64.
+ *
+ * @param onSave - Callback que recibe la firma en formato base64 al guardar.
+ * @param onClear - Callback opcional que se invoca al limpiar el canvas.
+ * @param title - Título opcional a mostrar sobre el área de firma.
+ * @param persona - Objeto {@link PersonaDTO} con los datos del firmante, o `null` si no hay persona.
+ */
 export function SignatureCapture({ onSave, onClear, title, persona }: Props) {
 	const ref = useRef<SignatureRef>(null);
 	const [signatureKey, setSignatureKey] = useState(Date.now()); // gera uma nova key para forçar recriação

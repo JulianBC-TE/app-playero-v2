@@ -16,6 +16,17 @@ export interface SelectProps<T> extends Partial<PickerProps<string>> {
 	valueField: keyof T;
 }
 
+/**
+ * Selector desplegable genérico basado en `Picker`.
+ * Muestra un spinner mientras carga y selecciona automáticamente el primer valor disponible.
+ *
+ * @param data - Lista de ítems a mostrar en el selector.
+ * @param isLoading - Si es `true`, muestra el componente de carga en lugar del selector.
+ * @param selectedValue - Valor actualmente seleccionado.
+ * @param setSelectedValue - Callback que se invoca cuando el usuario cambia la selección.
+ * @param labelField - Clave del objeto `T` a usar como etiqueta visible.
+ * @param valueField - Clave del objeto `T` a usar como valor interno.
+ */
 export function Select<T>({
 	data,
 	selectedValue,

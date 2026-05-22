@@ -15,6 +15,12 @@ type Props = TouchableOpacityProps & {
 	data: MedicionDTO;
 };
 
+/**
+ * Tarjeta que muestra la información de una medición de tanque con opción de eliminarla.
+ * El botón de eliminar acepta todas las props de `TouchableOpacity`.
+ *
+ * @param data - Objeto {@link MedicionDTO} con los datos de la medición a mostrar.
+ */
 export function MedicionesCard({ data, ...rest }: Props) {
 	return (
 		<View className='flex-row items-center justify-between p-2 pr-2 rounded-md mb-3 bg-teColorPrincipalClaro'>

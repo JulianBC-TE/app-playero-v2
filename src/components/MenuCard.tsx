@@ -18,6 +18,17 @@ type Props = TouchableOpacityProps & {
 	turno?: "abierto" | "cerrado" | "pendiente" | "iniciar" | "falta_cerrar";
 };
 
+/**
+ * Tarjeta de menú con ícono y nombre para la pantalla de inicio.
+ * El color de fondo varía según el estado del turno o si está habilitada.
+ * Se deshabilita automáticamente cuando no hay turno activo ni está habilitada.
+ *
+ * @param name - Nombre de la opción de menú a mostrar.
+ * @param icon - Componente de ícono de Lucide a mostrar.
+ * @param route - Ruta de navegación asociada a la tarjeta.
+ * @param enabled - Si es `true`, habilita la tarjeta cuando no hay estado de turno. Por defecto `false`.
+ * @param turno - Estado del turno: `"abierto"` | `"cerrado"` | `"pendiente"` | `"iniciar"` | `"falta_cerrar"`.
+ */
 export function MenuCard({
 	name,
 	icon: IconComponent,

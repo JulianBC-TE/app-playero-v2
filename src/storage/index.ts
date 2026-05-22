@@ -1,5 +1,5 @@
 /**
- * @module Storage
+ * @module Playero/Storage
  * @category Local Storage
  */
 

@@ -11,6 +11,12 @@ type Props = TouchableOpacityProps & {
 	data: VehiculoDTO;
 };
 
+/**
+ * Tarjeta que muestra la información de un vehículo (descripción, ID y RUC).
+ * Acepta todas las props de `TouchableOpacity` para manejar eventos de toque.
+ *
+ * @param data - Objeto {@link VehiculoDTO} con los datos del vehículo a mostrar.
+ */
 export function VehiculoCard({ data, ...rest }: Props) {
 	return (
 		<TouchableOpacity {...rest}>

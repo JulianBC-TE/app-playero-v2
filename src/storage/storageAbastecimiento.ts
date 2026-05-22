@@ -19,47 +19,6 @@ export type AbastecimientoStorageDTO = {
 	turnoCerrado: boolean;
 };
 
-/*export async function saveAbastecimiento(
-	data: AbastecimientoStorageDTO
-): Promise<void> {
-	try {
-		await AsyncStorage.setItem(ABASTECIMIENTO_STORAGE, JSON.stringify(data));
-	} catch (error) {
-		throw error;
-	}
-}*/
-
-/*export async function removeAbastecimiento(): Promise<void> {
-	try {
-		await AsyncStorage.removeItem(ABASTECIMIENTO_STORAGE);
-	} catch (error) {
-		throw error;
-	}
-}*/
-
-/*export async function getStorageAbastecimiento(): Promise<AbastecimientoStorageDTO | null> {
-	try {
-		const storage = await AsyncStorage.getItem(ABASTECIMIENTO_STORAGE);
-		if (!storage) return null;
-		const parsed: AbastecimientoStorageDTO = JSON.parse(storage);
-		// Solo restaurar si hay algo significativo guardado
-		const tieneEstado =
-			parsed.ordenCompra !== "" ||
-			parsed.remision !== "" ||
-			parsed.litros !== "" ||
-			parsed.base64Images.length > 0 ||
-			parsed.cargaZeta !== null ||
-			parsed.medicionInicial.length > 0;
-		return tieneEstado ? parsed : null;
-	} catch (error) {
-		console.log("[storageAbastecimiento] error al leer:", error);
-		return null;
-	}
-}*/
-
-// En storageAbastecimiento.ts — guardá las fotos en keys separados
-// storageAbastecimiento.ts
-
 export async function saveAbastecimiento(estado: AbastecimientoStorageDTO) {
   try {
     const { base64Images, base64FotoObs, medicionInicial, medicionFinal, ...resto } = estado;

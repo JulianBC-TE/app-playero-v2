@@ -6,6 +6,17 @@ import clsx from "clsx";
 import { View, Text } from "react-native";
 import { LockKeyhole, Check } from "lucide-react-native"; // Importa apenas para garantir que os ícones sejam incluídos no bundle
 
+/**
+ * Contenedor con título para agrupar campos de formulario.
+ * Soporta indicador de campo requerido, verificado y bloqueado.
+ *
+ * @param title - Título que se muestra en la parte superior de la tarjeta.
+ * @param children - Contenido interno del contenedor.
+ * @param required - Si es `true`, muestra un asterisco rojo o un check verde si está verificado.
+ * @param verified - Si es `true`, reemplaza el asterisco por un ícono de check verde.
+ * @param locked - Si es `true`, muestra un ícono de candado en lugar del indicador de requerido.
+ * @param className - Clases adicionales para personalizar el estilo del contenedor.
+ */
 export function InputCard({
 	title,
 	children,

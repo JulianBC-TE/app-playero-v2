@@ -12,6 +12,15 @@ type Props = TextInputProps & {
 	align?: "left" | "center" | "right";
 };
 
+/**
+ * Campo de texto personalizado con soporte para estado de foco, error y modo solo lectura.
+ * Extiende `TextInputProps` de React Native.
+ *
+ * @param isReadOnly - Si es `true`, el campo no es editable. Por defecto `false`.
+ * @param isInvalid - Marca el campo como inválido mostrando borde rojo.
+ * @param errorMessage - Mensaje de error a mostrar debajo del campo.
+ * @param align - Alineación del texto: `"left"` | `"center"` | `"right"`. Por defecto `"left"`.
+ */
 export function Input({
 	isReadOnly = false,
 	errorMessage = null,
