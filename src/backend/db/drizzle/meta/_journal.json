@@ -22,6 +22,20 @@
       "when": 1779191998397,
       "tag": "0002_sudden_princess_powerful",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1779459399276,
+      "tag": "0003_aberrant_vertigo",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1779461880969,
+      "tag": "0004_tearful_scalphunter",
+      "breakpoints": true
     }
   ]
 }

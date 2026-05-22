@@ -196,7 +196,7 @@ export const despachos = sqliteTable("despachos", {
   clienteId: text("cliente_id"),
   volTanqueMl: integer("vol_tanque_ml"),
   creadoEn: integer("creado_en").notNull().$defaultFn(() => Date.now()),
-  sync: integer("sync", { mode: "boolean" }),
+  sync: integer("sync").notNull().default(0),
   proces: integer("proces", { mode: "boolean" }),
 });
 
@@ -245,6 +245,60 @@ export const habilitadosTrapaso = sqliteTable(
   })
 );
 
+/**
+ * Tabla intermedia para la relación muchos a muchos entre usuarios y bodegas.
+ * Define qué bodegas están bajo el control/mando de qué usuario de la app.
+ */
+export const usuariosBodegas = sqliteTable(
+  "usuarios_bodegas",
+  {
+    cedula: integer("cedula")
+      .notNull(), // FK -> usuariosApp.cedula
+    idBodega: integer("id_bodega")
+      .notNull(), // FK -> bodegas.id_bodega
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.cedula, table.idBodega],
+    }),
+  })
+);
+
+/**
+ * Tabla de módulos habilitados por usuario de la app móvil.
+ * Controla el acceso a las funciones de la interfaz.
+ * En la BD se guarda como 0 (deshabilitado) / 1 (habilitado).
+ */
+export const modulosUsuarios = sqliteTable("modulos_usuarios", {
+  // Clave primaria y foránea que conecta directamente con el usuario
+  cedula: integer("cedula").primaryKey(), // FK → usuariosApp.cedula
+
+  // Campos de módulos (en BD: 0 o 1 / en TS: false o true)
+  abastecimiento: integer("abastecimiento", { mode: "boolean" })
+    .notNull()
+    .default(false),
+    
+  calibracion: integer("calibracion", { mode: "boolean" })
+    .notNull()
+    .default(false),
+    
+  traspaso: integer("traspaso", { mode: "boolean" })
+    .notNull()
+    .default(false),
+    
+  salida: integer("salida", { mode: "boolean" })
+    .notNull()
+    .default(false),
+    
+  vehiculo: integer("vehiculo", { mode: "boolean" })
+    .notNull()
+    .default(false),
+    
+  persona: integer("persona", { mode: "boolean" })
+    .notNull()
+    .default(false),
+});
+
 // ==================== RELACIONES ====================
 /** Relación 1-a-1 personas → usuariosApp. */
 export const personasRelations = relations(personas, ({ one }) => ({
@@ -276,6 +330,8 @@ export const bodegasRelations = relations(bodegas, ({ one, many }) => ({
   }),
   picos: many(picos),
   tanques: many(tanques),
+  // Nueva relación: una bodega puede estar controlada por muchos usuarios (vía intermedia)
+  usuariosControladores: many(usuariosBodegas), 
 }));
 
 /** Relaciones de habilitadosTrapaso → sucursales y bodegas. */
@@ -295,17 +351,40 @@ export const habilitadosTrapasoRelations = relations(
 );
 
 /** Relaciones de usuariosApp → personas y sucursales. */
-export const usuariosAppRelations = relations(
-  usuariosApp,
-  ({ one }) => ({
-    persona: one(personas, {
-      fields: [usuariosApp.cedula],
-      references: [personas.cedula],
-    }),
+export const usuariosAppRelations = relations(usuariosApp, ({ one, many }) => ({
+  persona: one(personas, {
+    fields: [usuariosApp.cedula],
+    references: [personas.cedula],
+  }),
+  sucursal: one(sucursales, {
+    fields: [usuariosApp.idSucursal],
+    references: [sucursales.idSucursal],
+  }),
+  bodegasControladas: many(usuariosBodegas), 
+  
+  // Nueva relación 1 a 1: El usuario tiene un único perfil de módulos
+  modulos: one(modulosUsuarios, {
+    fields: [usuariosApp.cedula],
+    references: [modulosUsuarios.cedula],
+  }),
+}));
 
-    sucursal: one(sucursales, {
-      fields: [usuariosApp.idSucursal],
-      references: [sucursales.idSucursal],
-    }),
-  })
-);
+/** Relaciones de la tabla intermedia usuariosBodegas */
+export const usuariosBodegasRelations = relations(usuariosBodegas, ({ one }) => ({
+  usuario: one(usuariosApp, {
+    fields: [usuariosBodegas.cedula],
+    references: [usuariosApp.cedula],
+  }),
+  bodega: one(bodegas, {
+    fields: [usuariosBodegas.idBodega],
+    references: [bodegas.idBodega],
+  }),
+}));
+
+/** Relación 1-a-1 modulosUsuarios → usuariosApp. */
+export const modulosUsuariosRelations = relations(modulosUsuarios, ({ one }) => ({
+  usuario: one(usuariosApp, {
+    fields: [modulosUsuarios.cedula],
+    references: [usuariosApp.cedula],
+  }),
+}));
