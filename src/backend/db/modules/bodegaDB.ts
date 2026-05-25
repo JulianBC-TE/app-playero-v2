@@ -16,6 +16,7 @@ import { bodegas, syncs } from "@/backend/db/schema";
 import { eq } from "drizzle-orm";
 import { BodegaDTO } from "@/dto/BodegaDTO";
 import { SYNC_CONFIG } from "../constants/syncConfig";
+import { usuariosBodegas } from "@/backend/db/schema";
 import axios from "axios"; // solo como fallback
 
 // Clave en tabla syncs para registrar la última sincronización de bodegas.
@@ -185,58 +186,102 @@ export async function getLastSyncDate(): Promise<number | null> {
   }
 }
 
-// ====================== SINCRONIZACIÓN ESPECIAL BODEGAS ======================
+// ---------------------------------------------------------------------------
+// getIdsBodegasDelUsuario
+// Lee la tabla intermedia y devuelve los IDs autorizados para el operario.
+// La usan picoDB y tanqueDB como filtro antes de llamar a la API.
+// ---------------------------------------------------------------------------
+
 /**
- * Sincroniza bodegas desde el servidor central.
- * Aplica las reglas de negocio:
- * - Todas las bodegas de la sucursal actual.
- * - Más las bodegas de otras sucursales habilitadas para traspaso.
+ * Devuelve los IDs de bodegas autorizadas para un operario desde la BD local.
+ * No requiere internet.
  *
- * @param idSucursalActual - ID de la sucursal activa.
- * @returns Número de bodegas guardadas localmente.
- * @throws Error si la petición HTTP falla.
+ * @param cedula - Cédula del operario.
+ * @returns Array de `idBodega` autorizados, o `[]` si no hay registros.
  */
-export async function syncBodegasFromCentral(idSucursalActual: number): Promise<number> {
+export async function getIdsBodegasDelUsuario(cedula: string): Promise<number[]> {
   try {
-    console.log(`🔄 Sincronizando bodegas para sucursal ${idSucursalActual}...`);
+    const rows = await db
+      .select({ idBodega: usuariosBodegas.idBodega })
+      .from(usuariosBodegas)
+      .where(eq(usuariosBodegas.cedula, Number(cedula)));
 
-    // 1. Traer todas las bodegas
-    const { data: todasBodegas } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.bodegas);
-
-    // 2. Traer habilitados para traspaso
-    const { data: habilitados } = await SYNC_CONFIG.http.get('/api/habilitados-traspaso');
-
-    if (!Array.isArray(todasBodegas)) {
-      console.warn("⚠️ No se recibieron bodegas del servidor");
-      return 0;
-    }
-
-    // Convertir habilitados a un Set para búsqueda rápida
-    const habilitadosSet = new Set(
-      Array.isArray(habilitados) 
-        ? habilitados.map((h: any) => Number(h.id_bodega)) 
-        : []
-    );
-
-    // 3. Filtrar según reglas
-    const bodegasAFiltrar = todasBodegas.filter((b: any) => {
-      const idBodega = Number(b.id_bodega);
-      const idSucursalBodega = Number(b.id_sucursal);
-
-      return (
-        idSucursalBodega === idSucursalActual ||           // Bodegas de mi sucursal
-        habilitadosSet.has(idBodega)                       // Bodegas habilitadas para traspaso
-      );
-    });
-
-    // 4. Guardar en local
-    await saveBodegas(bodegasAFiltrar);
-
-    console.log(`✅ ${bodegasAFiltrar.length} bodegas guardadas localmente (de ${todasBodegas.length} totales)`);
-    return bodegasAFiltrar.length;
-
+    return rows.map((r) => r.idBodega);
   } catch (error) {
-    console.error("❌ Error en syncBodegasFromCentral:", error);
-    throw error;
+    console.error("[DB] Error al obtener bodegas del usuario:", error);
+    return [];
   }
+}
+
+// ---------------------------------------------------------------------------
+// syncBodegasDelOperario
+// Reemplaza la sincronización masiva anterior.
+// Transacción: limpia + guarda bodegas del operario en usuarios_bodegas,
+// y hace upsert de las bodegas en la tabla principal.
+// ---------------------------------------------------------------------------
+
+/**
+ * Sincroniza las bodegas autorizadas para un operario específico.
+ *
+ * Pasos en una sola transacción:
+ * 1. Elimina los registros previos de `usuarios_bodegas` para esa cédula.
+ * 2. Llama al endpoint `/api/bodegas/operario/:cedula` que devuelve
+ *    solo las bodegas de ese operario.
+ * 3. Hace upsert de las bodegas en la tabla `bodegas`.
+ * 4. Inserta las relaciones en `usuarios_bodegas`.
+ *
+ * @param cedula - Cédula del operario autenticado.
+ * @returns Cantidad de bodegas sincronizadas.
+ * @throws Si la llamada al servidor falla.
+ */
+export async function syncBodegasDelOperario(cedula: string): Promise<number> {
+  console.log(`🔄 Sincronizando bodegas del operario ${cedula}...`);
+
+  // Llamada a la API — solo las bodegas de este operario
+  const { data: bodegasServidor } = await SYNC_CONFIG.http.get(
+    `${SYNC_CONFIG.endpoints.bodegas}/operario/${cedula}`
+  );
+
+  if (!Array.isArray(bodegasServidor) || bodegasServidor.length === 0) {
+    console.log("📭 No se recibieron bodegas para este operario");
+    return 0;
+  }
+
+  const cedulaNum = Number(cedula);
+
+  await db.transaction(async (tx) => {
+    // 1. Limpiar la relación anterior del operario
+    await tx
+      .delete(usuariosBodegas)
+      .where(eq(usuariosBodegas.cedula, cedulaNum));
+
+    // 2. Upsert de cada bodega en la tabla principal
+    for (const b of bodegasServidor) {
+      await tx
+        .insert(bodegas)
+        .values({
+          idBodega:          b.id_bodega,
+          descripcionBodega: b.descripcion_bodega,
+          idSucursal:        b.id_sucursal,
+          trapaso:           b.trapaso ?? false,
+        })
+        .onConflictDoUpdate({
+          target: bodegas.idBodega,
+          set: {
+            descripcionBodega: b.descripcion_bodega,
+            idSucursal:        b.id_sucursal,
+            trapaso:           b.trapaso ?? false,
+          },
+        });
+
+      // 3. Insertar en la tabla intermedia
+      await tx
+        .insert(usuariosBodegas)
+        .values({ cedula: cedulaNum, idBodega: b.id_bodega })
+        .onConflictDoNothing();
+    }
+  });
+
+  console.log(`✅ ${bodegasServidor.length} bodegas sincronizadas para cédula ${cedula}`);
+  return bodegasServidor.length;
 }

@@ -11,38 +11,10 @@
 import { db } from "@/backend/db/client";
 import { calibraciones, syncs } from "@/backend/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { CalibracionDTO } from "@/dto/CalibracionDTO";
+
 
 const SYNC_KEY = "__last_sync_calibraciones__";
-
-// ---------------------------------------------------------------------------
-// Tipos
-// ---------------------------------------------------------------------------
-/** Detalle de una medición individual de calibración (balde de prueba). */
-export type CalibracionDetalleInput = {
-  val_medicion: string;
-  foto_med_balde: string;
-  taxilitro_carga: string;
-};
-
-/** Payload completo de una calibración para persistir y enviar al servidor. */
-export type CalibracionInput = {
-  fecha_hora: string;
-  hora: string;
-  bodega: number;
-  obs_gral: string;
-  ci_encargado: number;
-  nombre_encargado: string;
-  pico: number;
-  taxilitro_inicial: number;
-  taxilitro_final: number;
-  nro_precinto_retirado: string;
-  nro_precinto_colocado: string;
-  foto_precinto_retirado: string;
-  foto_precinto_colocado: string;
-  firma_calibrador: string;
-  tipo_operacion: "VERIFICACION" | "CALIBRACION";
-  detalles: CalibracionDetalleInput[];
-};
 
 /**
  * Inserta un registro de calibración pendiente de sincronización.
@@ -50,18 +22,14 @@ export type CalibracionInput = {
  * @param input - Datos de la calibración.
  * @returns ID generado por SQLite.
  */
-export async function saveCalibracionLocal(
-  input: CalibracionInput,
-): Promise<number> {
+export async function saveCalibracionLocal(dto: CalibracionDTO): Promise<number> {
   const result = await db.insert(calibraciones).values({
-    json: JSON.stringify(input),
-    tipo: input.tipo_operacion,
+    json: JSON.stringify(dto),
+    tipo: dto.tipo_operacion,
     sync: 0,
     fecha: Date.now(),
     hora: Date.now(),
   });
-
-  // drizzle-orm expo-sqlite devuelve lastInsertRowId en result
   return (result as any).lastInsertRowId ?? 0;
 }
 
@@ -72,15 +40,10 @@ export async function saveCalibracionLocal(
  * @returns Lista con `json` parseado a {@link CalibracionInput}.
  */
 export async function getCalibracionesPendientes() {
-  const rows = await db
-    .select()
-    .from(calibraciones)
-    .where(eq(calibraciones.sync, 0))
-    .orderBy(desc(calibraciones.fecha));
-
+  const rows = await db.select().from(calibraciones).where(eq(calibraciones.sync, 0)).orderBy(desc(calibraciones.fecha));
   return rows.map((r) => ({
     ...r,
-    json: JSON.parse(r.json) as CalibracionInput,
+    dto: JSON.parse(r.json) as CalibracionDTO,
   }));
 }
 

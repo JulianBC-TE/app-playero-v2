@@ -8,6 +8,7 @@ import { turnos } from "../schema";
 import { calcularEstadoTurno } from "../services/turnoStatusService";
 import { getBodegasByIdSucursal } from "./bodegaDB";
 import { BodegaDTO } from "@/dto/BodegaDTO";
+import { TurnoDTO } from "@/dto/TurnoDTO";
 import { TurnoEstado } from "../constants/turnoEstado";
 
 /**
@@ -23,28 +24,26 @@ import { TurnoEstado } from "../constants/turnoEstado";
  */
 export async function crearTurnoLocal({
   idBodega,
-  json,
+  dto,
   tipo,
   fecha,
   hora,
 }: {
   idBodega: number;
-  json: unknown;
-  tipo: string;
+  dto: TurnoDTO;
+  tipo: "APERTURA" | "CIERRE";
   fecha?: number;
   hora?: number;
 }) {
-  const result = await db.insert(turnos).values({
+  return db.insert(turnos).values({
     idBodega,
-    json: JSON.stringify(json),
+    json: JSON.stringify(dto),
     tipo,
     fecha,
     hora,
     sync: 0,
     estado: 1,
   });
-
-  return result;
 }
 
 /**
@@ -58,13 +57,8 @@ export async function getTurnoById(idTurno: number) {
     .select()
     .from(turnos)
     .where(eq(turnos.idTurno, idTurno));
-
   if (!result.length) return null;
-
-  return {
-    ...result[0],
-    json: JSON.parse(result[0].json),
-  };
+  return { ...result[0], dto: JSON.parse(result[0].json) as TurnoDTO };
 }
 
 /**
@@ -75,10 +69,9 @@ export async function getTurnoById(idTurno: number) {
  */
 export async function getTurnosPendientes() {
   const result = await db.select().from(turnos).where(eq(turnos.sync, 0));
-
   return result.map((t) => ({
     ...t,
-    json: JSON.parse(t.json),
+    dto: JSON.parse(t.json) as TurnoDTO,
   }));
 }
 

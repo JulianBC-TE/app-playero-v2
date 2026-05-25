@@ -19,6 +19,8 @@ import { eq } from "drizzle-orm";
 import { PicoDTO } from "@/dto/PicosDTO";
 import { SYNC_CONFIG } from "../constants/syncConfig";
 import { bodegas } from "../schema";   // ← Agregar esta línea
+import { getIdsBodegasDelUsuario } from "./bodegaDB";
+
 
 // Clave en tabla syncs para registrar la última sincronización de picos.
 const SYNC_KEY = "__last_sync_picos__";
@@ -155,40 +157,43 @@ export async function getLastSyncDate(): Promise<number | null> {
 }
 
 // ====================== SINCRONIZACIÓN ======================
+// ---------------------------------------------------------------------------
+// syncPicosDelOperario  (reemplaza a syncPicosFromCentral)
+// Envía los IDs de bodegas autorizadas como filtro a la API.
+// ---------------------------------------------------------------------------
 
 /**
- * Trae TODOS los picos desde el servidor y filtra localmente
- * solo aquellos cuya bodega ya esté guardada en la BD local.
+ * Descarga únicamente los picos de las bodegas autorizadas para el operario.
+ * Lee los IDs desde `usuarios_bodegas` (sin internet) y los envía
+ * como query param a la API para que filtre en el servidor.
+ *
+ * @param cedula - Cédula del operario autenticado.
+ * @returns Cantidad de picos sincronizados.
+ * @throws Si la llamada al servidor falla.
  */
-export async function syncPicosFromCentral(): Promise<number> {
-  try {
-    console.log("🔄 Sincronizando picos desde central...");
+export async function syncPicosDelOperario(cedula: string): Promise<number> {
+  console.log(`🔄 Sincronizando picos del operario ${cedula}...`);
 
-    const { data: todosPicos } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.picos);
+  const idsBodegas = await getIdsBodegasDelUsuario(cedula);
 
-    if (!Array.isArray(todosPicos) || todosPicos.length === 0) {
-      console.log("📭 No se recibieron picos");
-      return 0;
-    }
-
-    // Obtener IDs de bodegas que tenemos guardadas localmente
-    const bodegasLocales = await db
-      .select({ idBodega: bodegas.idBodega })
-      .from(bodegas);
-
-    const bodegasSet = new Set(bodegasLocales.map(b => b.idBodega));
-
-    // Filtrar solo picos de bodegas que tenemos
-    const picosFiltrados = todosPicos.filter((p: any) => {
-      return bodegasSet.has(Number(p.id_bodega));
-    });
-
-    await savePicos(picosFiltrados);
-
-    console.log(`✅ ${picosFiltrados.length} picos guardados (de ${todosPicos.length} totales)`);
-    return picosFiltrados.length;
-  } catch (error) {
-    console.error("❌ Error en syncPicosFromCentral:", error);
-    throw error;
+  if (idsBodegas.length === 0) {
+    console.log("⚠️ Sin bodegas autorizadas — se omite sync de picos");
+    return 0;
   }
+
+  // Enviar los IDs como query param: /api/picos?bodegas=1,2,3
+  const { data: picosServidor } = await SYNC_CONFIG.http.get(
+    SYNC_CONFIG.endpoints.picos,
+    { params: { bodegas: idsBodegas.join(",") } }
+  );
+
+  if (!Array.isArray(picosServidor) || picosServidor.length === 0) {
+    console.log("📭 No se recibieron picos");
+    return 0;
+  }
+
+  await savePicos(picosServidor);
+
+  console.log(`✅ ${picosServidor.length} picos sincronizados`);
+  return picosServidor.length;
 }

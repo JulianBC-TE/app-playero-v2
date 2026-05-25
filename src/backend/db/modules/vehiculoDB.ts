@@ -10,7 +10,7 @@
 //   - saveVehiculos() hace upsert masivo de datos bajados del servidor (sync=1).
 //   - saveVehiculoLocal() guarda un vehículo creado offline (sync=0).
 //   - getVehiculosPendientesSync() devuelve los vehículos aún no enviados al servidor.
-//   - markAsSynced() marca un vehículo como sincronizado tras un POST exitoso.
+//   - markVehiculoAsSynced() marca un vehículo como sincronizado tras un POST exitoso.
 //   - getVehiculosByRuc() filtra por el RUC del cliente propietario.
 
 import { db } from "@/backend/db/client";
@@ -19,7 +19,6 @@ import { eq, like, or } from "drizzle-orm";
 import { VehiculoDTO } from "@/dto/VehiculoDTO";
 import { AppError } from "@/utils/AppError";
 import { SYNC_CONFIG } from "../constants/syncConfig";
-import axios from "axios"; // solo como fallback
 
 // Clave en tabla syncs para registrar la última sincronización de vehículos.
 const SYNC_KEY = "__last_sync_vehiculos__";
@@ -77,10 +76,9 @@ export async function saveVehiculoLocal(data: VehiculoDTO): Promise<void> {
       descripcionVehiculo: data.descripcion_vehiculo,
       ruc: data.ruc,
       timestamp: Date.now(),
-      sync: 0, // Marcamos que aún no está sincronizado con el servidor
+      sync: 0,
     });
   } catch (error: any) {
-    // Verificamos si es un error de restricción de unicidad (SQLITE_CONSTRAINT_PRIMARYKEY)
     if (
       error.message?.includes("UNIQUE") ||
       error.code === "SQLITE_CONSTRAINT"
@@ -112,7 +110,6 @@ export async function getVehiculos(): Promise<VehiculoDTO[]> {
   }));
 }
 
-// Definimos una interfaz para la respuesta que coincida con lo que espera response.data
 export interface PaginatedVehiculos {
   vehiculos: VehiculoDTO[];
 }
@@ -122,10 +119,8 @@ export async function getVehiculosPaginado(
   page: number,
   limit: number,
 ): Promise<PaginatedVehiculos> {
-  // Calculamos el offset (salto de registros) para la paginación
   const offset = (page - 1) * limit;
 
-  // Realizamos la consulta con filtros y paginación
   const rows = await db
     .select({
       idVehiculo: vehiculos.idVehiculo,
@@ -137,24 +132,21 @@ export async function getVehiculosPaginado(
       filter
         ? or(
             like(vehiculos.descripcionVehiculo, `%${filter}%`),
-            like(vehiculos.ruc, `%${filter}%`),
+            // ✅ CORREGIDO: filtrar por idVehiculo (PK), no por ruc
+            like(vehiculos.idVehiculo, `%${filter}%`),
           )
         : undefined,
     )
     .limit(limit)
     .offset(offset);
 
-  // Mapeamos al formato DTO que espera el frontend [cite: 17]
   const result: VehiculoDTO[] = rows.map((r) => ({
     id_vehiculo: r.idVehiculo,
     descripcion_vehiculo: r.descripcionVehiculo,
     ruc: r.ruc,
   }));
 
-  // Retornamos el objeto con la propiedad 'vehiculos' para que response.data.vehiculos funcione
-  return {
-    vehiculos: result,
-  };
+  return { vehiculos: result };
 }
 
 // ---------------------------------------------------------------------------
@@ -326,42 +318,58 @@ export async function getLastSyncDate(): Promise<number | null> {
 
 // ====================== SINCRONIZACIÓN ======================
 
+/**
+ * Descarga vehículos nuevos/modificados desde el servidor central.
+ *
+ * @param lastTimestamp - Solo se traen registros posteriores a este timestamp.
+ * @returns Número de vehículos sincronizados.
+ * @throws Error si la petición HTTP falla.
+ */
 export async function syncVehiculosFromCentral(lastTimestamp: number = 0) {
   try {
-    const { data } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.clientesGet, {
+    // ✅ CORREGIDO: usar vehiculosGet, no clientesGet
+    const { data } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.vehiculosGet, {
       params: { createdAt: lastTimestamp },
     });
 
     const items = Array.isArray(data) ? data : [];
-    
+
     if (items.length > 0) {
       await saveVehiculos(items);
-      console.log(`✅ ${items.length} clientes sincronizados desde central`);
+      console.log(`✅ ${items.length} vehículos sincronizados desde central`);
     }
     return items.length;
   } catch (error) {
-    console.error("❌ Error syncClientesFromCentral:", error);
+    console.error("❌ Error syncVehiculosFromCentral:", error);
     throw error;
   }
 }
 
+/**
+ * Envía al servidor central los vehículos creados offline pendientes de sync.
+ *
+ * @returns Número de vehículos enviados.
+ * @throws Error si la petición HTTP falla.
+ */
 export async function syncVehiculosToCentral() {
   const pendientes = await getVehiculosPendientesSync();
   if (pendientes.length === 0) return 0;
 
   try {
-    await SYNC_CONFIG.http.post(SYNC_CONFIG.endpoints.clientesPost, {
-      clientes: pendientes,
+    // ✅ CORREGIDO: usar vehiculosPost y payload { vehiculos }, no { clientes }
+    await SYNC_CONFIG.http.post(SYNC_CONFIG.endpoints.vehiculosPost, {
+      vehiculos: pendientes,
     });
 
-    for (const c of pendientes) {
-      await markVehiculoAsSynced(c.ruc);
+    for (const v of pendientes) {
+      // ✅ CORREGIDO: marcar por id_vehiculo (PK real), no por ruc
+      await markVehiculoAsSynced(v.id_vehiculo);
     }
 
-    console.log(`✅ ${pendientes.length} clientes enviados al central`);
+    console.log(`✅ ${pendientes.length} vehículos enviados al central`);
     return pendientes.length;
   } catch (error) {
-    console.error("❌ Error syncClientesToCentral:", error);
+    console.error("❌ Error syncVehiculosToCentral:", error);
     throw error;
   }
 }

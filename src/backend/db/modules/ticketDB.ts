@@ -5,31 +5,26 @@
 import { eq } from "drizzle-orm";
 import { db } from "../client";
 import { tickets } from "../schema";
+import { TicketDTO } from "@/dto/TicketDTO";
+
 
 /**
  * Crear ticket local (salida offline)
  */
-export async function crearTicketLocal({
-  json,
-  tipo,
-  fecha,
-  hora,
-}: {
-  json: unknown; // idealmente TicketDTO
-  tipo: string;
-  fecha?: number;
-  hora?: number;
-}) {
+export async function crearTicketLocal(
+  dto: TicketDTO,
+  fecha?: number,
+  hora?: number,
+): Promise<number> {
   const result = await db.insert(tickets).values({
-    json: JSON.stringify(json),
-    tipo,
-    fecha,
-    hora,
+    json: JSON.stringify(dto),   // serialización: responsabilidad del DB
+    tipo: dto.tipo,
+    fecha: fecha ?? Date.now(),
+    hora: hora ?? Date.now(),
     sync: 0,
     estado: 1,
   });
-
-  return result;
+  return (result as any).lastInsertRowId ?? 0;
 }
 
 /**
@@ -52,15 +47,19 @@ export async function getTicketById(idTicket: number) {
 /**
  * Obtener tickets pendientes de sincronización
  */
-export async function getTicketsPendientes() {
-  const result = await db
-    .select()
-    .from(tickets)
-    .where(eq(tickets.sync, 0));
-
+export async function getTicketsPendientes(): Promise<Array<{
+  idTicket: number;
+  tipo: string;
+  sync: number;
+  fecha: number | null;
+  hora: number | null;
+  estado: number;
+  dto: TicketDTO;           // campo renombrado de json → dto
+}>> {
+  const result = await db.select().from(tickets).where(eq(tickets.sync, 0));
   return result.map((t) => ({
     ...t,
-    json: JSON.parse(t.json),
+    dto: JSON.parse(t.json) as TicketDTO,
   }));
 }
 

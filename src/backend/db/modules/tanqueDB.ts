@@ -17,6 +17,8 @@ import { bodegas } from "../schema";   // ← Agregar esta línea
 import { eq } from "drizzle-orm";
 import { TanqueDTO } from "@/dto/TanqueDTO";
 import { SYNC_CONFIG } from "../constants/syncConfig";
+import { getIdsBodegasDelUsuario } from "./bodegaDB";
+
 
 // Clave en tabla syncs para registrar la última sincronización de tanques.
 const SYNC_KEY = "__last_sync_tanques__";
@@ -160,39 +162,43 @@ export async function getLastSyncDate(): Promise<number | null> {
 
 // ====================== SINCRONIZACIÓN ======================
 
+// ---------------------------------------------------------------------------
+// syncTanquesDelOperario  (reemplaza a syncTanquesFromCentral)
+// Envía los IDs de bodegas autorizadas como filtro a la API.
+// ---------------------------------------------------------------------------
+
 /**
- * Trae TODOS los tanques desde el servidor y filtra localmente
- * solo aquellos cuya bodega ya esté guardada en la BD local.
+ * Descarga únicamente los tanques de las bodegas autorizadas para el operario.
+ * Lee los IDs desde `usuarios_bodegas` (sin internet) y los envía
+ * como query param a la API para que filtre en el servidor.
+ *
+ * @param cedula - Cédula del operario autenticado.
+ * @returns Cantidad de tanques sincronizados.
+ * @throws Si la llamada al servidor falla.
  */
-export async function syncTanquesFromCentral(): Promise<number> {
-  try {
-    console.log("🔄 Sincronizando tanques desde central...");
+export async function syncTanquesDelOperario(cedula: string): Promise<number> {
+  console.log(`🔄 Sincronizando tanques del operario ${cedula}...`);
 
-    const { data: todosTanques } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.tanques);
+  const idsBodegas = await getIdsBodegasDelUsuario(cedula);
 
-    if (!Array.isArray(todosTanques) || todosTanques.length === 0) {
-      console.log("📭 No se recibieron tanques");
-      return 0;
-    }
-
-    // Obtener IDs de bodegas locales
-    const bodegasLocales = await db
-      .select({ idBodega: bodegas.idBodega })
-      .from(bodegas);
-
-    const bodegasSet = new Set(bodegasLocales.map(b => b.idBodega));
-
-    // Filtrar tanques
-    const tanquesFiltrados = todosTanques.filter((t: any) => {
-      return bodegasSet.has(Number(t.id_bodega));
-    });
-
-    await saveTanques(tanquesFiltrados);
-
-    console.log(`✅ ${tanquesFiltrados.length} tanques guardados (de ${todosTanques.length} totales)`);
-    return tanquesFiltrados.length;
-  } catch (error) {
-    console.error("❌ Error en syncTanquesFromCentral:", error);
-    throw error;
+  if (idsBodegas.length === 0) {
+    console.log("⚠️ Sin bodegas autorizadas — se omite sync de tanques");
+    return 0;
   }
+
+  // Enviar los IDs como query param: /api/tanques?bodegas=1,2,3
+  const { data: tanquesServidor } = await SYNC_CONFIG.http.get(
+    SYNC_CONFIG.endpoints.tanques,
+    { params: { bodegas: idsBodegas.join(",") } }
+  );
+
+  if (!Array.isArray(tanquesServidor) || tanquesServidor.length === 0) {
+    console.log("📭 No se recibieron tanques");
+    return 0;
+  }
+
+  await saveTanques(tanquesServidor);
+
+  console.log(`✅ ${tanquesServidor.length} tanques sincronizados`);
+  return tanquesServidor.length;
 }

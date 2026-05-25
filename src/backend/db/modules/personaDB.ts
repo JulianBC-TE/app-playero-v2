@@ -14,16 +14,15 @@ import { personas, syncs } from "@/backend/db/schema";
 import { eq, like, or, sql } from "drizzle-orm";
 import { PersonaDTO } from "@/dto/PersonaDTO";
 import { SYNC_CONFIG } from "../constants/syncConfig";
-import axios from "axios"; // solo como fallback
 
 // Clave en tabla syncs para registrar la última sincronización de personas.
 const SYNC_KEY = "__last_sync_personas__";
 
 /**
- * Upsert masivo de personas recibidas del servidor.
- * @param items - Lista de {@link PersonaDTO}.
+ * Upsert masivo de personas recibidas del servidor. Todos quedan con `sync = 1`.
+ *
+ * @param items - Lista de {@link PersonaDTO} a insertar o actualizar.
  */
-
 export async function savePersonas(items: PersonaDTO[]): Promise<void> {
   if (items.length === 0) return;
 
@@ -58,10 +57,10 @@ export async function savePersonas(items: PersonaDTO[]): Promise<void> {
 
 /**
  * Guarda una persona creada offline con `sync = 0`.
+ *
  * @param data - Datos de la persona.
- * @throws Error si la cédula ya existe.
+ * @throws Error si la cédula ya existe en la tabla local.
  */
-
 export async function savePersonaLocal(data: PersonaDTO): Promise<void> {
   await db.insert(personas).values({
     cedula: data.cedula,
@@ -73,9 +72,9 @@ export async function savePersonaLocal(data: PersonaDTO): Promise<void> {
 
 /**
  * Devuelve todas las personas del catálogo local.
+ *
  * @returns Lista de {@link PersonaDTO}.
  */
-
 export async function getPersonas(): Promise<PersonaDTO[]> {
   const rows = await db
     .select({
@@ -137,10 +136,10 @@ export async function getPersonasPaginado(
 
 /**
  * Devuelve una persona por su cédula.
+ *
  * @param cedula - Cédula numérica.
  * @returns un {@link PersonaDTO} o `null`.
  */
-
 export async function getPersonaByCedula(
   cedula: number,
 ): Promise<PersonaDTO | null> {
@@ -163,7 +162,9 @@ export async function getPersonaByCedula(
 
 /**
  * Búsqueda local por cédula o nombre (parcial, case-insensitive).
+ *
  * @param query - Texto a buscar.
+ * @returns Lista de {@link PersonaDTO} que coinciden.
  */
 export async function buscarPersonasLocal(
   query: string,
@@ -190,6 +191,8 @@ export async function buscarPersonasLocal(
 
 /**
  * Devuelve las personas pendientes de enviar al servidor (`sync = 0`).
+ *
+ * @returns Lista de {@link PersonaDTO} con `sync = 0`.
  */
 export async function getPersonasPendientesSync(): Promise<PersonaDTO[]> {
   const rows = await db
@@ -206,13 +209,18 @@ export async function getPersonasPendientesSync(): Promise<PersonaDTO[]> {
   }));
 }
 
-/** Marca una persona como sincronizada (`sync = 1`). @param cedula */
+/**
+ * Marca una persona como sincronizada (`sync = 1`).
+ *
+ * @param cedula - Cédula de la persona.
+ */
 export async function markPersonaAsSynced(cedula: number): Promise<void> {
   await db.update(personas).set({ sync: 1 }).where(eq(personas.cedula, cedula));
 }
 
 /**
  * Actualiza una persona en la BD local. Pone `sync = 0` si `synced = false`.
+ *
  * @param cedula - Cédula de la persona.
  * @param data - Campos a modificar.
  * @param synced - Si `true`, marca como ya sincronizado. Por defecto `false`.
@@ -236,6 +244,7 @@ export async function actualizarPersonaLocal(
 
 /**
  * Elimina una persona de la BD local.
+ *
  * @remarks No eliminar personas que tengan registros en `usuariosApp`.
  * @param cedula - Cédula de la persona a eliminar.
  */
@@ -243,7 +252,11 @@ export async function eliminarPersonaLocal(cedula: number): Promise<void> {
   await db.delete(personas).where(eq(personas.cedula, cedula));
 }
 
-/** Timestamp de la última sync de personas. @returns ms Unix o `null`. */
+/**
+ * Timestamp de la última sync de personas.
+ *
+ * @returns ms Unix o `null` si nunca se sincronizó.
+ */
 export async function getLastSyncDate(): Promise<number | null> {
   try {
     const result = await db
@@ -257,48 +270,61 @@ export async function getLastSyncDate(): Promise<number | null> {
     return null;
   }
 }
+
 // ====================== SINCRONIZACIÓN ======================
-/* 
-* Descarga personas nuevas/modificadas desde el servidor central.
+
+/**
+ * Descarga personas nuevas/modificadas desde el servidor central.
+ *
  * @param lastTimestamp - Solo se traen registros posteriores a este timestamp.
+ * @returns Número de personas sincronizadas.
+ * @throws Error si la petición HTTP falla.
  */
 export async function syncPersonasFromCentral(lastTimestamp: number = 0) {
   try {
-    const { data } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.clientesGet, {
+    // ✅ CORREGIDO: usar personasGet, no clientesGet
+    const { data } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.personasGet, {
       params: { createdAt: lastTimestamp },
     });
 
     const items = Array.isArray(data) ? data : [];
-    
+
     if (items.length > 0) {
       await savePersonas(items);
-      console.log(`✅ ${items.length} clientes sincronizados desde central`);
+      console.log(`✅ ${items.length} personas sincronizadas desde central`);
     }
     return items.length;
   } catch (error) {
-    console.error("❌ Error syncClientesFromCentral:", error);
+    console.error("❌ Error syncPersonasFromCentral:", error);
     throw error;
   }
 }
 
-/** Envía al servidor central las personas creadas offline pendientes de sync. */
+/**
+ * Envía al servidor central las personas creadas offline pendientes de sync.
+ *
+ * @returns Número de personas enviadas.
+ * @throws Error si la petición HTTP falla.
+ */
 export async function syncPersonasToCentral() {
   const pendientes = await getPersonasPendientesSync();
   if (pendientes.length === 0) return 0;
 
   try {
-    await SYNC_CONFIG.http.post(SYNC_CONFIG.endpoints.clientesPost, {
-      clientes: pendientes,
+    // ✅ CORREGIDO: usar personasPost y payload { personas }, no { clientes }
+    await SYNC_CONFIG.http.post(SYNC_CONFIG.endpoints.personasPost, {
+      personas: pendientes,
     });
 
-    for (const c of pendientes) {
-      await markPersonaAsSynced(c.cedula);
+    for (const p of pendientes) {
+      // ✅ CORREGIDO: marcar por cedula (PK real), no por ruc
+      await markPersonaAsSynced(p.cedula);
     }
 
-    console.log(`✅ ${pendientes.length} clientes enviados al central`);
+    console.log(`✅ ${pendientes.length} personas enviadas al central`);
     return pendientes.length;
   } catch (error) {
-    console.error("❌ Error syncClientesToCentral:", error);
+    console.error("❌ Error syncPersonasToCentral:", error);
     throw error;
   }
 }

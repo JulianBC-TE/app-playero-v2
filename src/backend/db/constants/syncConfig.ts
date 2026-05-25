@@ -31,5 +31,10 @@ export const SYNC_CONFIG = {
     bodegas: "/api/bodegas",
     picos: "/api/picos",
     tanques: "/api/tanques",
+    tickets: "/api/tickets",
+    traspasos: "/api/traspasos",
+    calibraciones: "/api/calibraciones",
+    abastecimientos: "/api/Abastecimientos-V2",
+    turnos: "/api/turnos",
   },
 };

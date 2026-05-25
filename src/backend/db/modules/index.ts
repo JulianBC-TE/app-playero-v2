@@ -19,3 +19,4 @@ export * as TanqueDB from './tanqueDB';
 export * as TraspasoDB from './traspasoDB';
 export * as VehiculoDB from './vehiculoDB';
 export * as AbastecimientoDB from './abastecimientoDB';
+export * from './moduleDB';

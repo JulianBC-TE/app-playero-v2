@@ -11,58 +11,10 @@
 import { db } from "@/backend/db/client";
 import { abastecimientos, syncs } from "@/backend/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { AbastecimientoDTO } from "@/dto/AbastecimientoDTO";
 
 const SYNC_KEY = "__last_sync_abastecimientos__";
 
-// ---------------------------------------------------------------------------
-// Tipos
-// ---------------------------------------------------------------------------
-
-/**
- * 
- * Medición de un tanque tomada al inicio y al final del abastecimiento.
- */
-export type MedicionTanqueInput = {
-  id_tanque: number;
-  inicio: {
-    regla: string;
-    temperatura: number;
-    litros: number;
-    foto_medicion: string;
-  };
-  fin: {
-    regla: string;
-    temperatura: number;
-    litros: number;
-    foto_medicion: string;
-  };
-};
-
-/**
- * Payload completo de un abastecimiento para persistir en BD local
- * y enviar al endpoint `/api/Abastecimientos-V2`.
- * @category inputType
- */
-export type AbastecimientoInput = {
-  id_suc: number;
-  id_bod: number;
-  fecha: string;
-  hora: string;
-  nro_oc: number;
-  nro_remision: string;
-  litros_remision: number;
-  playero: number;
-  foto_rev_docs: string[];
-  zeta_no_llega: number;
-  id_pico_para_zeta: number;
-  taxilitro_inicial: number;
-  taxilitro_final: number;
-  litros_zeta: number;
-  obs_repos: string;
-  foto_obs_repos: string[];
-  litros_total_repos: string;
-  mediciones_tanque: MedicionTanqueInput[];
-};
 
 /**
  * Inserta un nuevo abastecimiento pendiente de sincronización.
@@ -70,17 +22,14 @@ export type AbastecimientoInput = {
  * @param input - Datos del abastecimiento a guardar.
  * @returns ID generado por SQLite (`lastInsertRowId`).
  */
-export async function saveAbastecimientoLocal(
-  input: AbastecimientoInput,
-): Promise<number> {
+export async function saveAbastecimientoLocal(dto: AbastecimientoDTO): Promise<number> {
   const result = await db.insert(abastecimientos).values({
-    json: JSON.stringify(input),
+    json: JSON.stringify(dto),
     tipo: "ABASTECIMIENTO",
     sync: 0,
     fecha: Date.now(),
     hora: Date.now(),
   });
-
   return (result as any).lastInsertRowId ?? 0;
 }
 
@@ -91,15 +40,10 @@ export async function saveAbastecimientoLocal(
  * @returns Lista de registros con el campo `json` ya parseado a `AbastecimientoInput`.
  */
 export async function getAbastecimientosPendientes() {
-  const rows = await db
-    .select()
-    .from(abastecimientos)
-    .where(eq(abastecimientos.sync, 0))
-    .orderBy(desc(abastecimientos.fecha));
-
+  const rows = await db.select().from(abastecimientos).where(eq(abastecimientos.sync, 0)).orderBy(desc(abastecimientos.fecha));
   return rows.map((r) => ({
     ...r,
-    json: JSON.parse(r.json) as AbastecimientoInput,
+    dto: JSON.parse(r.json) as AbastecimientoDTO,
   }));
 }
 

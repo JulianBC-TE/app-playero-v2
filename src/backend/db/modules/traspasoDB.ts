@@ -18,6 +18,7 @@
 import { db } from "@/backend/db/client";
 import { trapasos, syncs } from "@/backend/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { TraspasoDTO } from "@/dto/TraspasoDTO";
 
 const SYNC_KEY = "__last_sync_traspasos__";
 
@@ -25,52 +26,21 @@ const SYNC_KEY = "__last_sync_traspasos__";
 // Tipo: payload que se envía al servidor (sin campos internos)
 // ---------------------------------------------------------------------------
 
-export type TraspasoPayload = {
-  bod_origen: number;
-  bod_destino: number;
-  id_tanque_destino: number;
-  regla_altura_inicial: string;
-  regla_altura_final: string;
-  litros_tanque_inicial: number;
-  litros_tanque_final: number;
-  temp_inicial: number;
-  temp_final: number;
-  id_pico: number;
-  taxilitro_inicial: number;
-  taxilitro_final: number;
-  litros_pico: number;
-  obs_traspaso: string;
-  foto_obs_traspaso: string[];
-  foto_medicion_inicial: string[];
-  foto_medicion_final: string[];
-  fecha: string;
-  hora: string;
-  firma_receptor: string[];
-  id_playero: number;
-  id_encargado_receptor: number;
-  // Campos opcionales que van en el payload pero se excluyen al sincronizar:
-  corte_id?: number;
-  id_autorizado?: number;
-};
-
 // ---------------------------------------------------------------------------
-// saveTraspasoLocal
+// saveTraspasoLoca
 // Inserta un traspaso pendiente de sincronización.
 // Devuelve el ID generado por SQLite.
 // ---------------------------------------------------------------------------
 
-export async function saveTraspasoLocal(
-  payload: TraspasoPayload,
-): Promise<number> {
+export async function saveTraspasoLocal(dto: TraspasoDTO["json"]): Promise<number> {
   const result = await db.insert(trapasos).values({
-    json: JSON.stringify(payload),
+    json: JSON.stringify(dto),
     tipo: "TRASPASO",
     sync: 0,
     fecha: Date.now(),
     hora: Date.now(),
     estado: 1,
   });
-
   return (result as any).lastInsertRowId ?? 0;
 }
 
@@ -80,15 +50,10 @@ export async function saveTraspasoLocal(
 // ---------------------------------------------------------------------------
 
 export async function getTraspasosPendientes() {
-  const rows = await db
-    .select()
-    .from(trapasos)
-    .where(eq(trapasos.sync, 0))
-    .orderBy(desc(trapasos.fecha));
-
+  const rows = await db.select().from(trapasos).where(eq(trapasos.sync, 0)).orderBy(desc(trapasos.fecha));
   return rows.map((r) => ({
     ...r,
-    json: JSON.parse(r.json) as TraspasoPayload,
+    dto: JSON.parse(r.json) as TraspasoDTO["json"],  // json → dto
   }));
 }
 
