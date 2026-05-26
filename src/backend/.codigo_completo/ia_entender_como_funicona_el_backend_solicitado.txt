@@ -1,0 +1,938 @@
+<context_metadata>
+  generated_at: 2026-05-26T09:17:13
+  project_root: C:\dev\playero_2\mobile-playero\src\backend
+  file_count: 6
+  extensions_included: .css, .html, .js, .jsx, .py, .ts, .tsx
+</context_metadata>
+
+<task>
+  entender como funicona el backend
+</task>
+
+<file_tree>
+backend/
+  index.ts
+  db/
+    client.tsx
+  api/
+    httpClient.ts
+    schema.ts
+    constants/
+      syncConfig.ts
+    services/
+      syncService.ts
+</file_tree>
+
+<codebase>
+
+<file path="index.ts">
+/**
+ * @module Playero/Backend
+ * @category Backend
+ */
+export * from "./api"
+export * from "./db"
+export * as schema from "./db/schema"
+export * as client from "./db/client"
+</file>
+
+<file path="db/client.tsx">
+/**
+ * Configura y expone la instancia global de la base de datos SQLite
+ * mediante Drizzle ORM para Expo.
+ *
+ * @module Playero/Backend/DB/Client
+ * @category Database
+ * @category client
+ */
+import React from "react";
+import { drizzle } from "drizzle-orm/expo-sqlite";
+import * as SQLite from "expo-sqlite";
+import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
+import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
+import migrations from "./drizzle/migrations";
+
+/** Instancia SQLite subyacente abierta con soporte de change listener. */
+const expoDb = SQLite.openDatabaseSync("playero.db", { 
+  enableChangeListener: true 
+});
+
+/**
+ * Instancia global de Drizzle ORM vinculada a la BD SQLite local.
+ * Usar esta constante en todos los módulos de acceso a datos.
+ */
+export const db = drizzle(expoDb);
+
+/**
+ * Proveedor React que aplica las migraciones pendientes al montar la app.
+ * Mientras las migraciones no terminen, no renderiza los hijos.
+ * En caso de error de migración, retorna `null` y registra el error en consola.
+ *
+ * @param children - Árbol de componentes a renderizar una vez migradas las tablas.
+ * @returns El árbol de hijos o `null` durante la migración / en caso de error.
+ *
+ * @example
+ * ```tsx
+ * <DatabaseProvider>
+ *   <App />
+ * </DatabaseProvider>
+ * ```
+ */
+export function DatabaseProvider({ children }: { children: React.ReactNode }) {
+  useDrizzleStudio(expoDb);
+
+  const { success, error } = useMigrations(db, migrations);
+
+  if (error) {
+    console.error("❌ Migration error:", error);
+    return null;
+  }
+
+  if (!success) {
+    console.log("⏳ Aplicando migraciones...");
+    return null;
+  }
+
+  return <>{children}</>;
+}
+</file>
+
+<file path="api/httpClient.ts">
+/**
+ * @module Playero/Backend/API/httpClient
+ * @category HTTP Clients
+ */
+// Cliente HTTP centralizado. Es el único lugar del proyecto que conoce axios.
+// Maneja: baseURL dinámica, token JWT, refresh automático de token, y signOut.
+//
+// USO:
+//   import { httpClient } from "@/backend/api/httpClient"
+//   httpClient.registerSignOut(signOut)   ← llamar una vez en AuthContext
+//   httpClient.get("/api/recursos")
+//   httpClient.post("/api/auth/login", body)
+
+import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AUTH_TOKEN_STORAGE, SERVER_URL } from "@storage/storageConfig";
+
+// ---------------------------------------------------------------------------
+// Tipos internos
+// ---------------------------------------------------------------------------
+
+type TokenStorage = { token: string; refresh_token: string };
+type QueueItem = { onSuccess: (token: string) => void; onFailure: (err: AxiosError) => void };
+
+// ---------------------------------------------------------------------------
+// Helpers de AsyncStorage (internos, no exportar)
+// ---------------------------------------------------------------------------
+
+async function readTokens(): Promise<TokenStorage> {
+  const raw = await AsyncStorage.getItem(AUTH_TOKEN_STORAGE);
+  return raw ? JSON.parse(raw) : { token: "", refresh_token: "" };
+}
+
+async function writeTokens(tokens: TokenStorage): Promise<void> {
+  await AsyncStorage.setItem(AUTH_TOKEN_STORAGE, JSON.stringify(tokens));
+}
+
+async function readServerUrl(): Promise<string | null> {
+  const raw = await AsyncStorage.getItem(SERVER_URL);
+  return raw ? JSON.parse(raw) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Construcción del cliente
+// ---------------------------------------------------------------------------
+
+const axiosInstance: AxiosInstance = axios.create({ timeout: 22000 });
+
+let failedQueue: QueueItem[] = [];
+let isRefreshing = false;
+let registeredSignOut: (() => Promise<void>) | null = null;
+
+function resolveQueue(token: string) {
+  failedQueue.forEach((item) => item.onSuccess(token));
+  failedQueue = [];
+}
+
+function rejectQueue(err: AxiosError) {
+  failedQueue.forEach((item) => item.onFailure(err));
+  failedQueue = [];
+}
+
+// ── Interceptor de REQUEST: inyecta baseURL y token ─────────────────────────
+axiosInstance.interceptors.request.use(async (config) => {
+  const serverIP = await readServerUrl();
+  if (serverIP) {
+    config.baseURL = serverIP.startsWith("http://") ? serverIP : `http://${serverIP}`;
+  }
+
+  const { token } = await readTokens();
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+
+// ── Interceptor de RESPONSE: maneja 401 y refresh token ─────────────────────
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  async (error: AxiosError) => {
+    if (!error.response) {
+      return Promise.reject(new Error("No se pudo conectar al servidor."));
+    }
+
+    const { response } = error;
+    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+
+    if (response?.status === 401) {
+      const message = (response.data as any)?.message;
+
+      if (message === "token.expired" || message === "token.invalid") {
+        if (originalRequest._retry) {
+          registeredSignOut?.();
+          return Promise.reject(new Error("Sesión expirada. Iniciá sesión nuevamente."));
+        }
+
+        originalRequest._retry = true;
+        const { refresh_token } = await readTokens();
+
+        if (!refresh_token) {
+          registeredSignOut?.();
+          return Promise.reject(new Error("Sin token de autenticación."));
+        }
+
+        if (isRefreshing) {
+          return new Promise((resolve, reject) => {
+            failedQueue.push({
+              onSuccess: (token) => {
+                if (originalRequest.headers) originalRequest.headers.Authorization = `Bearer ${token}`;
+                resolve(axiosInstance(originalRequest));
+              },
+              onFailure: reject,
+            });
+          });
+        }
+
+        isRefreshing = true;
+
+        return new Promise(async (resolve, reject) => {
+          try {
+            const baseURL = axiosInstance.defaults.baseURL;
+            const { data } = await axios.post(`${baseURL}/api/auth/refresh-token`, { refresh_token });
+
+            await writeTokens({ token: data.token, refresh_token: data.refresh_token });
+            axiosInstance.defaults.headers.common.Authorization = `Bearer ${data.token}`;
+            if (originalRequest.headers) originalRequest.headers.Authorization = `Bearer ${data.token}`;
+
+            resolveQueue(data.token);
+            resolve(axiosInstance(originalRequest));
+          } catch (refreshError) {
+            rejectQueue(refreshError as AxiosError);
+            registeredSignOut?.();
+            reject(refreshError);
+          } finally {
+            isRefreshing = false;
+          }
+        });
+      }
+
+      registeredSignOut?.();
+      return Promise.reject(new Error((response.data as any)?.message || "Acceso no autorizado."));
+    }
+
+    const msg = (response?.data as any)?.message || `Error ${response?.status}`;
+    return Promise.reject(new Error(msg));
+  }
+);
+
+// ---------------------------------------------------------------------------
+// API pública del httpClient
+// ---------------------------------------------------------------------------
+
+export const httpClient = {
+  /** Registrar la función signOut del AuthContext para que el interceptor pueda llamarla */
+  registerSignOut(fn: () => Promise<void>) {
+    registeredSignOut = fn;
+    return () => { registeredSignOut = null; };
+  },
+
+  /** Actualizar el token en los headers globales (llamar tras login) */
+  setToken(token: string) {
+    axiosInstance.defaults.headers.common.Authorization = `Bearer ${token}`;
+  },
+
+  /** Limpiar el token de los headers (llamar tras logout) */
+  clearToken() {
+    delete axiosInstance.defaults.headers.common.Authorization;
+  },
+
+  get<T = any>(url: string, config?: AxiosRequestConfig) {
+    return axiosInstance.get<T>(url, config);
+  },
+
+  post<T = any>(url: string, data?: any, config?: AxiosRequestConfig) {
+    return axiosInstance.post<T>(url, data, config);
+  },
+
+  put<T = any>(url: string, data?: any, config?: AxiosRequestConfig) {
+    return axiosInstance.put<T>(url, data, config);
+  },
+
+  patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig) {
+    return axiosInstance.patch<T>(url, data, config);
+  },
+
+  delete<T = any>(url: string, config?: AxiosRequestConfig) {
+    return axiosInstance.delete<T>(url, config);
+  },
+
+  /** Verificar conectividad al servidor (usado para detectar modo offline) */
+  async isOnline(): Promise<boolean> {
+    try {
+      await axiosInstance.get("/api/health", { timeout: 5000 });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+};
+</file>
+
+<file path="db/schema.ts">
+/**
+ * Definición del esquema SQLite local usando Drizzle ORM.
+ * Cada tabla mapea una entidad del dominio y sigue la convención
+ * `sync = 0` (pendiente) / `sync = 1` (sincronizado con el servidor).
+ *
+ * @module Playero/Backend/DB/Schema
+ * @category Database
+ * @category Schema
+ */
+import { sqliteTable, integer, text, real, primaryKey } from "drizzle-orm/sqlite-core";
+import { relations } from "drizzle-orm";
+
+/** Tabla de personas físicas identificadas por cédula. */
+export const personas = sqliteTable("personas", {
+  cedula: integer("cedula").primaryKey(),
+  nombreApellido: text("nombre_apellido").notNull(),
+  timestamp: integer("timestamp"),
+  sync: integer("sync").notNull().default(0),
+});
+
+/**
+ * Tabla de usuarios de la app móvil.
+ * Cada usuario está asociado a una persona (FK → personas.cedula)
+ * y a una sucursal asignada (idSucursal).
+ * El campo `bloqueado` impide el login cuando es `true`.
+ */
+export const usuariosApp = sqliteTable("usuarios_app", {
+  cedula: integer("cedula").primaryKey(), // FK → personas.cedula
+  clave: text("clave").notNull(),
+  refreshToken: text("refresh_token"),
+  salt: text("salt"),
+  // nuevo: usuario bloqueado o no
+  bloqueado: integer("bloqueado", { mode: "boolean" })
+    .notNull()
+    .default(false),
+
+  // nuevo: sucursal asignada
+  idSucursal: integer("id_sucursal").notNull(),
+});
+
+/** Tabla de clientes identificados por RUC. */
+export const clientes = sqliteTable("clientes", {
+  ruc: text("ruc").primaryKey(),
+  descripcionCliente: text("descripcion_cliente").notNull(),
+  timestamp: integer("timestamp"),
+  sync: integer("sync").notNull().default(0),
+});
+
+/**
+ * Tabla de vehículos asociados a un cliente (FK → clientes.ruc).
+ * El ID de vehículo es un texto libre provisto por el servidor central.
+ */
+export const vehiculos = sqliteTable("vehiculos", {
+  idVehiculo: text("id_vehiculo").primaryKey(),
+  descripcionVehiculo: text("descripcion_vehiculo").notNull(),
+  ruc: text("ruc").notNull(),              // FK → clientes.ruc
+  timestamp: integer("timestamp"),
+  sync: integer("sync").notNull().default(0),
+});
+
+/** Tabla de sucursales del negocio. Catálogo de solo lectura. */
+export const sucursales = sqliteTable("sucursales", {
+  idSucursal: integer("id_sucursal").primaryKey(),
+  descripcionSucursal: text("descripcion_sucursal").notNull(),
+});
+
+/**
+ * Tabla de bodegas (depósitos de combustible).
+ * Cada bodega pertenece a una sucursal y puede estar habilitada
+ * como destino de traspaso (`trapaso = true`).
+ */
+export const bodegas = sqliteTable("bodegas", {
+  idBodega: integer("id_bodega").primaryKey(),
+  descripcionBodega: text("descripcion_bodega").notNull(),
+  idSucursal: integer("id_sucursal").notNull(), // FK → sucursales.id_sucursal
+  trapaso: integer("trapaso", { mode: "boolean" }).notNull().default(false),
+});
+
+/**
+ * Tabla de picos (surtidores).
+ * Cada pico pertenece a una bodega y tiene un número de surtidor físico
+ * (`idPicoSurtidor`) usado por el hardware para identificar el despacho.
+ */
+export const picos = sqliteTable("picos", {
+  idPico: integer("id_pico").primaryKey(),
+  descripcionPico: text("descripcion_pico").notNull(),
+  idBodega: integer("id_bodega").notNull(),     // FK → bodegas.id_bodega
+  idPicoSurtidor: integer("id_pico_surtidor").notNull(),
+});
+
+/**
+ * Tabla de tanques de almacenamiento.
+ * Cada tanque pertenece a una bodega y tiene capacidad en litros.
+ */
+export const tanques = sqliteTable("tanques", {
+  idTanque: integer("id_tanque").primaryKey(),
+  descripcionTanque: text("descripcion_tanque").notNull(),
+  idBodega: integer("id_bodega").notNull(),     // FK → bodegas.id_bodega
+  capacidadLitros: real("capacidad_litros"),
+});
+
+/**
+ * Tabla de turnos de trabajo.
+ * El payload completo se serializa en el campo `json`.
+ * `estado = 1` → activo, `estado = 0` → cerrado/anulado.
+ */
+export const turnos = sqliteTable("turnos", {
+  idTurno: integer("id_turno").primaryKey({ autoIncrement: true }),
+  idBodega: integer("id_bodega").notNull(),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+  estado: integer("estado").notNull().default(1),
+  observacionAnulacion: text("observacion_anulacion"),
+});
+
+/**
+ * Tabla de tickets de operación.
+ * El payload completo se serializa en el campo `json`.
+ */
+export const tickets = sqliteTable("tickets", {
+  idTicket: integer("id_ticket").primaryKey({ autoIncrement: true }),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+  estado: integer("estado").notNull().default(1),
+});
+
+/**
+ * Tabla de traspasos de combustible entre bodegas.
+ * El payload completo se serializa en el campo `json`.
+ */
+export const trapasos = sqliteTable("trapasos", {
+  idTrapaso: integer("id_trapaso").primaryKey({ autoIncrement: true }),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+  estado: integer("estado").notNull().default(1),
+});
+
+/**
+ * Tabla de calibraciones / verificaciones de picos.
+ * `tipo` puede ser `"VERIFICACION"` o `"CALIBRACION"`.
+ * El payload completo se serializa en el campo `json`.
+ */
+export const calibraciones = sqliteTable("calibraciones", {
+  idCalibracion: integer("id_calibracion").primaryKey({ autoIncrement: true }),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+});
+
+/**
+ * Tabla de abastecimientos (reposiciones de combustible desde un camión).
+ * El payload completo se serializa en el campo `json`.
+ */
+export const abastecimientos = sqliteTable("abastecimientos", {
+  idAbastecimiento: integer("id_abastecimiento").primaryKey({ autoIncrement: true }),
+  json: text("json").notNull(),
+  tipo: text("tipo").notNull(),
+  sync: integer("sync").notNull().default(0),
+  fecha: integer("fecha"),
+  hora: integer("hora"),
+});
+
+/**
+ * Tabla de despachos escritos directamente por el surtidor.
+ * La app la lee en modo polling para detectar nuevos despachos.
+ * Las unidades de volumen son mililitros; dividir por 1000 para obtener litros.
+ */
+export const despachos = sqliteTable("despachos", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  idHrs: integer("id_hrs").notNull(),
+  pico: integer("pico").notNull(),
+  combustible: integer("combustible").notNull(),
+  tanque: integer("tanque").notNull(),
+  totalCtvs: integer("total_ctvs").notNull(),
+  volumenMl: integer("volumen_ml").notNull(),
+  precioCvl: integer("precio_cvl").notNull(),
+  decTotal: integer("dec_total").notNull(),
+  decVolumen: integer("dec_volumen").notNull(),
+  decPrecio: integer("dec_precio").notNull(),
+  tiempoSeg: integer("tiempo_seg"),
+  fechaHora: integer("fecha_hora").notNull(),
+  totalIni: integer("total_ini"),
+  totalFin: integer("total_fin"),
+  frentistaId: text("frentista_id"),
+  clienteId: text("cliente_id"),
+  volTanqueMl: integer("vol_tanque_ml"),
+  creadoEn: integer("creado_en").notNull().$defaultFn(() => Date.now()),
+  sync: integer("sync").notNull().default(0),
+  proces: integer("proces", { mode: "boolean" }),
+});
+
+/**
+ * Tabla key-value para registrar timestamps de última sincronización
+ * y el último usuario autenticado online. Reutilizada por todos los módulos DB.
+ */
+export const syncs = sqliteTable("syncs", {
+  idSync: integer("id_sync").primaryKey({ autoIncrement: true }),
+  tipo: text("tipo").notNull().unique(),
+  fecha: integer("fecha").notNull(),
+});
+
+/** Tabla de administradores con acceso al panel web. */
+export const usuariosAdmin = sqliteTable("usuarios_admin", {
+  correo: text("correo").primaryKey(),
+  nombre: text("nombre").notNull(),
+  salt: text("salt").notNull(),
+  clave: text("clave").notNull(),
+  refreshToken: text("refresh_token"),
+  timestamp: integer("timestamp"),
+});
+
+/**
+ * Tabla de permisos de traspaso entre sucursal y bodega.
+ * Clave primaria compuesta: (idSucursal, idBodega).
+ */
+export const habilitadosTrapaso = sqliteTable(
+  "habilitados_trapaso",
+  {
+    // sucursal que consulta / realiza el traspaso
+    idSucursal: integer("id_sucursal").notNull(),
+
+    // bodega relacionada
+    idBodega: integer("id_bodega").notNull(),
+
+    // permiso explícito
+    permitido: integer("permitido", { mode: "boolean" })
+      .notNull()
+      .default(false),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.idSucursal, table.idBodega],
+    }),
+  })
+);
+
+/**
+ * Tabla intermedia para la relación muchos a muchos entre usuarios y bodegas.
+ * Define qué bodegas están bajo el control/mando de qué usuario de la app.
+ */
+export const usuariosBodegas = sqliteTable(
+  "usuarios_bodegas",
+  {
+    cedula: integer("cedula")
+      .notNull(), // FK -> usuariosApp.cedula
+    idBodega: integer("id_bodega")
+      .notNull(), // FK -> bodegas.id_bodega
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.cedula, table.idBodega],
+    }),
+  })
+);
+
+/**
+ * Tabla de módulos habilitados por usuario de la app móvil.
+ * Controla el acceso a las funciones de la interfaz.
+ * En la BD se guarda como 0 (deshabilitado) / 1 (habilitado).
+ */
+export const modulosUsuarios = sqliteTable("modulos_usuarios", {
+  // Clave primaria y foránea que conecta directamente con el usuario
+  cedula: integer("cedula").primaryKey(), // FK → usuariosApp.cedula
+
+  // Campos de módulos (en BD: 0 o 1 / en TS: false o true)
+  abastecimiento: integer("abastecimiento", { mode: "boolean" })
+    .notNull()
+    .default(false),
+    
+  calibracion: integer("calibracion", { mode: "boolean" })
+    .notNull()
+    .default(false),
+    
+  traspaso: integer("traspaso", { mode: "boolean" })
+    .notNull()
+    .default(false),
+    
+  salida: integer("salida", { mode: "boolean" })
+    .notNull()
+    .default(false),
+    
+  vehiculo: integer("vehiculo", { mode: "boolean" })
+    .notNull()
+    .default(false),
+    
+  persona: integer("persona", { mode: "boolean" })
+    .notNull()
+    .default(false),
+});
+
+// ==================== RELACIONES ====================
+/** Relación 1-a-1 personas → usuariosApp. */
+export const personasRelations = relations(personas, ({ one }) => ({
+  usuarioApp: one(usuariosApp, {
+    fields: [personas.cedula],
+    references: [usuariosApp.cedula],
+  }),
+}));
+
+/** Relación N-a-1 vehículos → clientes. */
+export const vehiculosRelations = relations(vehiculos, ({ one }) => ({
+  cliente: one(clientes, {
+    fields: [vehiculos.ruc],
+    references: [clientes.ruc],
+  }),
+}));
+
+
+/**
+ * Relaciones de bodegas:
+ * - N-a-1 con sucursales
+ * - 1-a-N con picos
+ * - 1-a-N con tanques
+ */
+export const bodegasRelations = relations(bodegas, ({ one, many }) => ({
+  sucursal: one(sucursales, {
+    fields: [bodegas.idSucursal],
+    references: [sucursales.idSucursal],
+  }),
+  picos: many(picos),
+  tanques: many(tanques),
+  // Nueva relación: una bodega puede estar controlada por muchos usuarios (vía intermedia)
+  usuariosControladores: many(usuariosBodegas), 
+}));
+
+/** Relaciones de habilitadosTrapaso → sucursales y bodegas. */
+export const habilitadosTrapasoRelations = relations(
+  habilitadosTrapaso,
+  ({ one }) => ({
+    sucursal: one(sucursales, {
+      fields: [habilitadosTrapaso.idSucursal],
+      references: [sucursales.idSucursal],
+    }),
+
+    bodega: one(bodegas, {
+      fields: [habilitadosTrapaso.idBodega],
+      references: [bodegas.idBodega],
+    }),
+  })
+);
+
+/** Relaciones de usuariosApp → personas y sucursales. */
+export const usuariosAppRelations = relations(usuariosApp, ({ one, many }) => ({
+  persona: one(personas, {
+    fields: [usuariosApp.cedula],
+    references: [personas.cedula],
+  }),
+  sucursal: one(sucursales, {
+    fields: [usuariosApp.idSucursal],
+    references: [sucursales.idSucursal],
+  }),
+  bodegasControladas: many(usuariosBodegas), 
+  
+  // Nueva relación 1 a 1: El usuario tiene un único perfil de módulos
+  modulos: one(modulosUsuarios, {
+    fields: [usuariosApp.cedula],
+    references: [modulosUsuarios.cedula],
+  }),
+}));
+
+/** Relaciones de la tabla intermedia usuariosBodegas */
+export const usuariosBodegasRelations = relations(usuariosBodegas, ({ one }) => ({
+  usuario: one(usuariosApp, {
+    fields: [usuariosBodegas.cedula],
+    references: [usuariosApp.cedula],
+  }),
+  bodega: one(bodegas, {
+    fields: [usuariosBodegas.idBodega],
+    references: [bodegas.idBodega],
+  }),
+}));
+
+/** Relación 1-a-1 modulosUsuarios → usuariosApp. */
+export const modulosUsuariosRelations = relations(modulosUsuarios, ({ one }) => ({
+  usuario: one(usuariosApp, {
+    fields: [modulosUsuarios.cedula],
+    references: [usuariosApp.cedula],
+  }),
+}));
+</file>
+
+<file path="db/constants/syncConfig.ts">
+/**
+ * Constantes y utilidades relacionadas con el estado de los turnos.
+ *
+ * @module Playero/Backend/DB/Constants/syncConfig
+ * @category Constants
+ */
+import { httpClient } from "@/backend/api/httpClient";
+
+export const SYNC_CONFIG = {
+  // Usamos el mismo httpClient que ya tienes (maneja token, IP, refresh, etc.)
+  get http() {
+    return httpClient;
+  },
+
+  // Endpoints de sincronización (los que vienen del daemon NestJS)
+  endpoints: {
+    // Maestros bidireccionales
+    clientesGet: "/api/sync/syncClientesGet",
+    clientesPost: "/api/sync/syncClientesPost",
+
+    personasGet: "/api/sync/syncPersonasGet",
+    personasPost: "/api/sync/syncPersonasPost",
+
+    vehiculosGet: "/api/sync/syncVehiclesGet",
+    vehiculosPost: "/api/sync/syncVehiclesPost",
+
+    usuariosAdminGet: "/api/auth/getUsuariosAdminSync",
+
+    // Catálogos (solo bajada)
+    sucursales: "/api/sucursales",
+    bodegas: "/api/bodegas",
+    picos: "/api/picos",
+    tanques: "/api/tanques",
+    tickets: "/api/tickets",
+    traspasos: "/api/traspasos",
+    calibraciones: "/api/calibraciones",
+    abastecimientos: "/api/Abastecimientos-V2",
+    turnos: "/api/turnos",
+  },
+};
+</file>
+
+<file path="db/services/syncService.ts">
+/**
+ * Servicio de sincronización maestro.
+ * Coordina la ejecución secuencial de todos los módulos de sync
+ * (personas, clientes, vehículos, bodegas, picos, tanques, etc.).
+ *
+ * @module Playero/Backend/DB/Services/syncService
+ * @category Database Services
+ */
+import { SYNC_CONFIG } from "../constants/syncConfig";
+
+import {
+  syncClientesFromCentral,
+  syncClientesToCentral,
+} from "../modules/clienteDB";
+import {
+  syncPersonasFromCentral,
+  syncPersonasToCentral,
+} from "../modules/personaDB";
+import {
+  syncVehiculosFromCentral,
+  syncVehiculosToCentral,
+} from "../modules/vehiculoDB";
+
+import { syncSucursalesFromCentral } from "../modules/sucursalDB";
+import { syncBodegasDelOperario } from "../modules/bodegaDB";
+import { syncPicosDelOperario } from "../modules/picoDB";
+import { syncTanquesDelOperario } from "../modules/tanqueDB";
+import {
+  getTicketsPendientes,
+  marcarTicketSync,
+  marcarTicketErrorSync,
+} from "../modules/ticketDB";
+import {
+  getTraspasosPendientes,
+  marcarTraspasoSync,
+  marcarTraspasoErrorSync,
+} from "../modules/traspasoDB";
+import {
+  getCalibracionesPendientes,
+  marcarCalibracionSync,
+  marcarCalibracionErrorSync,
+} from "../modules/calibracionDB";
+import {
+  getAbastecimientosPendientes,
+  marcarAbastecimientoSync,
+  marcarAbastecimientoErrorSync,
+} from "../modules/abastecimientoDB";
+import {
+  getTurnosPendientes,
+  marcarTurnoSync,
+  marcarTurnoErrorSync,
+} from "../modules/turnoBD";
+import {
+  enviarTicket,
+  enviarTraspaso,
+  enviarCalibracion,
+  enviarAbastecimiento,
+  enviarTurno,
+} from "../../api/operacionesAPI";
+
+/**
+ * Sincronización Inicial después del Login Online
+ */
+export async function syncInitialData(
+  idSucursal: number,
+  cedula: string,
+): Promise<void> {
+  console.log("🚀 Iniciando sincronización inicial completa...");
+
+  try {
+    // 1. Sucursales
+    await syncSucursalesFromCentral();
+
+    await syncBodegasDelOperario(cedula); // solo las bodegas de este operario
+    await syncPicosDelOperario(cedula); // solo los picos de esas bodegas
+    await syncTanquesDelOperario(cedula); // solo los tanques de esas bodegas;
+
+    // 4. Maestros bidireccionales
+    await syncClientesFromCentral(0);
+    await syncPersonasFromCentral(0);
+    await syncVehiculosFromCentral(0);
+
+    console.log("✅ Sincronización inicial COMPLETADA");
+  } catch (error) {
+    console.error("❌ Error durante syncInitialData:", error);
+  }
+}
+
+/** Sincronización completa (manual o background) */
+export async function fullSync(idSucursal: number, cedula: string) {
+  await syncInitialData(idSucursal, cedula);
+  await syncPendingData(cedula);
+}
+
+// ── Helper genérico de envío por lotes ───────────────────────────────────────
+
+async function syncLote<T>(
+  items: T[],
+  getPk: (item: T) => number, // ← función en vez de keyof
+  enviar: (item: T) => Promise<void>,
+  marcarOk: (id: number) => Promise<void>,
+  marcarError: (id: number) => Promise<void>,
+  nombre: string,
+) {
+  for (const item of items) {
+    const id = getPk(item);
+    try {
+      await enviar(item);
+      await marcarOk(id);
+      console.log(`✅ ${nombre} #${id} sincronizado`);
+    } catch (err) {
+      await marcarError(id);
+      console.warn(`⚠️ ${nombre} #${id} error:`, err);
+    }
+  }
+}
+
+// ── syncPendingData actualizado ───────────────────────────────────────────────
+/** Solo envía pendientes al servidor */
+export async function syncPendingData(cedula: string) {
+  try {
+    // Maestros
+    await syncClientesToCentral();
+    await syncPersonasToCentral();
+    await syncVehiculosToCentral();
+
+    // Operaciones de pista
+    await syncLote(
+      await getTicketsPendientes(),
+      (t) => t.idTicket, // ← así en todos
+      enviarTicket,
+      marcarTicketSync,
+      marcarTicketErrorSync,
+      "Ticket",
+    );
+
+    await syncLote(
+      await getTraspasosPendientes(),
+      (t) => t.idTrapaso,
+      enviarTraspaso,
+      marcarTraspasoSync,
+      marcarTraspasoErrorSync,
+      "Traspaso",
+    );
+
+    await syncLote(
+      await getCalibracionesPendientes(),
+      (t) => t.idCalibracion,
+      enviarCalibracion,
+      marcarCalibracionSync,
+      marcarCalibracionErrorSync,
+      "Calibracion",
+    );
+
+    await syncLote(
+      await getAbastecimientosPendientes(),
+      (t) => t.idAbastecimiento,
+      enviarAbastecimiento,
+      marcarAbastecimientoSync,
+      marcarAbastecimientoErrorSync,
+      "Abastecimiento",
+    );
+
+    await syncLote(
+      await getTurnosPendientes(),
+      (t) => t.idTurno,
+      enviarTurno,
+      marcarTurnoSync,
+      marcarTurnoErrorSync,
+      "Turno",
+    );
+  } catch (error) {
+    console.error("Error en syncPendingData:", error);
+  }
+}
+</file>
+
+</codebase>
+
+<response_instructions>
+  You are receiving the specific files you requested.
+  Your task is defined in <task>.
+  You now have sufficient context. Proceed with your full response.
+  Do not ask for additional files.
+</response_instructions>
+
+# ========================================================================
+# ESTIMACIÓN DE TOKENS
+# ========================================================================
+#
+#  Modelo           : Genérico (sin modelo específico)
+#  Caracteres       : 28.280
+#  Tokens estimados : ~7.070
+#  Costo estimado   : no disponible (varía según proveedor)
+#  Context window   : no especificado para este modelo
+#
+#  Nota: los precios y límites pueden haber cambiado. Verificá en
+#  la documentación oficial del modelo antes de tomar decisiones de costo.
+# ========================================================================

@@ -1,0 +1,142 @@
+<context_metadata>
+  generated_at: 2026-05-26T09:13:59
+  project_root: C:\dev\playero_2\mobile-playero\src\screens
+  file_count: 33
+  extensions_included: .css, .html, .js, .jsx, .py, .ts, .tsx
+  content_type: structure_only (no source code)
+  recent_commits:
+    - c4da6e9 Refactor de backend móvil implementando Data Mapper y sincronización de inventario segmentada por la cédula del usuario
+    - 4733ab6 Actualizacion de schema de bd para reflejar oncfiguracion de modulos habilitados y bodegas a las que se pueden hacer traspaso
+    - 2912225 Ampliacion de la documentacion(TypeDoc)
+    - 511e6eb Ampliacion de la documentacion(TypeDoc)
+    - 8cec1d5 Avance en docs de DB
+</context_metadata>
+
+<task>
+  verificar que nada axeda a comunicacion con api y que se comunique unicamente por medio de los modulos con el backend
+</task>
+
+<file_tree>
+screens/
+  Config.tsx
+  index.ts
+  Firma.tsx
+  Home.tsx
+  Setup.tsx
+  SignIn.tsx
+  abastecimiento/
+    index.ts
+  calibracion/
+    index.ts
+  cliente/
+    index.ts
+  persona/
+    index.ts
+  salida/
+    index.ts
+  traspaso/
+    index.ts
+  turno/
+    index.ts
+  vehiculo/
+    index.ts
+    Abastecimiento.tsx
+    BuscarCliente.tsx
+    BuscarPersona.tsx
+    BuscarVehiculo.tsx
+    Calibracion.tsx
+    CargaCombustible.tsx
+    Cliente.tsx
+    CrearCliente.tsx
+    CrearPersona.tsx
+    CrearVehiculo.tsx
+    EditarPersona.tsx
+    Medicion.tsx
+    MedicionAbastecimiento.tsx
+    Persona.tsx
+    Salida.tsx
+    Sequencias.tsx
+    Traspaso.tsx
+    Turno.tsx
+    Vehiculo.tsx
+</file_tree>
+
+<file_index>
+  <file path="Config.tsx" lines="17" ext=".tsx" imports="@/route/app.routes, react-native, @/backend/db/seeds/seedLocalDB" />
+  <file path="index.ts" lines="18" ext=".ts" />
+  <file path="Firma.tsx" lines="26" ext=".tsx" imports="@/components/ScreenHeader, @/components/SignatureCapture, @/dto/PersonaDTO, @/route/app.routes, react-native" />
+  <file path="Home.tsx" lines="157" ext=".tsx" imports="@/components/HomeHeader, react-native, @/components/MenuCard, @/route/app.routes, @/hooks/useAppContext, react, @/components/Loading, @/dto/MenuItens, @/dto/statusTurnoDTO, @react-navigation/native, @DBmodules/turnoBD, @/utils/toastMessage, @/backend/db/seeds/seedLocalDB, @DBmodules/sucursalDB" />
+  <file path="Setup.tsx" lines="106" ext=".tsx" imports="react, @hooks/useAuth, @assets/logo.png, @components/Input, @components/Button, react-hook-form, @utils/AppError, @/utils/toastMessage, react-native, @/components/InputCard, axios" />
+  <file path="SignIn.tsx" lines="117" ext=".tsx" imports="react, @react-navigation/native, react-native, react-hook-form, @route/auth.routes, @hooks/useAuth, @/utils/useInitialSync, @utils/AppError, @/utils/toastMessage, @assets/logo.png, @components/Input, @components/Button, @/components/InputCard, @/backend/db/seeds/seedLocalDB" />
+  <file path="abastecimiento/index.ts" lines="8" ext=".ts" />
+  <file path="calibracion/index.ts" lines="7" ext=".ts" />
+  <file path="cliente/index.ts" lines="8" ext=".ts" />
+  <file path="persona/index.ts" lines="9" ext=".ts" />
+  <file path="salida/index.ts" lines="6" ext=".ts" />
+  <file path="traspaso/index.ts" lines="6" ext=".ts" />
+  <file path="turno/index.ts" lines="7" ext=".ts" />
+  <file path="vehiculo/index.ts" lines="8" ext=".ts" />
+  <file path="abastecimiento/Abastecimiento.tsx" lines="736" ext=".tsx" imports="react, @/components/InputCard, @/components/ScreenHeader, @/components/Select, @/hooks/useAppContext, @/utils/toastMessage, @/services/api, @/components/Input, @/dto/BodegaDTO, @/components/Photo, @/components/Button, @/route/app.routes, @/dto/CargaZetaDTO, @/dto/MedicionDTO, @/storage/storageMedicionAbastecimiento (+3)" />
+  <file path="cliente/BuscarCliente.tsx" lines="146" ext=".tsx" imports="react, @/route/app.routes, @components/Input, @components/InputCard, @services/api, @DBmodules/clienteDB, @utils/AppError, @components/Loading, @components/ClienteCard, @dto/ClienteDTO, @hooks/useCliente, @utils/toastMessage, lucide-react-native, react-native, @/components/EmptyList (+1)" />
+  <file path="persona/BuscarPersona.tsx" lines="216" ext=".tsx" imports="@components/Input, @components/InputCard, @components/PersonaCard, react, @services/api, @DBmodules/personaDB, @dto/PersonaDTO, lucide-react-native, lodash.debounce, @/components/EmptyList, @utils/toastMessage, @/route/app.routes, @/components/ScreenHeader, @react-navigation/native" />
+  <file path="vehiculo/BuscarVehiculo.tsx" lines="187" ext=".tsx" imports="react, lodash.debounce, @components/Input, @components/InputCard, @services/api, @dto/VehiculoDTO, @components/VehiculoCard, @utils/toastMessage, lucide-react-native, @/components/EmptyList, @/route/app.routes, @/components/ScreenHeader, @DBmodules/vehiculoDB" />
+  <file path="calibracion/Calibracion.tsx" lines="752" ext=".tsx" imports="expo-image-picker, react, @/components/InputCard, @/components/Photo, @/components/ScreenHeader, @/components/Select, @/hooks/useAppContext, @/dto/PicosDTO, @/route/app.routes, @/utils/toastMessage, @/components/Input, @/components/TextSearch, @/dto/PersonaDTO, lucide-react-native, @/components/Button (+5)" />
+  <file path="abastecimiento/CargaCombustible.tsx" lines="285" ext=".tsx" imports="lucide-react-native, @/components/Button, @/components/InputCard, react, react-native, @/utils/toastMessage, @/components/Select, @/route/app.routes, @/dto/PicosDTO, @/hooks/useAppContext, @/components/ScreenHeader, @/dto/CargaZetaDTO, @/components/Input, @DBmodules/picoDB" />
+  <file path="cliente/Cliente.tsx" lines="31" ext=".tsx" imports="@react-navigation/material-top-tabs, @/components/ScreenHeader, @/route/app.routes, react-native, ./BuscarCliente, ./CrearCliente" />
+  <file path="cliente/CrearCliente.tsx" lines="127" ext=".tsx" imports="@components/Input, @components/InputCard, @components/Button, react, @utils/AppError, react-hook-form, @hookform/resolvers/yup, yup, @services/api, @DBmodules/clienteDB, @dto/ClienteDTO, @/utils/toastMessage, react-native, lucide-react-native" />
+  <file path="persona/CrearPersona.tsx" lines="157" ext=".tsx" imports="react, react-native, react-hook-form, yup, @hookform/resolvers/yup, @utils/toastMessage, @components/Input, @components/InputCard, @components/Button, @utils/AppError, @services/api, @DBmodules/personaDB, lucide-react-native, axios, @react-navigation/native" />
+  <file path="vehiculo/CrearVehiculo.tsx" lines="186" ext=".tsx" imports="react-native, react, @/route/app.routes, @utils/toastMessage, @components/Input, @components/InputCard, @components/Button, @utils/AppError, react-hook-form, @hookform/resolvers/yup, yup, @DBmodules/vehiculoDB, lucide-react-native, @/hooks/useCliente" />
+  <file path="persona/EditarPersona.tsx" lines="131" ext=".tsx" imports="react-native, react, react-hook-form, @components/Input, @components/InputCard, @components/ScreenHeader, @components/Button, @utils/AppError, @hookform/resolvers/yup, @utils/toastMessage, yup, @services/api, @DBmodules/personaDB, @/route/app.routes, lucide-react-native" />
+  <file path="turno/Medicion.tsx" lines="251" ext=".tsx" imports="@/components/ScreenHeader, @/route/app.routes, react-native, @/components/Button, @utils/toastMessage, react, @/components/InputCard, @/components/Input, @/services/api, @DBmodules/tanqueDB, @/dto/TanqueDTO, @/dto/MedicionDTO, @/components/Select, yup, @hookform/resolvers/yup (+3)" />
+  <file path="abastecimiento/MedicionAbastecimiento.tsx" lines="547" ext=".tsx" imports="@/components/ScreenHeader, @/route/app.routes, @/components/Button, @utils/toastMessage, react, @/components/InputCard, @/components/Input, @/services/api, @/dto/TanqueDTO, @/dto/MedicionDTO, @/components/Select, yup, @hookform/resolvers/yup, lucide-react-native, react-hook-form (+2)" />
+  <file path="persona/Persona.tsx" lines="34" ext=".tsx" imports="@react-navigation/material-top-tabs, @/components/ScreenHeader, @/route/app.routes, react-native, ./BuscarPersona, ./CrearPersona" />
+  <file path="salida/Salida.tsx" lines="759" ext=".tsx" imports="expo-location, @/components/Input, @/components/InputCard, @/components/ScreenHeader, @/components/TextSearch, @/dto/PersonaDTO, @/dto/VehiculoDTO, @/dto/BodegaDTO, @/route/app.routes, react, react-hook-form, lucide-react-native, @/utils/toastMessage, @hookform/resolvers/yup, yup (+10)" />
+  <file path="calibracion/Sequencias.tsx" lines="300" ext=".tsx" imports="@/route/app.routes, @/utils/toastMessage, react, react-native, @/components/InputCard, @/components/Button, lucide-react-native, @/components/Select, @/dto/SequenciaCalibracionDTO, @/components/ScreenHeader, @/components/Photo, @/components/Input" />
+  <file path="traspaso/Traspaso.tsx" lines="1135" ext=".tsx" imports="@/components/Input, @/components/InputCard, @/components/ScreenHeader, @/components/TextSearch, @/dto/PersonaDTO, @/route/app.routes, react, @/utils/toastMessage, @/hooks/useAppContext, @/dto/PicosDTO, @/components/Select, @/components/Button, @/components/Loading, @/dto/statusTurnoDTO, @/dto/MedicionDTO (+7)" />
+  <file path="turno/Turno.tsx" lines="548" ext=".tsx" imports="react, @/route/app.routes, @/components/ScreenHeader, @/components/InputCard, @/components/Button, @/utils/toastMessage, @/components/Input, @/components/Select, @/dto/BodegaDTO, @/dto/MedicionDTO, @/dto/TurnoDTO, @/dto/PicosDTO, lucide-react-native, @/utils/AppError, @/dto/statusTurnoDTO (+6)" />
+  <file path="vehiculo/Vehiculo.tsx" lines="36" ext=".tsx" imports="@react-navigation/material-top-tabs, @/components/ScreenHeader, @/route/app.routes, react-native, ./BuscarVehiculo, ./CrearVehiculo" />
+</file_index>
+
+<dependency_graph>
+  <file path="cliente/Cliente.tsx" depends_on="cliente\BuscarCliente.tsx, cliente\CrearCliente.tsx" />
+  <file path="persona/Persona.tsx" depends_on="persona\BuscarPersona.tsx, persona\CrearPersona.tsx" />
+  <file path="vehiculo/Vehiculo.tsx" depends_on="vehiculo\BuscarVehiculo.tsx, vehiculo\CrearVehiculo.tsx" />
+</dependency_graph>
+
+<response_instructions>
+  You are receiving the structural map of a codebase (no source code).
+  Your task is defined in <task>.
+
+  STEP 1 — Analyze the structure:
+    Use <file_tree>, <file_index>, and <dependency_graph> to understand
+    the project layout, module sizes, and how files relate to each other.
+
+  STEP 2 — Identify relevant files:
+    Based on the structure and your task, determine which files you need
+    to read to provide a complete and accurate response.
+
+  STEP 3 — Output the follow-up command:
+    Output EXACTLY this block (copy-paste ready, no surrounding text),
+    replacing the placeholders with the actual file paths you need:
+
+    <follow_up_command>
+    contexto C:\dev\playero_2\mobile-playero\src\screens --objetivo "verificar que nada axeda a comunicacion con api y que se comunique unicamente por medio de los modulos con el backend" --archivos [ruta/archivo1] [ruta/archivo2] ...
+    </follow_up_command>
+
+    Use forward slashes. Paths are relative to project_root.
+    Be selective — only request files genuinely needed for the task.
+</response_instructions>
+
+# ========================================================================
+# ESTIMACIÓN DE TOKENS
+# ========================================================================
+#
+#  Modelo           : Genérico (sin modelo específico)
+#  Caracteres       : 11.046
+#  Tokens estimados : ~2.761
+#  Costo estimado   : no disponible (varía según proveedor)
+#  Context window   : no especificado para este modelo
+#
+#  Nota: los precios y límites pueden haber cambiado. Verificá en
+#  la documentación oficial del modelo antes de tomar decisiones de costo.
+# ========================================================================

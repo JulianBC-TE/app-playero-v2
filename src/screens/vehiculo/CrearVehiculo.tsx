@@ -5,7 +5,7 @@
 //   Sin otros cambios — ya usaba saveVehiculoLocal desde vehiculoDB
 
 import { Text, TouchableOpacity, View } from "react-native";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { StackRoutesProps } from "@/route/app.routes";
 import { toastError, toastSuccess } from "@utils/toastMessage";
 import { Input } from "@components/Input";
@@ -39,7 +39,7 @@ export function CrearVehiculo({
   navigation,
   route,
 }: StackRoutesProps<"crearvehiculo">) {
-  const { cliente, setCliente } = useCliente();
+  const { cliente,} = useCliente();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
@@ -47,10 +47,8 @@ export function CrearVehiculo({
     control,
     handleSubmit,
     formState: { errors },
-    setValue,
     reset,
     clearErrors,
-    watch,
   } = useForm({
     resolver: yupResolver(addVehiculochema),
     defaultValues: {

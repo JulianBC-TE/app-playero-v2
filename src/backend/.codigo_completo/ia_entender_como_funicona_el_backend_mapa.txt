@@ -1,0 +1,178 @@
+<context_metadata>
+  generated_at: 2026-05-26T09:08:44
+  project_root: C:\dev\playero_2\mobile-playero\src\backend
+  file_count: 39
+  extensions_included: .css, .html, .js, .jsx, .py, .ts, .tsx
+  content_type: structure_only (no source code)
+  recent_commits:
+    - c4da6e9 Refactor de backend móvil implementando Data Mapper y sincronización de inventario segmentada por la cédula del usuario
+    - 4733ab6 Actualizacion de schema de bd para reflejar oncfiguracion de modulos habilitados y bodegas a las que se pueden hacer traspaso
+    - 2912225 Ampliacion de la documentacion(TypeDoc)
+    - 511e6eb Ampliacion de la documentacion(TypeDoc)
+    - 8cec1d5 Avance en docs de DB
+</context_metadata>
+
+<task>
+  entender como funicona el backend
+</task>
+
+<file_tree>
+backend/
+  index.ts
+  errors.ts
+  api/
+    index.ts
+  db/
+    index.ts
+    authAPI.ts
+    client.tsx
+    clienteAPI.ts
+    httpClient.ts
+    modulosAPI.ts
+    operacionesAPI.ts
+    personaAPI.ts
+    schema.ts
+    vehiculoAPI.ts
+    constants/
+      index.ts
+    modules/
+      index.ts
+    seeds/
+      index.ts
+    services/
+      index.ts
+      abastecimientoDB.ts
+      authDB.ts
+      bodegaDB.ts
+      calibracionDB.ts
+      clienteDB.ts
+      despachoDB.ts
+    drizzle/
+      migrations.js
+      moduleDB.ts
+      personaDB.ts
+      picoDB.ts
+      seedLocalDB.ts
+      sucursalDB.ts
+      syncConfig.ts
+      syncService.ts
+      tanqueDB.ts
+      ticketDB.ts
+      traspasoDB.ts
+      turnoBD.ts
+      turnoEstado.ts
+      turnoStatusService.ts
+      usuarioDB.ts
+      vehiculoDB.ts
+</file_tree>
+
+<file_index>
+  <file path="index.ts" lines="8" ext=".ts" />
+  <file path="errors.ts" lines="32" ext=".ts" />
+  <file path="api/index.ts" lines="12" ext=".ts" />
+  <file path="db/index.ts" lines="9" ext=".ts" />
+  <file path="api/authAPI.ts" lines="62" ext=".ts" imports="./httpClient" />
+  <file path="db/client.tsx" lines="58" ext=".tsx" imports="react, drizzle-orm/expo-sqlite, expo-sqlite, drizzle-orm/expo-sqlite/migrator, expo-drizzle-studio-plugin, ./drizzle/migrations" />
+  <file path="api/clienteAPI.ts" lines="108" ext=".ts" imports="./httpClient, @/dto/ClienteDTO" />
+  <file path="api/httpClient.ts" lines="200" ext=".ts" imports="@/backend/api/httpClient, axios, @react-native-async-storage/async-storage, @storage/storageConfig" />
+  <file path="api/modulosAPI.ts" lines="102" ext=".ts" imports="./httpClient" />
+  <file path="api/operacionesAPI.ts" lines="87" ext=".ts" imports="./httpClient, ../db/constants/syncConfig, @/dto/TicketDTO, @/dto/TraspasoDTO, @/dto/CalibracionDTO, @/dto/AbastecimientoDTO, @/dto/TurnoDTO" />
+  <file path="api/personaAPI.ts" lines="109" ext=".ts" imports="./httpClient, @/dto/PersonaDTO" />
+  <file path="db/schema.ts" lines="390" ext=".ts" imports="drizzle-orm/sqlite-core, drizzle-orm" />
+  <file path="api/vehiculoAPI.ts" lines="125" ext=".ts" imports="./httpClient, @/dto/VehiculoDTO" />
+  <file path="db/constants/index.ts" lines="7" ext=".ts" />
+  <file path="db/modules/index.ts" lines="22" ext=".ts" />
+  <file path="db/seeds/index.ts" lines="6" ext=".ts" />
+  <file path="db/services/index.ts" lines="7" ext=".ts" />
+  <file path="db/modules/abastecimientoDB.ts" lines="91" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/AbastecimientoDTO" />
+  <file path="db/modules/authDB.ts" lines="239" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, expo-crypto" />
+  <file path="db/modules/bodegaDB.ts" lines="287" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/BodegaDTO, ../constants/syncConfig, axios" />
+  <file path="db/modules/calibracionDB.ts" lines="95" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/CalibracionDTO" />
+  <file path="db/modules/clienteDB.ts" lines="281" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/ClienteDTO, ../constants/syncConfig, axios" />
+  <file path="db/modules/despachoDB.ts" lines="109" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm" />
+  <file path="db/drizzle/migrations.js" lines="20" ext=".js" imports="./meta/_journal.json, ./0000_parallel_vindicator.sql, ./0001_luxuriant_rattler.sql, ./0002_sudden_princess_powerful.sql, ./0003_aberrant_vertigo.sql, ./0004_tearful_scalphunter.sql" />
+  <file path="db/modules/moduleDB.ts" lines="95" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/backend/api/modulosAPI, @/dto/modulosDTO" />
+  <file path="db/modules/personaDB.ts" lines="330" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/PersonaDTO, ../constants/syncConfig" />
+  <file path="db/modules/picoDB.ts" lines="199" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/PicosDTO, ../constants/syncConfig, ../schema, ./bodegaDB" />
+  <file path="db/seeds/seedLocalDB.ts" lines="350" ext=".ts" imports="@/backend/db/seed/seedLocalDB, @/backend/db/client, expo-crypto, @/storage/storageSucursal, @/storage/storageUse, @/storage/storageAuthToken" />
+  <file path="db/modules/sucursalDB.ts" lines="152" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/sucursalDTO, ../constants/syncConfig, axios" />
+  <file path="db/constants/syncConfig.ts" lines="40" ext=".ts" imports="@/backend/api/httpClient" />
+  <file path="db/services/syncService.ts" lines="175" ext=".ts" imports="../constants/syncConfig, ../modules/sucursalDB, ../modules/bodegaDB, ../modules/picoDB, ../modules/tanqueDB" />
+  <file path="db/modules/tanqueDB.ts" lines="204" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, ../schema, drizzle-orm, @/dto/TanqueDTO, ../constants/syncConfig, ./bodegaDB" />
+  <file path="db/modules/ticketDB.ts" lines="100" ext=".ts" imports="drizzle-orm, ../client, ../schema, @/dto/TicketDTO" />
+  <file path="db/modules/traspasoDB.ts" lines="92" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/TraspasoDTO" />
+  <file path="db/modules/turnoBD.ts" lines="146" ext=".ts" imports="drizzle-orm, ../client, ../schema, ../services/turnoStatusService, ./bodegaDB, @/dto/BodegaDTO, @/dto/TurnoDTO, ../constants/turnoEstado" />
+  <file path="db/constants/turnoEstado.ts" lines="12" ext=".ts" />
+  <file path="db/services/turnoStatusService.ts" lines="186" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, ../constants/turnoEstado, drizzle-orm" />
+  <file path="db/modules/usuarioDB.ts" lines="28" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm" />
+  <file path="db/modules/vehiculoDB.ts" lines="375" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/VehiculoDTO, @/utils/AppError, ../constants/syncConfig" />
+</file_index>
+
+<dependency_graph>
+  <file path="api/authAPI.ts" depends_on="api\httpClient.ts" />
+  <file path="db/client.tsx" depends_on="db\drizzle\migrations.js" />
+  <file path="api/clienteAPI.ts" depends_on="api\httpClient.ts" />
+  <file path="api/httpClient.ts" depends_on="api\httpClient.ts" />
+  <file path="api/modulosAPI.ts" depends_on="api\httpClient.ts" />
+  <file path="api/operacionesAPI.ts" depends_on="api\httpClient.ts, db\constants\syncConfig.ts" />
+  <file path="api/personaAPI.ts" depends_on="api\httpClient.ts" />
+  <file path="api/vehiculoAPI.ts" depends_on="api\httpClient.ts" />
+  <file path="db/modules/abastecimientoDB.ts" depends_on="db\client.tsx, db\schema.ts" />
+  <file path="db/modules/authDB.ts" depends_on="db\client.tsx, db\schema.ts" />
+  <file path="db/modules/bodegaDB.ts" depends_on="db\client.tsx, db\schema.ts, db\constants\syncConfig.ts" />
+  <file path="db/modules/calibracionDB.ts" depends_on="db\client.tsx, db\schema.ts" />
+  <file path="db/modules/clienteDB.ts" depends_on="db\client.tsx, db\schema.ts, db\constants\syncConfig.ts" />
+  <file path="db/modules/despachoDB.ts" depends_on="db\client.tsx, db\schema.ts" />
+  <file path="db/modules/moduleDB.ts" depends_on="db\client.tsx, db\schema.ts, api\modulosAPI.ts" />
+  <file path="db/modules/personaDB.ts" depends_on="db\client.tsx, db\schema.ts, db\constants\syncConfig.ts" />
+  <file path="db/modules/picoDB.ts" depends_on="db\client.tsx, db\schema.ts, db\constants\syncConfig.ts, db\schema.ts, db\modules\bodegaDB.ts" />
+  <file path="db/seeds/seedLocalDB.ts" depends_on="db\seeds\seedLocalDB.ts, db\client.tsx" />
+  <file path="db/modules/sucursalDB.ts" depends_on="db\client.tsx, db\schema.ts, db\constants\syncConfig.ts" />
+  <file path="db/constants/syncConfig.ts" depends_on="api\httpClient.ts" />
+  <file path="db/services/syncService.ts" depends_on="db\constants\syncConfig.ts, db\modules\sucursalDB.ts, db\modules\bodegaDB.ts, db\modules\picoDB.ts, db\modules\tanqueDB.ts" />
+  <file path="db/modules/tanqueDB.ts" depends_on="db\client.tsx, db\schema.ts, db\schema.ts, db\constants\syncConfig.ts, db\modules\bodegaDB.ts" />
+  <file path="db/modules/ticketDB.ts" depends_on="db\client.tsx, db\schema.ts" />
+  <file path="db/modules/traspasoDB.ts" depends_on="db\client.tsx, db\schema.ts" />
+  <file path="db/modules/turnoBD.ts" depends_on="db\client.tsx, db\schema.ts, db\services\turnoStatusService.ts, db\modules\bodegaDB.ts, db\constants\turnoEstado.ts" />
+  <file path="db/services/turnoStatusService.ts" depends_on="db\client.tsx, db\schema.ts, db\constants\turnoEstado.ts" />
+  <file path="db/modules/usuarioDB.ts" depends_on="db\client.tsx, db\schema.ts" />
+  <file path="db/modules/vehiculoDB.ts" depends_on="db\client.tsx, db\schema.ts, db\constants\syncConfig.ts" />
+</dependency_graph>
+
+<response_instructions>
+  You are receiving the structural map of a codebase (no source code).
+  Your task is defined in <task>.
+
+  STEP 1 — Analyze the structure:
+    Use <file_tree>, <file_index>, and <dependency_graph> to understand
+    the project layout, module sizes, and how files relate to each other.
+
+  STEP 2 — Identify relevant files:
+    Based on the structure and your task, determine which files you need
+    to read to provide a complete and accurate response.
+
+  STEP 3 — Output the follow-up command:
+    Output EXACTLY this block (copy-paste ready, no surrounding text),
+    replacing the placeholders with the actual file paths you need:
+
+    <follow_up_command>
+    contexto C:\dev\playero_2\mobile-playero\src\backend --objetivo "entender como funicona el backend" --archivos [ruta/archivo1] [ruta/archivo2] ...
+    </follow_up_command>
+
+    Use forward slashes. Paths are relative to project_root.
+    Be selective — only request files genuinely needed for the task.
+</response_instructions>
+
+# ========================================================================
+# ESTIMACIÓN DE TOKENS
+# ========================================================================
+#
+#  Modelo           : Genérico (sin modelo específico)
+#  Caracteres       : 10.582
+#  Tokens estimados : ~2.645
+#  Costo estimado   : no disponible (varía según proveedor)
+#  Context window   : no especificado para este modelo
+#
+#  Nota: los precios y límites pueden haber cambiado. Verificá en
+#  la documentación oficial del modelo antes de tomar decisiones de costo.
+# ========================================================================

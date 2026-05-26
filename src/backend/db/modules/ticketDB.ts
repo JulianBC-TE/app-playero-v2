@@ -47,7 +47,7 @@ export async function getTicketById(idTicket: number) {
 /**
  * Obtener tickets pendientes de sincronización
  */
-export async function getTicketsPendientes(): Promise<Array<{
+export async function getTicketsPendientes(): Promise<{
   idTicket: number;
   tipo: string;
   sync: number;
@@ -55,7 +55,7 @@ export async function getTicketsPendientes(): Promise<Array<{
   hora: number | null;
   estado: number;
   dto: TicketDTO;           // campo renombrado de json → dto
-}>> {
+}[]> {
   const result = await db.select().from(tickets).where(eq(tickets.sync, 0));
   return result.map((t) => ({
     ...t,

@@ -17,7 +17,7 @@ const api = axios.create({
 	timeout: 22000,
 }) as APIInstanceProps;
 
-let failedQueue: Array<PromiseType> = [];
+let failedQueue: PromiseType[] = [];
 let isRefreshing = false;
 
 api.registerInterceptTokenManager = (signOut) => {
