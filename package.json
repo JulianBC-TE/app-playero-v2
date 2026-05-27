@@ -3,13 +3,16 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "postinstall": "patch-package",
     "start": "expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@expo-google-fonts/roboto": "^0.4.0",
+    "@expo/vector-icons": "^14.1.0",
     "@hookform/resolvers": "^5.0.1",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-native-picker/picker": "2.11.1",
@@ -22,6 +25,7 @@
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
     "expo": "^53.0.16",
+    "expo-asset": "~11.1.7",
     "expo-build-properties": "~0.14.8",
     "expo-crypto": "~14.1.5",
     "expo-dev-client": "~5.2.3",
@@ -37,9 +41,10 @@
     "nativewind": "^4.1.23",
     "react": "19.0.0",
     "react-hook-form": "^7.56.4",
-    "react-native": "0.79.5",
+    "react-native": "0.79.6",
+    "react-native-css-interop": "^0.2.4",
     "react-native-pager-view": "6.7.1",
-    "react-native-reanimated": "^3.17.4",
+    "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-signature-canvas": "^4.7.4",
@@ -50,27 +55,35 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
-    "@expo/config-plugins": "~10.0.0",
+    "@expo/config-plugins": "~10.1.1",
     "@expo/metro-config": "^0.20.17",
     "@types/bcryptjs": "^2.4.6",
+    "@types/expo__vector-icons": "^9.0.1",
     "@types/lodash.debounce": "^4.0.9",
     "@types/react": "~19.0.10",
     "babel-plugin-inline-import": "^3.0.0",
+    "babel-plugin-module-resolver": "^5.0.3",
     "drizzle-kit": "^0.31.10",
+    "eslint": "^9.39.4",
+    "eslint-config-expo": "~9.2.0",
+    "patch-package": "^8.0.1",
     "tailwindcss": "^3.4.17",
     "typedoc": "^0.28.19",
     "typescript": "~5.8.3"
   },
   "overrides": {
-    "@xmldom/xmldom": "0.8.12",
-    "glob@^10.0.0": "10.5.0",
-    "minimatch@^3.0.0": "3.1.4",
-    "minimatch@^9.0.0": "9.0.7",
+    "@xmldom/xmldom": "0.8.13",
     "node-forge": "1.4.0",
-    "picomatch@^2.0.0": "2.3.2",
-    "picomatch@^3.0.0": "3.0.2",
     "tar": "7.5.11",
-    "undici": "6.24.0"
+    "undici": "6.24.0",
+    "fast-uri": "3.1.2",
+    "postcss": "8.5.10",
+    "ws": "8.20.1",
+    "esbuild": "0.25.0",
+    "glob": {
+      "minimatch": "9.0.7"
+    },
+    "minimatch": "9.0.7"
   },
   "expo": {
     "doctor": {

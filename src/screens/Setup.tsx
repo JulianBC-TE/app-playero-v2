@@ -12,6 +12,7 @@ import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { Image, Text, View } from "react-native";
 import { InputCard } from "@/components/InputCard";
 import axios from "axios";
+import { seedLocalDB } from "@/backend/db/seeds/seedLocalDB";
 
 type FormData = {
   ip: string;
@@ -96,6 +97,7 @@ export function Setup() {
             {errorText?.message || ""}
           </Text>
         </View>
+        <View><Button title="🌱 Seed BD" onPress={seedLocalDB} /></View>
       </View>
     </View>
   );

@@ -9,14 +9,17 @@ export function Routes() {
 	const { user, isLoadingUserData, serverIP, isLoadingServerIP } = useAuth();
 
 	if (isLoadingUserData || isLoadingServerIP) {
+		console.log("loading");
 		return <Loading />;
 	}
 
 	return (
-		<NavigationContainer>
-			{!serverIP ? (
+		/*!serverIP ? (
 				<SetupRoutes />
-			) : user.cedula ? (
+			) :  */
+		<NavigationContainer>
+			
+			{user.cedula ? (
 				<StackRoutes />
 			) : (
 				<AuthRoutes />

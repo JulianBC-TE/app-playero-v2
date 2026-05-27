@@ -28,6 +28,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
   const [isLoading, setIsLoading] = useState(true);
   const [menuItems, setMenuItems] = useState<menuItemType[]>(baseMenuItems);
   const { user } = useAuth(); // Extraemos el operario logueado para obtener su cédula
+  const cedula = user?.cedula; // primitivo, comparación estable
   const [sucursal, setSucursal] = useState<{
     id_sucursal: number;
     descripcion_sucursal: string;
@@ -49,25 +50,31 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 
           // 2. Obtener el estado del turno si hay una sucursal activa
           if (sucursalActiva) {
-            const statusTurno = await getTurnoStatusLocal(sucursalActiva.id_sucursal);
+            const statusTurno = await getTurnoStatusLocal(
+              sucursalActiva.id_sucursal,
+            );
             // Aquí puedes mapear campos adicionales del estado del turno a los ítems si lo requieres en tu UI
           }
 
           // 3. CONTROL DE ACCESO ACCIONADO POR LA BD LOCAL (Offline-First)
-          if (user?.cedula) {
-            const permisosLocales = await getModulosDelUsuario(String(user.cedula));
+          if (cedula) {
+            const permisosLocales = await getModulosDelUsuario(
+              String(user.cedula),
+            );
 
             if (permisosLocales) {
               // Recorremos los ítems estáticos del menú y alteramos su propiedad 'enabled'
               const itemsFiltrados = baseMenuItems.map((item) => {
                 // Formateamos el "route" a minúsculas (ej: 'Abastecimiento' -> 'abastecimiento')
                 // para que coincida exactamente con las columnas de tu esquema SQLite
-                const campoModulo = item.route.toLowerCase() as keyof typeof permisosLocales;
+                const campoModulo =
+                  item.route.toLowerCase() as keyof typeof permisosLocales;
 
                 // Verificamos si la columna existe en el registro de la base de datos
-                const tieneAcceso = permisosLocales[campoModulo] !== undefined
-                  ? permisosLocales[campoModulo]
-                  : item.enabled; // Si no existe (ej: la ruta 'config'), preserva el valor por defecto
+                const tieneAcceso =
+                  permisosLocales[campoModulo] !== undefined
+                    ? permisosLocales[campoModulo]
+                    : item.enabled; // Si no existe (ej: la ruta 'config'), preserva el valor por defecto
 
                 return {
                   ...item,
@@ -80,14 +87,17 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
           }
         } catch (error) {
           console.error("Error cargando el dashboard:", error);
-          toastError("Error", "No se pudieron procesar los permisos o el estado del turno local.");
+          toastError(
+            "Error",
+            "No se pudieron procesar los permisos o el estado del turno local.",
+          );
         } finally {
           setIsLoading(false);
         }
       }
 
       loadDashboardData();
-    }, [user])
+    }, [cedula]),
   );
 
   return (
@@ -127,7 +137,8 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 
           <View className="mb-6">
             <Text className="text-center text-lg font-bold">
-              {sucursal?.descripcion_sucursal || "Ninguna Sucursal Seleccionada"}
+              {sucursal?.descripcion_sucursal ||
+                "Ninguna Sucursal Seleccionada"}
               {sucursal ? ` (${sucursal.id_sucursal})` : ""}
             </Text>
           </View>

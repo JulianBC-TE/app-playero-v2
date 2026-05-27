@@ -12,6 +12,8 @@ import * as SQLite from "expo-sqlite";
 import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
 import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
 import migrations from "./drizzle/migrations";
+import { View, Text } from "react-native";
+import { Loading } from "@/components/Loading";
 
 /** Instancia SQLite subyacente abierta con soporte de change listener. */
 const expoDb = SQLite.openDatabaseSync("playero.db", { 
@@ -46,12 +48,17 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
 
   if (error) {
     console.error("❌ Migration error:", error);
-    return null;
+    // Mostrá algo en vez de pantalla negra
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <Text>Error al inicializar la base de datos.</Text>
+        <Text>{error.message}</Text>
+      </View>
+    );
   }
 
   if (!success) {
-    console.log("⏳ Aplicando migraciones...");
-    return null;
+    return <Loading />;  // ← en vez de null
   }
 
   return <>{children}</>;

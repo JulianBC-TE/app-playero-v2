@@ -1,0 +1,29 @@
+{
+  "descripcion": "Describe aquí tu proyecto en una o dos oraciones.",
+  "extensiones": [
+    ".py",
+    ".js",
+    ".ts",
+    ".jsx",
+    ".tsx",
+    ".css"
+  ],
+  "ignorar": [
+    "node_modules",
+    ".git",
+    "__pycache__",
+    "dist",
+    "venv",
+    "build"
+  ],
+  "incluir_solo": [
+    "src"
+  ],
+  "limite_lineas": null,
+  "omitir_autogenerados": true,
+  "carpeta_salida": ".codigo_completo",
+  "nombre_salida": "contexto_codigo.txt",
+  "nombre_salida_cambios": "cambios_git.txt",
+  "nombre_salida_co": "mapa_contexto.txt",
+  "modelo": "default"
+}

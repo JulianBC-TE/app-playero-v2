@@ -34,7 +34,8 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-asset"
     ],
     "owner": "tecnoedil",
     "ios": {

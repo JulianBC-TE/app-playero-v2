@@ -1,0 +1,793 @@
+<context_metadata>
+  generated_at: 2026-05-27T11:24:06
+  project_root: C:\dev\playero_2\mobile-playero
+  file_count: 8
+  extensions_included: .css, .html, .js, .jsx, .py, .ts, .tsx
+</context_metadata>
+
+<task>
+  al abrir la appp se queda cargando en la pantalla de carga(components/Loading) y no sale nunca de ese estado
+</task>
+
+<file_index>
+  <file path="src/route/index.tsx" lines="27" ext=".tsx" imports="@react-navigation/native, ./app.routes, ./auth.routes, ./config.routes, @/hooks/useAuth, @/components/Loading" />
+  <file path="src/route/app.routes.tsx" lines="178" ext=".tsx" imports="@/screens/Home, @/screens/Config, @/screens/cliente/Cliente, @/screens/cliente/BuscarCliente, @/screens/persona/Persona, @/screens/turno/Turno, @/screens/persona/BuscarPersona, @/screens/persona/EditarPersona, @/screens/vehiculo/Vehiculo, @/screens/vehiculo/BuscarVehiculo, @/screens/vehiculo/CrearVehiculo, @/screens/turno/Medicion, @/dto/MedicionDTO, @/screens/Firma, @/dto/PersonaDTO (+11)" />
+  <file path="src/route/auth.routes.tsx" lines="31" ext=".tsx" imports="../screens/SignIn, ../screens/Setup" />
+  <file path="src/components/Loading.tsx" lines="19" ext=".tsx" imports="react-native" />
+  <file path="src/hooks/useInitialSync.ts" lines="40" ext=".ts" imports="@/backend/db/modules/clienteDB, @/backend/db/modules/personaDB, @/backend/db/modules/vehiculoDB, @/backend/db/modules/sucursalDB, @/backend/db/modules/bodegaDB, @/backend/db/modules/picoDB, @/backend/db/modules/tanqueDB" />
+  <file path="src/utils/useInitialSync.ts" lines="27" ext=".ts" imports="@/backend/db/modules/clienteDB, @/backend/db/modules/personaDB, @/backend/db/modules/vehiculoDB, @/backend/db/modules/sucursalDB, @/backend/db/modules/bodegaDB, @/backend/db/modules/picoDB, @/backend/db/modules/tanqueDB" />
+  <file path="src/backend/db/client.tsx" lines="65" ext=".tsx" imports="react, drizzle-orm/expo-sqlite, expo-sqlite, drizzle-orm/expo-sqlite/migrator, expo-drizzle-studio-plugin, ./drizzle/migrations, react-native, @/components/Loading" />
+  <file path="src/backend/db/seeds/seedLocalDB.ts" lines="350" ext=".ts" imports="@/backend/db/seed/seedLocalDB, @/backend/db/client, expo-crypto, @/storage/storageSucursal, @/storage/storageUse, @/storage/storageAuthToken" />
+</file_index>
+
+<codebase>
+
+<file path="src/route/index.tsx">
+import { NavigationContainer } from "@react-navigation/native";
+import { StackRoutes } from "./app.routes";
+import { AuthRoutes } from "./auth.routes";
+import { SetupRoutes } from "./config.routes";
+import { useAuth } from "@/hooks/useAuth";
+import { Loading } from "@/components/Loading";
+
+export function Routes() {
+	const { user, isLoadingUserData, serverIP, isLoadingServerIP } = useAuth();
+
+	if (isLoadingUserData || isLoadingServerIP) {
+		console.log("loading");
+		return <Loading />;
+	}
+
+	return (
+		<NavigationContainer>
+			{!serverIP ? (
+				<SetupRoutes />
+			) : user.cedula ? (
+				<StackRoutes />
+			) : (
+				<AuthRoutes />
+			)}
+		</NavigationContainer>
+	);
+}
+</file>
+
+<file path="src/route/app.routes.tsx">
+import {
+	createNativeStackNavigator,
+	NativeStackScreenProps,
+} from "@react-navigation/native-stack";
+
+import { Home } from "@/screens/Home";
+import { Config } from "@/screens/Config";
+import { Cliente } from "@/screens/cliente/Cliente";
+import { BuscarCliente } from "@/screens/cliente/BuscarCliente";
+import { Persona } from "@/screens/persona/Persona";
+import { Turno } from "@/screens/turno/Turno";
+import { BuscarPersona } from "@/screens/persona/BuscarPersona";
+import { EditarPersona } from "@/screens/persona/EditarPersona";
+import { Vehiculo } from "@/screens/vehiculo/Vehiculo";
+import { BuscarVehiculo } from "@/screens/vehiculo/BuscarVehiculo";
+import { CrearVehiculo } from "@/screens/vehiculo/CrearVehiculo";
+import { Medicion } from "@/screens/turno/Medicion";
+import { MedicionDTO } from "@/dto/MedicionDTO";
+import { Firma } from "@/screens/Firma";
+import { PersonaDTO } from "@/dto/PersonaDTO";
+import { VehiculoDTO } from "@/dto/VehiculoDTO";
+import { Salida } from "@/screens/salida/Salida";
+import { ClienteDTO } from "@/dto/ClienteDTO";
+import { Traspaso } from "@/screens/traspaso/Traspaso";
+import { Calibracion } from "@/screens/calibracion/Calibracion";
+import { Sequencias } from "@/screens/calibracion/Sequencias";
+import { SequenciaCalibracionDTO } from "@/dto/SequenciaCalibracionDTO";
+import { Abastecimiento } from "@/screens/abastecimiento/Abastecimiento";
+import { CargaCombustible } from "@/screens/abastecimiento/CargaCombustible";
+import { MedicionAbastecimiento } from "@/screens/abastecimiento/MedicionAbastecimiento";
+import { CargaZetaDTO } from "@/dto/CargaZetaDTO";
+
+export type StackRoutesList = {
+	home: undefined;
+	config: undefined;
+	persona: undefined;
+	turno:
+		| { onFirma?: string; onPersona: PersonaDTO; onMedicion: MedicionDTO[] }
+		| undefined;
+	traspaso:
+		| { onFirma?: string; onPersona: PersonaDTO; onMedicion: MedicionDTO[] }
+		| undefined;
+	abastecimiento:
+		| {
+				onCargaZeta?: CargaZetaDTO;
+				onMedicionInicial?: MedicionDTO[] | null;
+				onMedicionFinal?: MedicionDTO[] | null;
+		  }
+		| undefined;
+	cargaCombustible: { idBodega: string } | undefined;
+	medicionAbastecimiento:
+		| {
+				fromScreen?: string;
+				idBodega: string;
+				cargaZeta: number;
+				litrosRemision: number;
+		  }
+		| undefined;
+	calibracion:
+		| {
+				onFirma?: string;
+				onPersona?: PersonaDTO;
+				onSequencia?: SequenciaCalibracionDTO;
+		  }
+		| undefined;
+	sequencias: { pico_surtidor?: number } | undefined;
+	cliente: { enabledSelect?: boolean } | undefined;
+	buscarcliente: { fromScreen?: string; enabledSelect?: boolean } | undefined;
+	editarpersona: { cedula: number; nombre: string } | undefined;
+	buscarpersona:
+		| { fromScreen?: string; enabledEdit?: boolean; enabledSelect?: boolean }
+		| undefined;
+	vehiculo: undefined;
+	buscarvehiculo: { fromScreen?: string; enabledSelect?: boolean } | undefined;
+	crearvehiculo: { onCliente?: ClienteDTO } | undefined;
+	medicion: { fromScreen?: string; idBodega: string } | undefined;
+	firma: { fromScreen?: string; persona: PersonaDTO | null } | undefined;
+	salida:
+		| { onFirma?: string; onPersona: PersonaDTO; onVehiculo: VehiculoDTO }
+		| undefined;
+};
+
+export type StackRoutesProps<T extends keyof StackRoutesList> =
+	NativeStackScreenProps<StackRoutesList, T>;
+
+const Stack = createNativeStackNavigator<StackRoutesList>();
+
+export function StackRoutes() {
+	return (
+		<Stack.Navigator
+			initialRouteName='home'
+			screenOptions={{
+				headerShown: false,
+			}}
+		>
+			<Stack.Screen
+				name='home'
+				component={Home}
+			/>
+			<Stack.Screen
+				name='persona'
+				component={Persona}
+			/>
+			<Stack.Screen
+				name='cliente'
+				component={Cliente}
+			/>
+			<Stack.Screen
+				name='buscarcliente'
+				component={BuscarCliente}
+			/>
+			<Stack.Screen
+				name='editarpersona'
+				component={EditarPersona}
+			/>
+			<Stack.Screen
+				name='buscarpersona'
+				component={BuscarPersona}
+			/>
+			<Stack.Screen
+				name='vehiculo'
+				component={Vehiculo}
+			/>
+			<Stack.Screen
+				name='buscarvehiculo'
+				component={BuscarVehiculo}
+			/>
+			<Stack.Screen
+				name='crearvehiculo'
+				component={CrearVehiculo}
+			/>
+			<Stack.Screen
+				name='turno'
+				component={Turno}
+			/>
+			<Stack.Screen
+				name='medicion'
+				component={Medicion}
+			/>
+			<Stack.Screen
+				name='config'
+				component={Config}
+			/>
+			<Stack.Screen
+				name='firma'
+				component={Firma}
+			/>
+			<Stack.Screen
+				name='salida'
+				component={Salida}
+			/>
+			<Stack.Screen
+				name='traspaso'
+				component={Traspaso}
+			/>
+			<Stack.Screen
+				name='calibracion'
+				component={Calibracion}
+			/>
+			<Stack.Screen
+				name='sequencias'
+				component={Sequencias}
+			/>
+			<Stack.Screen
+				name='abastecimiento'
+				component={Abastecimiento}
+			/>
+			<Stack.Screen
+				name='cargaCombustible'
+				component={CargaCombustible}
+			/>
+			<Stack.Screen
+				name='medicionAbastecimiento'
+				component={MedicionAbastecimiento}
+			/>
+		</Stack.Navigator>
+	);
+}
+</file>
+
+<file path="src/route/auth.routes.tsx">
+import {
+	createNativeStackNavigator,
+	NativeStackNavigationProp,
+} from "@react-navigation/native-stack";
+
+import { SignIn } from "../screens/SignIn";
+import { Setup } from "../screens/Setup";
+
+type authRoutes = {
+	signIn: undefined;
+	setUp: undefined;
+};
+
+export type authNavigatorRoutesProps = NativeStackNavigationProp<authRoutes>;
+
+const { Navigator, Screen } = createNativeStackNavigator<authRoutes>();
+
+export function AuthRoutes() {
+	return (
+		<Navigator screenOptions={{ headerShown: false }}>
+			<Screen
+				name='signIn'
+				component={SignIn}
+			/>
+			<Screen
+				name='setUp'
+				component={Setup}
+			/>
+		</Navigator>
+	);
+}
+</file>
+
+<file path="src/components/Loading.tsx">
+/**
+ * @module Playero/Components/Loading
+ * @category UI Components
+ */
+import { View, ActivityIndicator } from "react-native";
+
+/**
+ * Indicador de carga centrado. Muestra un spinner mientras se procesan datos.
+ */
+export function Loading() {
+	return (
+		<View>
+			<ActivityIndicator
+				size='large'
+				color='#000'
+			/>
+		</View>
+	);
+}
+</file>
+
+<file path="src/hooks/useInitialSync.ts">
+// src/hooks/useInitialSync.ts
+import { syncClientesFromCentral } from "@/backend/db/modules/clienteDB";
+import { syncPersonasFromCentral } from "@/backend/db/modules/personaDB";
+import { syncVehiculosFromCentral } from "@/backend/db/modules/vehiculoDB";
+import { syncSucursalesFromCentral } from "@/backend/db/modules/sucursalDB";
+import { syncBodegasFromCentral } from "@/backend/db/modules/bodegaDB";
+import { syncPicosFromCentral } from "@/backend/db/modules/picoDB";
+import { syncTanquesFromCentral } from "@/backend/db/modules/tanqueDB";
+/**
+ * Hook que provee la función de sincronización inicial de datos desde el servidor central.
+ * Sincroniza sucursales, bodegas, picos, tanques, clientes, personas y vehículos en orden.
+ *
+ * @param cedula - Cédula del usuario autenticado.
+ * @param password - Contraseña del usuario autenticado.
+ * @returns `syncInitialData` función asíncrona que ejecuta la sincronización completa.
+ */
+export function useInitialSync(cedula: string, password: string) {
+  async function syncInitialData(): Promise<void> {
+    console.log("🚀 Iniciando sincronización inicial completa...");
+
+    try {
+      // Orden recomendado
+      await syncSucursalesFromCentral();
+      await syncBodegasFromCentral(0); //aca puse cero temporalmente pero tiene que ser la id de la sucursal de usuario
+      await syncPicosFromCentral();
+      await syncTanquesFromCentral();
+
+      await syncClientesFromCentral(0);   // 0 = primera vez
+      await syncPersonasFromCentral(0);
+      await syncVehiculosFromCentral(0);
+
+      console.log("✅ Sincronización inicial completada con éxito");
+    } catch (error) {
+      console.error("❌ Falló alguna parte de la sincronización inicial:", error);
+      // No lanzamos error para no romper el login, solo logueamos
+    }
+  }
+
+  return { syncInitialData };
+}
+</file>
+
+<file path="src/utils/useInitialSync.ts">
+// src/hooks/useInitialSync.ts  →  renombrar a src/utils/initialSync.ts
+
+import { syncClientesFromCentral } from "@/backend/db/modules/clienteDB";
+import { syncPersonasFromCentral } from "@/backend/db/modules/personaDB";
+import { syncVehiculosFromCentral } from "@/backend/db/modules/vehiculoDB";
+import { syncSucursalesFromCentral } from "@/backend/db/modules/sucursalDB";
+import { syncBodegasDelOperario } from "@/backend/db/modules/bodegaDB";
+import { syncPicosDelOperario } from "@/backend/db/modules/picoDB";
+import { syncTanquesDelOperario } from "@/backend/db/modules/tanqueDB";
+
+export async function runInitialSync(cedula: string): Promise<boolean> {
+  console.log("🚀 Iniciando sincronización inicial...");
+  try {
+    await syncSucursalesFromCentral();
+    await syncBodegasDelOperario(cedula);   // solo las bodegas de este usuario
+    await syncPicosDelOperario(cedula);     // solo los picos de esas bodegas
+    await syncTanquesDelOperario(cedula);   // solo los tanques de esas bodegas
+    await syncClientesFromCentral(0);
+    await syncPersonasFromCentral(0);
+    await syncVehiculosFromCentral(0);
+    console.log("✅ Sincronización inicial completada");
+    return true;
+  } catch (error) {
+    console.error("❌ Error en sincronización inicial:", error);
+    return false;  // devuelve false en vez de tragar el error
+  }
+}
+</file>
+
+<file path="src/backend/db/client.tsx">
+/**
+ * Configura y expone la instancia global de la base de datos SQLite
+ * mediante Drizzle ORM para Expo.
+ *
+ * @module Playero/Backend/DB/Client
+ * @category Database
+ * @category client
+ */
+import React from "react";
+import { drizzle } from "drizzle-orm/expo-sqlite";
+import * as SQLite from "expo-sqlite";
+import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
+import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
+import migrations from "./drizzle/migrations";
+import { View, Text } from "react-native";
+import { Loading } from "@/components/Loading";
+
+/** Instancia SQLite subyacente abierta con soporte de change listener. */
+const expoDb = SQLite.openDatabaseSync("playero.db", { 
+  enableChangeListener: true 
+});
+
+/**
+ * Instancia global de Drizzle ORM vinculada a la BD SQLite local.
+ * Usar esta constante en todos los módulos de acceso a datos.
+ */
+export const db = drizzle(expoDb);
+
+/**
+ * Proveedor React que aplica las migraciones pendientes al montar la app.
+ * Mientras las migraciones no terminen, no renderiza los hijos.
+ * En caso de error de migración, retorna `null` y registra el error en consola.
+ *
+ * @param children - Árbol de componentes a renderizar una vez migradas las tablas.
+ * @returns El árbol de hijos o `null` durante la migración / en caso de error.
+ *
+ * @example
+ * ```tsx
+ * <DatabaseProvider>
+ *   <App />
+ * </DatabaseProvider>
+ * ```
+ */
+export function DatabaseProvider({ children }: { children: React.ReactNode }) {
+  useDrizzleStudio(expoDb);
+
+  const { success, error } = useMigrations(db, migrations);
+
+  if (error) {
+    console.error("❌ Migration error:", error);
+    // Mostrá algo en vez de pantalla negra
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <Text>Error al inicializar la base de datos.</Text>
+        <Text>{error.message}</Text>
+      </View>
+    );
+  }
+
+  if (!success) {
+    return <Loading />;  // ← en vez de null
+  }
+
+  return <>{children}</>;
+}
+</file>
+
+<file path="src/backend/db/seeds/seedLocalDB.ts">
+/**
+ * Seed de la base de datos local para desarrollo y pruebas.
+ * Inserta datos de ejemplo en las tablas principales.
+ *
+ * @remarks Solo debe ejecutarse en entornos de desarrollo.
+ *
+ * @module Playero/Backend/DB/Seeds
+ * @category Database Seeds
+ */
+// Pobla la BD local con datos de prueba que simulan haber hecho una
+// sincronización exitosa con el servidor.
+//
+// USO:
+//   Llamar a seedLocalDB() una sola vez, idealmente en un botón de
+//   desarrollo en la pantalla Config o al arrancar la app en modo __DEV__.
+//
+// EJEMPLO en App.tsx o Config.tsx:
+//   import { seedLocalDB } from "@/backend/db/seed/seedLocalDB";
+//   if (__DEV__) await seedLocalDB();
+//
+// ──────────────────────────────────────────────────────────────────────────────
+// DATOS INCLUIDOS
+//   • 1 sucursal
+//   • 2 bodegas (una con trapaso=true)
+//   • 2 picos por bodega (4 total)
+//   • 2 tanques por bodega (4 total)
+//   • 3 clientes
+//   • 3 personas
+//   • 2 vehículos
+//   • 1 usuario app (para login offline con cedula "12345678" / pass "1234")
+//   • 1 turno de apertura del día de hoy (estado=iniciado)
+//   • Registros en `syncs` para que la app no vuelva a pedir sync
+// ──────────────────────────────────────────────────────────────────────────────
+
+import { db } from "@/backend/db/client";
+import {
+  sucursales,
+  bodegas,
+  picos,
+  tanques,
+  clientes,
+  personas,
+  usuariosApp,
+  vehiculos,
+  turnos,
+  syncs,
+} from "@/backend/db/schema";
+import * as Crypto from "expo-crypto";
+import { saveSucursal } from "@/storage/storageSucursal";
+import { saveUser } from "@/storage/storageUse";
+import { saveAuthToken } from "@/storage/storageAuthToken";
+
+// ── Constantes de las claves de sync (copiadas de cada módulo DB) ─────────────
+const SYNC_KEYS = {
+  lastUser:    "__last_online_user__",
+  sucursales:  "__last_sync_sucursales__",
+  bodegas:     "__last_sync_bodegas__",
+  picos:       "__last_sync_picos__",
+  tanques:     "__last_sync_tanques__",
+  clientes:    "__last_sync_clientes__",
+  personas:    "__last_sync_personas__",
+  vehiculos:   "__last_sync_vehiculos__",
+};
+
+// ── Credenciales de prueba ────────────────────────────────────────────────────
+const SEED_USER = {
+  cedula:   12345678,
+  name:     "Juan Perez",
+  password: "1234",        // contraseña en texto plano → se hashea abajo
+  idSucursal: 1,
+};
+
+// ── Helpers de hash (igual que authDB.ts) ────────────────────────────────────
+
+async function hashPassword(password: string, salt: string): Promise<string> {
+  return Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    salt + password,
+  );
+}
+
+async function generateSalt(): Promise<string> {
+  const bytes = Crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+// ── Upsert genérico en tabla syncs ────────────────────────────────────────────
+
+async function upsertSync(tipo: string, fecha: number): Promise<void> {
+  await db
+    .insert(syncs)
+    .values({ tipo, fecha })
+    .onConflictDoUpdate({ target: syncs.tipo, set: { fecha } });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// seedLocalDB
+// ═════════════════════════════════════════════════════════════════════════════
+
+export async function seedLocalDB(): Promise<void> {
+  console.log(" Iniciando seed de BD local...");
+  const now = Date.now();
+
+  // ── 1. Sucursal ─────────────────────────────────────────────────────────────
+  await db
+    .insert(sucursales)
+    .values({ idSucursal: 1, descripcionSucursal: "Sucursal Central" })
+    .onConflictDoUpdate({
+      target: sucursales.idSucursal,
+      set: { descripcionSucursal: "Sucursal Central" },
+    });
+
+  await upsertSync(SYNC_KEYS.sucursales, now);
+  console.log("  ✅ Sucursal insertada");
+
+  // ── 2. Bodegas ──────────────────────────────────────────────────────────────
+  //   bodega 1 → normal
+  //   bodega 2 → habilitada para traspaso
+  const bodegasData = [
+    { idBodega: 1, descripcionBodega: "Bodega Principal",   idSucursal: 1, trapaso: false },
+    { idBodega: 2, descripcionBodega: "Bodega Secundaria",  idSucursal: 1, trapaso: true  },
+  ];
+
+  for (const b of bodegasData) {
+    await db
+      .insert(bodegas)
+      .values(b)
+      .onConflictDoUpdate({
+        target: bodegas.idBodega,
+        set: {
+          descripcionBodega: b.descripcionBodega,
+          idSucursal: b.idSucursal,
+          trapaso: b.trapaso,
+        },
+      });
+  }
+
+  await upsertSync(SYNC_KEYS.bodegas, now);
+  console.log("  ✅ Bodegas insertadas");
+
+  // ── 3. Picos ────────────────────────────────────────────────────────────────
+  const picosData = [
+    { idPico: 1, descripcionPico: "Pico 1 - Nafta",   idBodega: 1, idPicoSurtidor: 101 },
+    { idPico: 2, descripcionPico: "Pico 2 - Diesel",  idBodega: 1, idPicoSurtidor: 102 },
+    { idPico: 3, descripcionPico: "Pico 3 - Nafta",   idBodega: 2, idPicoSurtidor: 201 },
+    { idPico: 4, descripcionPico: "Pico 4 - GNC",     idBodega: 2, idPicoSurtidor: 202 },
+  ];
+
+  for (const p of picosData) {
+    await db
+      .insert(picos)
+      .values(p)
+      .onConflictDoUpdate({
+        target: picos.idPico,
+        set: {
+          descripcionPico: p.descripcionPico,
+          idBodega: p.idBodega,
+          idPicoSurtidor: p.idPicoSurtidor,
+        },
+      });
+  }
+
+  await upsertSync("__last_sync_picos__", now);
+  console.log("  ✅ Picos insertados");
+
+  // ── 4. Tanques ──────────────────────────────────────────────────────────────
+  const tanquesData = [
+    { idTanque: 1, descripcionTanque: "Tanque Nafta 95",  idBodega: 1, capacidadLitros: 20000 },
+    { idTanque: 2, descripcionTanque: "Tanque Diesel",    idBodega: 1, capacidadLitros: 30000 },
+    { idTanque: 3, descripcionTanque: "Tanque Nafta P",   idBodega: 2, capacidadLitros: 15000 },
+    { idTanque: 4, descripcionTanque: "Tanque GNC",       idBodega: 2, capacidadLitros: 10000 },
+  ];
+
+  for (const t of tanquesData) {
+    await db
+      .insert(tanques)
+      .values(t)
+      .onConflictDoUpdate({
+        target: tanques.idTanque,
+        set: {
+          descripcionTanque: t.descripcionTanque,
+          idBodega: t.idBodega,
+          capacidadLitros: t.capacidadLitros,
+        },
+      });
+  }
+
+  await upsertSync(SYNC_KEYS.tanques, now);
+  console.log("  ✅ Tanques insertados");
+
+  // ── 5. Clientes ─────────────────────────────────────────────────────────────
+  const clientesData = [
+    { ruc: "80012345-1", descripcionCliente: "Transportes García S.A." },
+    { ruc: "80098765-2", descripcionCliente: "Logística del Sur S.R.L." },
+    { ruc: "4567890-1",  descripcionCliente: "Juan Comerciante" },
+  ];
+
+  for (const c of clientesData) {
+    await db
+      .insert(clientes)
+      .values({ ruc: c.ruc, descripcionCliente: c.descripcionCliente, timestamp: now, sync: 1 })
+      .onConflictDoUpdate({
+        target: clientes.ruc,
+        set: { descripcionCliente: c.descripcionCliente, timestamp: now, sync: 1 },
+      });
+  }
+
+  await upsertSync(SYNC_KEYS.clientes, now);
+  console.log("  ✅ Clientes insertados");
+
+  // ── 6. Personas ─────────────────────────────────────────────────────────────
+  const personasData = [
+    { cedula: SEED_USER.cedula, nombreApellido: SEED_USER.name },
+    { cedula: 87654321,         nombreApellido: "Maria Lopez"  },
+    { cedula: 11223344,         nombreApellido: "Carlos Rojas" },
+  ];
+
+  for (const p of personasData) {
+    await db
+      .insert(personas)
+      .values({ cedula: p.cedula, nombreApellido: p.nombreApellido, timestamp: now, sync: 1 })
+      .onConflictDoUpdate({
+        target: personas.cedula,
+        set: { nombreApellido: p.nombreApellido, timestamp: now, sync: 1 },
+      });
+  }
+
+  await upsertSync(SYNC_KEYS.personas, now);
+  console.log("  ✅ Personas insertadas");
+
+// ── 7. Usuario app ──────────────────────────────────────────────────────────
+try {
+  const salt      = await generateSalt();
+  const claveHash = await hashPassword(SEED_USER.password, salt);
+
+  await db
+    .insert(usuariosApp)
+    .values({
+      cedula:       SEED_USER.cedula,
+      clave:        claveHash,
+      salt,
+      refreshToken: null,
+      bloqueado:    false,
+      idSucursal:   SEED_USER.idSucursal,
+    })
+    .onConflictDoUpdate({
+      target: usuariosApp.cedula,
+      set: { clave: claveHash, salt, idSucursal: SEED_USER.idSucursal },
+    });
+
+  await upsertSync(SYNC_KEYS.lastUser, SEED_USER.cedula);
+  console.log(`  ✅ Usuario app creado  →  cédula: ${SEED_USER.cedula}  |  pass: "${SEED_USER.password}"`);
+} catch (e) {
+  console.error("  ❌ Error en usuario app:", e);
+}
+  // ── 8. Vehículos ─────────────────────────────────────────────────────────────
+  const vehiculosData = [
+    { idVehiculo: "ABC123", descripcionVehiculo: "Camión Ford F-4000",  ruc: "80012345-1" },
+    { idVehiculo: "XYZ789", descripcionVehiculo: "Utilitario Toyota",   ruc: "80098765-2" },
+  ];
+
+  for (const v of vehiculosData) {
+    await db
+      .insert(vehiculos)
+      .values({ idVehiculo: v.idVehiculo, descripcionVehiculo: v.descripcionVehiculo, ruc: v.ruc, timestamp: now, sync: 1 })
+      .onConflictDoUpdate({
+        target: vehiculos.idVehiculo,
+        set: { descripcionVehiculo: v.descripcionVehiculo, ruc: v.ruc, timestamp: now, sync: 1 },
+      });
+  }
+
+  await upsertSync(SYNC_KEYS.vehiculos, now);
+  console.log("  ✅ Vehículos insertados");
+
+  // ── 9. Turno de apertura de hoy ──────────────────────────────────────────────
+  //   Simula que el operador ya abrió el turno de la bodega 1 hoy.
+  //   estado=1 (ACTIVO), tipo="inicio" → la Home mostrará status "iniciado".
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const fechaHoy = hoy.getTime();        // timestamp inicio del día
+  const horaApertura = 800;             // 08:00
+
+  const turnoJson = {
+    id_bodega:       1,
+    tipo:            "inicio",
+    cedula_operador: SEED_USER.cedula,
+    nombre_operador: SEED_USER.name,
+    observacion:     "Apertura seed",
+  };
+
+  // Insertamos solo si no existe ya un turno de inicio para bodega 1 hoy
+  const turnoExistente = await db
+    .select({ idTurno: turnos.idTurno })
+    .from(turnos)
+    .where(
+      // drizzle no importa and() aquí porque es TypeScript puro; lo hacemos manual:
+      // WHERE id_bodega=1 AND tipo='inicio' AND fecha=fechaHoy AND estado=1
+      // Para evitar importar `and` en el seed usamos un select amplio y filtramos
+      undefined
+    )
+    .limit(100);
+
+  const yaExiste = turnoExistente.some(
+    (t: any) =>
+      // La tabla no tiene campo tipo/fecha seleccionados en el select anterior;
+      // re-hacemos la query completa:
+      false // placeholder — ver nota abajo
+  );
+
+  // Nota: drizzle requiere `and()` para múltiples where. Para simplificar el seed
+  // (sin importar helpers extra) usamos insert con onConflictDoNothing.
+  // Como id_turno es autoincrement no hay conflicto garantizado, así que
+  // verificamos por separado antes de insertar.
+  const turnosHoy = await db
+    .select()
+    .from(turnos);
+
+  const yaHayApertura = turnosHoy.some(
+    (t) => t.idBodega === 1 && t.tipo === "inicio" && t.fecha === fechaHoy && t.estado === 1
+  );
+
+  if (!yaHayApertura) {
+    await db.insert(turnos).values({
+      idBodega: 1,
+      json:     JSON.stringify(turnoJson),
+      tipo:     "inicio",
+      fecha:    fechaHoy,
+      hora:     horaApertura,
+      sync:     0,          // pendiente de enviar al servidor
+      estado:   1,          // TurnoEstado.ACTIVO
+    });
+    console.log("  ✅ Turno apertura insertado (bodega 1, hoy, 08:00)");
+  } else {
+    console.log("  ⏭️  Turno apertura ya existía, se omitió");
+  }
+
+await saveSucursal({ id_sucursal: 1, descripcion_sucursal: "Sucursal Central" });
+await saveUser({ cedula: String(SEED_USER.cedula), name: SEED_USER.name });
+await saveAuthToken({ token: "dev_token_seed", refresh_token: "" });
+console.log("  ✅ AsyncStorage poblado");
+
+  console.log(" Seed completado.");
+  console.log("──────────────────────────────────────────");
+  console.log("   Login offline disponible:");
+  console.log(`   Cédula   : ${SEED_USER.cedula}`);
+  console.log(`   Contraseña: ${SEED_USER.password}`);
+  console.log("──────────────────────────────────────────");
+}
+</file>
+
+</codebase>
+
+<response_instructions>
+  You are receiving the specific files you requested.
+  Your task is defined in <task>.
+  You now have sufficient context. Proceed with your full response.
+  Do not ask for additional files.
+</response_instructions>

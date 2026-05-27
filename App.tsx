@@ -15,29 +15,30 @@ import { AuthContextProvider } from "@/contexts/AuthContext";
 import { DatabaseProvider } from "@/backend/db/client"; // ← agregar
 
 export default function App() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Roboto_400Regular,
     Roboto_700Bold,
   });
+  const ready = fontsLoaded || fontError;
 
   return (
-    <DatabaseProvider> {/* ← envolver todo */}
-      <View className='flex-1 bg-teColorSecundarioMedio'>
+    <DatabaseProvider>
+      {" "}
+      {/* ← envolver todo */}
+      <View className="flex-1 bg-teColorSecundarioMedio">
         <StatusBar
-          barStyle='light-content'
-          backgroundColor='transparent'
+          barStyle="light-content"
+          backgroundColor="transparent"
           translucent
         />
         <AuthContextProvider>
-          {fontsLoaded ? <Routes /> : <Loading />}
+          // Temporal para testear
+          {ready ? <Routes /> : <Loading />}
         </AuthContextProvider>
         <Toast
           config={{
             CustomToast: (props) => (
-              <CustomToast
-                {...props}
-                text1={props.text1 ?? ""}
-              />
+              <CustomToast {...props} text1={props.text1 ?? ""} />
             ),
           }}
         />

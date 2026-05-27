@@ -1,0 +1,458 @@
+<context_metadata>
+  generated_at: 2026-05-27T11:22:27
+  project_root: C:\dev\playero_2\mobile-playero
+  project_description: Describe aquí tu proyecto en una o dos oraciones.
+  file_count: 147
+  extensions_included: .css, .js, .jsx, .py, .ts, .tsx
+  root_dirs_included: src
+  content_type: structure_only (no source code)
+  recent_commits:
+    - 3c2a53a revision de frontent
+    - c4da6e9 Refactor de backend móvil implementando Data Mapper y sincronización de inventario segmentada por la cédula del usuario
+    - 4733ab6 Actualizacion de schema de bd para reflejar oncfiguracion de modulos habilitados y bodegas a las que se pueden hacer traspaso
+    - 2912225 Ampliacion de la documentacion(TypeDoc)
+    - 511e6eb Ampliacion de la documentacion(TypeDoc)
+</context_metadata>
+
+<task>
+  al abrir la appp se queda cargando en la pantalla de carga(components/Loading) y no sale nunca de ese estado
+</task>
+
+<file_tree>
+mobile-playero/
+  src/
+    index.ts
+    screens/
+      Config.tsx
+    backend/
+      index.ts
+    components/
+      index.ts
+    contexts/
+      index.ts
+    dto/
+      index.ts
+    hooks/
+      index.ts
+      index.ts
+    services/
+      index.ts
+    storage/
+      index.ts
+    utils/
+      index.ts
+    route/
+      index.tsx
+      AbastecimientoDTO.ts
+      api.ts
+      app.routes.tsx
+      AppError.ts
+      auth.routes.tsx
+      AuthContext.tsx
+      BodegaDTO.ts
+      Button.tsx
+      CalibracionDTO.ts
+      CargaZetaDTO.ts
+      ClienteCard.tsx
+      ClienteDTO.ts
+      config.routes.tsx
+      EmptyList.tsx
+      errors.ts
+      Firma.tsx
+      HistoryByDayDTO.ts
+      HistoryDTO.ts
+      Home.tsx
+      HomeHeader.tsx
+      Input.tsx
+      InputCard.tsx
+      Loading.tsx
+      MedicionDTO.ts
+      MedicionesCard.tsx
+      MenuCard.tsx
+      MenuItens.tsx
+      modulosDTO.ts
+    @types/
+      navigation.d.ts
+      PersonaCard.tsx
+      PersonaDTO.ts
+      Photo.tsx
+      PicosDTO.ts
+      png.d.ts
+      ScreenHeader.tsx
+      Select.tsx
+      SequenciaCalibracionDTO.tsx
+      Setup.tsx
+      SignatureCapture.tsx
+      SignIn.tsx
+      statusTurnoDTO.ts
+      storageAbastecimiento.ts
+      storageAuthToken.ts
+      storageCalibracion.ts
+      storageCargaCombustible.ts
+      storageConfig.ts
+      storageMedicionAbastecimiento.ts
+      storagePersona.ts
+      storageSalida.ts
+      storageServer.ts
+      storageSucursal.ts
+      storageTraspaso.ts
+      storageUse.ts
+      sucursalDTO.ts
+      svg.d.ts
+      TanqueDTO.ts
+      TextSearch.tsx
+      TicketDTO.ts
+      toastConfig.tsx
+      toastMessage.ts
+      TraspasoDTO.ts
+      TurnoDTO.ts
+      useAppContext.tsx
+      useAuth.tsx
+      useCliente.tsx
+      useInitialSync.ts
+      useInitialSync.ts
+      userDTO.ts
+      useServerConfig.ts
+      VehiculoCard.tsx
+      VehiculoDTO.ts
+      api/
+        index.ts
+      db/
+        index.ts
+      abastecimiento/
+        index.ts
+      calibracion/
+        index.ts
+      cliente/
+        index.ts
+      persona/
+        index.ts
+      salida/
+        index.ts
+      traspaso/
+        index.ts
+      turno/
+        index.ts
+      vehiculo/
+        index.ts
+        Abastecimiento.tsx
+        authAPI.ts
+        BuscarCliente.tsx
+        BuscarPersona.tsx
+        BuscarVehiculo.tsx
+        Calibracion.tsx
+        CargaCombustible.tsx
+        client.tsx
+        Cliente.tsx
+        clienteAPI.ts
+        CrearCliente.tsx
+        CrearPersona.tsx
+        CrearVehiculo.tsx
+        EditarPersona.tsx
+        httpClient.ts
+        Medicion.tsx
+        MedicionAbastecimiento.tsx
+        modulosAPI.ts
+        operacionesAPI.ts
+        Persona.tsx
+        personaAPI.ts
+        Salida.tsx
+        schema.ts
+        Sequencias.tsx
+        Traspaso.tsx
+        Turno.tsx
+        Vehiculo.tsx
+        vehiculoAPI.ts
+        constants/
+          index.ts
+        modules/
+          index.ts
+        seeds/
+          index.ts
+        services/
+          index.ts
+          abastecimientoDB.ts
+          authDB.ts
+          bodegaDB.ts
+          calibracionDB.ts
+          clienteDB.ts
+          despachoDB.ts
+        drizzle/
+          migrations.js
+          moduleDB.ts
+          personaDB.ts
+          picoDB.ts
+          seedLocalDB.ts
+          sucursalDB.ts
+          syncConfig.ts
+          syncService.ts
+          tanqueDB.ts
+          ticketDB.ts
+          traspasoDB.ts
+          turnoBD.ts
+          turnoEstado.ts
+          turnoStatusService.ts
+          usuarioDB.ts
+          vehiculoDB.ts
+</file_tree>
+
+<file_index>
+  <file path="src/index.ts" lines="14" ext=".ts" />
+  <file path="src/screens/Config.tsx" lines="17" ext=".tsx" imports="@/route/app.routes, react-native, @/backend/db/seeds/seedLocalDB" />
+  <file path="src/backend/index.ts" lines="8" ext=".ts" />
+  <file path="src/components/index.ts" lines="22" ext=".ts" />
+  <file path="src/contexts/index.ts" lines="6" ext=".ts" />
+  <file path="src/dto/index.ts" lines="26" ext=".ts" />
+  <file path="src/hooks/index.ts" lines="10" ext=".ts" />
+  <file path="src/screens/index.ts" lines="18" ext=".ts" />
+  <file path="src/services/index.ts" lines="6" ext=".ts" />
+  <file path="src/storage/index.ts" lines="17" ext=".ts" />
+  <file path="src/utils/index.ts" lines="7" ext=".ts" />
+  <file path="src/route/index.tsx" lines="27" ext=".tsx" imports="@react-navigation/native, ./app.routes, ./auth.routes, ./config.routes, @/hooks/useAuth, @/components/Loading" />
+  <file path="src/dto/AbastecimientoDTO.ts" lines="37" ext=".ts" />
+  <file path="src/services/api.ts" lines="225" ext=".ts" imports="@utils/AppError, axios, @storage/storageAuthToken, @/storage/storageServer" />
+  <file path="src/route/app.routes.tsx" lines="178" ext=".tsx" imports="@/screens/Home, @/screens/Config, @/screens/cliente/Cliente, @/screens/cliente/BuscarCliente, @/screens/persona/Persona, @/screens/turno/Turno, @/screens/persona/BuscarPersona, @/screens/persona/EditarPersona, @/screens/vehiculo/Vehiculo, @/screens/vehiculo/BuscarVehiculo, @/screens/vehiculo/CrearVehiculo, @/screens/turno/Medicion, @/dto/MedicionDTO, @/screens/Firma, @/dto/PersonaDTO (+11)" />
+  <file path="src/utils/AppError.ts" lines="11" ext=".ts" />
+  <file path="src/route/auth.routes.tsx" lines="31" ext=".tsx" imports="../screens/SignIn, ../screens/Setup" />
+  <file path="src/contexts/AuthContext.tsx" lines="242" ext=".tsx" imports="react, @dto/userDTO, @storage/storageUse, axios, @dto/ClienteDTO, @/dto/sucursalDTO, @/storage/storageSucursal, @/backend/api/httpClient, @/backend/api/authAPI, @DBmodules/authDB" />
+  <file path="src/dto/BodegaDTO.ts" lines="8" ext=".ts" />
+  <file path="src/components/Button.tsx" lines="80" ext=".tsx" imports="lucide-react-native" />
+  <file path="src/dto/CalibracionDTO.ts" lines="25" ext=".ts" />
+  <file path="src/dto/CargaZetaDTO.ts" lines="6" ext=".ts" />
+  <file path="src/components/ClienteCard.tsx" lines="47" ext=".tsx" imports="lucide-react-native, @dto/ClienteDTO" />
+  <file path="src/dto/ClienteDTO.ts" lines="8" ext=".ts" />
+  <file path="src/route/config.routes.tsx" lines="31" ext=".tsx" imports="../screens/SignIn, ../screens/Setup" />
+  <file path="src/components/EmptyList.tsx" lines="24" ext=".tsx" imports="react-native, lucide-react-native" />
+  <file path="src/backend/errors.ts" lines="32" ext=".ts" />
+  <file path="src/screens/Firma.tsx" lines="26" ext=".tsx" imports="@/components/ScreenHeader, @/components/SignatureCapture, @/dto/PersonaDTO, @/route/app.routes, react-native" />
+  <file path="src/dto/HistoryByDayDTO.ts" lines="6" ext=".ts" imports="./HistoryDTO" />
+  <file path="src/dto/HistoryDTO.ts" lines="7" ext=".ts" />
+  <file path="src/screens/Home.tsx" lines="153" ext=".tsx" imports="@/components/HomeHeader, react-native, @/components/MenuCard, @/route/app.routes, @/hooks/useAppContext, react, @/components/Loading, @/dto/MenuItens, @/dto/statusTurnoDTO, @react-navigation/native, @DBmodules/turnoBD, @/utils/toastMessage, @/backend/db/seeds/seedLocalDB, @DBmodules/sucursalDB, @DBmodules/moduleDB (+1)" />
+  <file path="src/components/HomeHeader.tsx" lines="38" ext=".tsx" imports="@expo/vector-icons, react-native, @hooks/useAuth" />
+  <file path="src/components/Input.tsx" lines="99" ext=".tsx" imports="react, react-native" />
+  <file path="src/components/InputCard.tsx" lines="69" ext=".tsx" imports="clsx, react-native, lucide-react-native" />
+  <file path="src/components/Loading.tsx" lines="19" ext=".tsx" imports="react-native" />
+  <file path="src/dto/MedicionDTO.ts" lines="8" ext=".ts" />
+  <file path="src/components/MedicionesCard.tsx" lines="43" ext=".tsx" imports="lucide-react-native, @/dto/MedicionDTO" />
+  <file path="src/components/MenuCard.tsx" lines="93" ext=".tsx" imports="lucide-react-native" />
+  <file path="src/dto/MenuItens.tsx" lines="74" ext=".tsx" imports="@/route/app.routes" />
+  <file path="src/dto/modulosDTO.ts" lines="51" ext=".ts" />
+  <file path="src/@types/navigation.d.ts" lines="56" ext=".ts" imports="@/dto/MedicionDTO, @/dto/PersonaDTO" />
+  <file path="src/components/PersonaCard.tsx" lines="53" ext=".tsx" imports="lucide-react-native, @dto/PersonaDTO, react" />
+  <file path="src/dto/PersonaDTO.ts" lines="4" ext=".ts" />
+  <file path="src/components/Photo.tsx" lines="123" ext=".tsx" imports="expo-image-picker, expo-image-manipulator, lucide-react-native, @/utils/toastMessage" />
+  <file path="src/dto/PicosDTO.ts" lines="6" ext=".ts" />
+  <file path="src/@types/png.d.ts" lines="1" ext=".ts" />
+  <file path="src/components/ScreenHeader.tsx" lines="42" ext=".tsx" imports="@react-navigation/native, lucide-react-native, react-native" />
+  <file path="src/components/Select.tsx" lines="68" ext=".tsx" imports="react-native, ./Loading, @react-native-picker/picker, react" />
+  <file path="src/dto/SequenciaCalibracionDTO.tsx" lines="15" ext=".tsx" />
+  <file path="src/screens/Setup.tsx" lines="102" ext=".tsx" imports="react, @hooks/useAuth, @assets/logo.png, @components/Input, @components/Button, react-hook-form, @utils/AppError, @/utils/toastMessage, react-native, @/components/InputCard, axios" />
+  <file path="src/components/SignatureCapture.tsx" lines="83" ext=".tsx" imports="react, react-native, @/components/Button, @/dto/PersonaDTO" />
+  <file path="src/screens/SignIn.tsx" lines="118" ext=".tsx" imports="react, @react-navigation/native, react-native, react-hook-form, @route/auth.routes, @hooks/useAuth, @/utils/useInitialSync, @utils/AppError, @/utils/toastMessage, @assets/logo.png, @components/Input, @components/Button, @/components/InputCard, @/backend/db/seeds/seedLocalDB" />
+  <file path="src/dto/statusTurnoDTO.ts" lines="28" ext=".ts" />
+  <file path="src/storage/storageAbastecimiento.ts" lines="110" ext=".ts" imports="@react-native-async-storage/async-storage, ./storageConfig, @/dto/CargaZetaDTO, @/dto/MedicionDTO" />
+  <file path="src/storage/storageAuthToken.ts" lines="29" ext=".ts" imports="@react-native-async-storage/async-storage, @storage/storageConfig" />
+  <file path="src/storage/storageCalibracion.ts" lines="170" ext=".ts" imports="@react-native-async-storage/async-storage" />
+  <file path="src/storage/storageCargaCombustible.ts" lines="41" ext=".ts" imports="@react-native-async-storage/async-storage" />
+  <file path="src/storage/storageConfig.ts" lines="19" ext=".ts" />
+  <file path="src/storage/storageMedicionAbastecimiento.ts" lines="33" ext=".ts" imports="@react-native-async-storage/async-storage, @/dto/MedicionDTO" />
+  <file path="src/storage/storagePersona.ts" lines="32" ext=".ts" imports="@react-native-async-storage/async-storage, ./storageConfig, @/dto/PersonaDTO" />
+  <file path="src/storage/storageSalida.ts" lines="60" ext=".ts" imports="@react-native-async-storage/async-storage, ./storageConfig, @/dto/PersonaDTO, @/dto/VehiculoDTO" />
+  <file path="src/storage/storageServer.ts" lines="30" ext=".ts" imports="@react-native-async-storage/async-storage, ./storageConfig" />
+  <file path="src/storage/storageSucursal.ts" lines="32" ext=".ts" imports="@react-native-async-storage/async-storage, ./storageConfig, @/dto/sucursalDTO" />
+  <file path="src/storage/storageTraspaso.ts" lines="57" ext=".ts" imports="@react-native-async-storage/async-storage, ./storageConfig, @/dto/TraspasoDTO" />
+  <file path="src/storage/storageUse.ts" lines="30" ext=".ts" imports="@react-native-async-storage/async-storage, @dto/userDTO, ./storageConfig" />
+  <file path="src/dto/sucursalDTO.ts" lines="4" ext=".ts" />
+  <file path="src/@types/svg.d.ts" lines="6" ext=".ts" imports="react, react-native-svg" />
+  <file path="src/dto/TanqueDTO.ts" lines="5" ext=".ts" />
+  <file path="src/components/TextSearch.tsx" lines="64" ext=".tsx" imports="react-native, lucide-react-native" />
+  <file path="src/dto/TicketDTO.ts" lines="17" ext=".ts" />
+  <file path="src/utils/toastConfig.tsx" lines="42" ext=".tsx" imports="react-native, lucide-react-native" />
+  <file path="src/utils/toastMessage.ts" lines="58" ext=".ts" imports="react-native-toast-message" />
+  <file path="src/dto/TraspasoDTO.ts" lines="59" ext=".ts" imports="./PersonaDTO" />
+  <file path="src/dto/TurnoDTO.ts" lines="57" ext=".ts" />
+  <file path="src/hooks/useAppContext.tsx" lines="10" ext=".tsx" imports="react, @contexts/AuthContext" />
+  <file path="src/hooks/useAuth.tsx" lines="10" ext=".tsx" imports="react, @contexts/AuthContext" />
+  <file path="src/hooks/useCliente.tsx" lines="10" ext=".tsx" imports="react, @contexts/AuthContext" />
+  <file path="src/hooks/useInitialSync.ts" lines="40" ext=".ts" imports="@/backend/db/modules/clienteDB, @/backend/db/modules/personaDB, @/backend/db/modules/vehiculoDB, @/backend/db/modules/sucursalDB, @/backend/db/modules/bodegaDB, @/backend/db/modules/picoDB, @/backend/db/modules/tanqueDB" />
+  <file path="src/utils/useInitialSync.ts" lines="27" ext=".ts" imports="@/backend/db/modules/clienteDB, @/backend/db/modules/personaDB, @/backend/db/modules/vehiculoDB, @/backend/db/modules/sucursalDB, @/backend/db/modules/bodegaDB, @/backend/db/modules/picoDB, @/backend/db/modules/tanqueDB" />
+  <file path="src/dto/userDTO.ts" lines="4" ext=".ts" />
+  <file path="src/hooks/useServerConfig.ts" lines="27" ext=".ts" imports="react, @storage/storageServer, @/storage/storageSucursal" />
+  <file path="src/components/VehiculoCard.tsx" lines="45" ext=".tsx" imports="lucide-react-native, @dto/VehiculoDTO" />
+  <file path="src/dto/VehiculoDTO.ts" lines="5" ext=".ts" />
+  <file path="src/backend/api/index.ts" lines="12" ext=".ts" />
+  <file path="src/backend/db/index.ts" lines="9" ext=".ts" />
+  <file path="src/screens/abastecimiento/index.ts" lines="8" ext=".ts" />
+  <file path="src/screens/calibracion/index.ts" lines="7" ext=".ts" />
+  <file path="src/screens/cliente/index.ts" lines="8" ext=".ts" />
+  <file path="src/screens/persona/index.ts" lines="9" ext=".ts" />
+  <file path="src/screens/salida/index.ts" lines="6" ext=".ts" />
+  <file path="src/screens/traspaso/index.ts" lines="6" ext=".ts" />
+  <file path="src/screens/turno/index.ts" lines="7" ext=".ts" />
+  <file path="src/screens/vehiculo/index.ts" lines="8" ext=".ts" />
+  <file path="src/screens/abastecimiento/Abastecimiento.tsx" lines="736" ext=".tsx" imports="react, @/components/InputCard, @/components/ScreenHeader, @/components/Select, @/hooks/useAppContext, @/utils/toastMessage, @/services/api, @/components/Input, @/dto/BodegaDTO, @/components/Photo, @/components/Button, @/route/app.routes, @/dto/CargaZetaDTO, @/dto/MedicionDTO, @/storage/storageMedicionAbastecimiento (+3)" />
+  <file path="src/backend/api/authAPI.ts" lines="62" ext=".ts" imports="./httpClient" />
+  <file path="src/screens/cliente/BuscarCliente.tsx" lines="146" ext=".tsx" imports="react, @/route/app.routes, @components/Input, @components/InputCard, @services/api, @DBmodules/clienteDB, @utils/AppError, @components/Loading, @components/ClienteCard, @dto/ClienteDTO, @hooks/useCliente, @utils/toastMessage, lucide-react-native, react-native, @/components/EmptyList (+1)" />
+  <file path="src/screens/persona/BuscarPersona.tsx" lines="216" ext=".tsx" imports="@components/Input, @components/InputCard, @components/PersonaCard, react, @services/api, @DBmodules/personaDB, @dto/PersonaDTO, lucide-react-native, lodash.debounce, @/components/EmptyList, @utils/toastMessage, @/route/app.routes, @/components/ScreenHeader, @react-navigation/native" />
+  <file path="src/screens/vehiculo/BuscarVehiculo.tsx" lines="187" ext=".tsx" imports="react, lodash.debounce, @components/Input, @components/InputCard, @services/api, @dto/VehiculoDTO, @components/VehiculoCard, @utils/toastMessage, lucide-react-native, @/components/EmptyList, @/route/app.routes, @/components/ScreenHeader, @DBmodules/vehiculoDB" />
+  <file path="src/screens/calibracion/Calibracion.tsx" lines="758" ext=".tsx" imports="expo-image-picker, react, @/components/InputCard, @/components/Photo, @/components/ScreenHeader, @/components/Select, @/hooks/useAppContext, @/dto/PicosDTO, @/route/app.routes, @/utils/toastMessage, @/components/Input, @/components/TextSearch, @/dto/PersonaDTO, lucide-react-native, @/components/Button (+6)" />
+  <file path="src/screens/abastecimiento/CargaCombustible.tsx" lines="285" ext=".tsx" imports="lucide-react-native, @/components/Button, @/components/InputCard, react, react-native, @/utils/toastMessage, @/components/Select, @/route/app.routes, @/dto/PicosDTO, @/hooks/useAppContext, @/components/ScreenHeader, @/dto/CargaZetaDTO, @/components/Input, @DBmodules/picoDB" />
+  <file path="src/backend/db/client.tsx" lines="65" ext=".tsx" imports="react, drizzle-orm/expo-sqlite, expo-sqlite, drizzle-orm/expo-sqlite/migrator, expo-drizzle-studio-plugin, ./drizzle/migrations, react-native, @/components/Loading" />
+  <file path="src/screens/cliente/Cliente.tsx" lines="31" ext=".tsx" imports="@react-navigation/material-top-tabs, @/components/ScreenHeader, @/route/app.routes, react-native, ./BuscarCliente, ./CrearCliente" />
+  <file path="src/backend/api/clienteAPI.ts" lines="108" ext=".ts" imports="./httpClient, @/dto/ClienteDTO" />
+  <file path="src/screens/cliente/CrearCliente.tsx" lines="127" ext=".tsx" imports="@components/Input, @components/InputCard, @components/Button, react, @utils/AppError, react-hook-form, @hookform/resolvers/yup, yup, @services/api, @DBmodules/clienteDB, @dto/ClienteDTO, @/utils/toastMessage, react-native, lucide-react-native" />
+  <file path="src/screens/persona/CrearPersona.tsx" lines="157" ext=".tsx" imports="react, react-native, react-hook-form, yup, @hookform/resolvers/yup, @utils/toastMessage, @components/Input, @components/InputCard, @components/Button, @utils/AppError, @services/api, @DBmodules/personaDB, lucide-react-native, axios, @react-navigation/native" />
+  <file path="src/screens/vehiculo/CrearVehiculo.tsx" lines="184" ext=".tsx" imports="react-native, react, @/route/app.routes, @utils/toastMessage, @components/Input, @components/InputCard, @components/Button, @utils/AppError, react-hook-form, @hookform/resolvers/yup, yup, @DBmodules/vehiculoDB, lucide-react-native, @/hooks/useCliente" />
+  <file path="src/screens/persona/EditarPersona.tsx" lines="131" ext=".tsx" imports="react-native, react, react-hook-form, @components/Input, @components/InputCard, @components/ScreenHeader, @components/Button, @utils/AppError, @hookform/resolvers/yup, @utils/toastMessage, yup, @services/api, @DBmodules/personaDB, @/route/app.routes, lucide-react-native" />
+  <file path="src/backend/api/httpClient.ts" lines="200" ext=".ts" imports="@/backend/api/httpClient, axios, @react-native-async-storage/async-storage, @storage/storageConfig" />
+  <file path="src/screens/turno/Medicion.tsx" lines="251" ext=".tsx" imports="@/components/ScreenHeader, @/route/app.routes, react-native, @/components/Button, @utils/toastMessage, react, @/components/InputCard, @/components/Input, @/services/api, @DBmodules/tanqueDB, @/dto/TanqueDTO, @/dto/MedicionDTO, @/components/Select, yup, @hookform/resolvers/yup (+3)" />
+  <file path="src/screens/abastecimiento/MedicionAbastecimiento.tsx" lines="547" ext=".tsx" imports="@/components/ScreenHeader, @/route/app.routes, @/components/Button, @utils/toastMessage, react, @/components/InputCard, @/components/Input, @/services/api, @/dto/TanqueDTO, @/dto/MedicionDTO, @/components/Select, yup, @hookform/resolvers/yup, lucide-react-native, react-hook-form (+2)" />
+  <file path="src/backend/api/modulosAPI.ts" lines="102" ext=".ts" imports="./httpClient" />
+  <file path="src/backend/api/operacionesAPI.ts" lines="87" ext=".ts" imports="./httpClient, ../db/constants/syncConfig, @/dto/TicketDTO, @/dto/TraspasoDTO, @/dto/CalibracionDTO, @/dto/AbastecimientoDTO, @/dto/TurnoDTO" />
+  <file path="src/screens/persona/Persona.tsx" lines="34" ext=".tsx" imports="@react-navigation/material-top-tabs, @/components/ScreenHeader, @/route/app.routes, react-native, ./BuscarPersona, ./CrearPersona" />
+  <file path="src/backend/api/personaAPI.ts" lines="109" ext=".ts" imports="./httpClient, @/dto/PersonaDTO" />
+  <file path="src/screens/salida/Salida.tsx" lines="759" ext=".tsx" imports="expo-location, @/components/Input, @/components/InputCard, @/components/ScreenHeader, @/components/TextSearch, @/dto/PersonaDTO, @/dto/VehiculoDTO, @/dto/BodegaDTO, @/route/app.routes, react, react-hook-form, lucide-react-native, @/utils/toastMessage, @hookform/resolvers/yup, yup (+10)" />
+  <file path="src/backend/db/schema.ts" lines="390" ext=".ts" imports="drizzle-orm/sqlite-core, drizzle-orm" />
+  <file path="src/screens/calibracion/Sequencias.tsx" lines="300" ext=".tsx" imports="@/route/app.routes, @/utils/toastMessage, react, react-native, @/components/InputCard, @/components/Button, lucide-react-native, @/components/Select, @/dto/SequenciaCalibracionDTO, @/components/ScreenHeader, @/components/Photo, @/components/Input" />
+  <file path="src/screens/traspaso/Traspaso.tsx" lines="1135" ext=".tsx" imports="@/components/Input, @/components/InputCard, @/components/ScreenHeader, @/components/TextSearch, @/dto/PersonaDTO, @/route/app.routes, react, @/utils/toastMessage, @/hooks/useAppContext, @/dto/PicosDTO, @/components/Select, @/components/Button, @/components/Loading, @/dto/statusTurnoDTO, @/dto/MedicionDTO (+7)" />
+  <file path="src/screens/turno/Turno.tsx" lines="548" ext=".tsx" imports="react, @/route/app.routes, @/components/ScreenHeader, @/components/InputCard, @/components/Button, @/utils/toastMessage, @/components/Input, @/components/Select, @/dto/BodegaDTO, @/dto/MedicionDTO, @/dto/TurnoDTO, @/dto/PicosDTO, lucide-react-native, @/utils/AppError, @/dto/statusTurnoDTO (+6)" />
+  <file path="src/screens/vehiculo/Vehiculo.tsx" lines="36" ext=".tsx" imports="@react-navigation/material-top-tabs, @/components/ScreenHeader, @/route/app.routes, react-native, ./BuscarVehiculo, ./CrearVehiculo" />
+  <file path="src/backend/api/vehiculoAPI.ts" lines="125" ext=".ts" imports="./httpClient, @/dto/VehiculoDTO" />
+  <file path="src/backend/db/constants/index.ts" lines="7" ext=".ts" />
+  <file path="src/backend/db/modules/index.ts" lines="22" ext=".ts" />
+  <file path="src/backend/db/seeds/index.ts" lines="6" ext=".ts" />
+  <file path="src/backend/db/services/index.ts" lines="7" ext=".ts" />
+  <file path="src/backend/db/modules/abastecimientoDB.ts" lines="91" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/AbastecimientoDTO" />
+  <file path="src/backend/db/modules/authDB.ts" lines="239" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, expo-crypto" />
+  <file path="src/backend/db/modules/bodegaDB.ts" lines="287" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/BodegaDTO, ../constants/syncConfig, axios" />
+  <file path="src/backend/db/modules/calibracionDB.ts" lines="95" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/CalibracionDTO" />
+  <file path="src/backend/db/modules/clienteDB.ts" lines="281" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/ClienteDTO, ../constants/syncConfig, axios" />
+  <file path="src/backend/db/modules/despachoDB.ts" lines="109" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm" />
+  <file path="src/backend/db/drizzle/migrations.js" lines="20" ext=".js" imports="./meta/_journal.json, ./0000_parallel_vindicator.sql, ./0001_luxuriant_rattler.sql, ./0002_sudden_princess_powerful.sql, ./0003_aberrant_vertigo.sql, ./0004_tearful_scalphunter.sql" />
+  <file path="src/backend/db/modules/moduleDB.ts" lines="95" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/backend/api/modulosAPI, @/dto/modulosDTO" />
+  <file path="src/backend/db/modules/personaDB.ts" lines="330" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/PersonaDTO, ../constants/syncConfig" />
+  <file path="src/backend/db/modules/picoDB.ts" lines="199" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/PicosDTO, ../constants/syncConfig, ../schema, ./bodegaDB" />
+  <file path="src/backend/db/seeds/seedLocalDB.ts" lines="350" ext=".ts" imports="@/backend/db/seed/seedLocalDB, @/backend/db/client, expo-crypto, @/storage/storageSucursal, @/storage/storageUse, @/storage/storageAuthToken" />
+  <file path="src/backend/db/modules/sucursalDB.ts" lines="152" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/sucursalDTO, ../constants/syncConfig, axios" />
+  <file path="src/backend/db/constants/syncConfig.ts" lines="40" ext=".ts" imports="@/backend/api/httpClient" />
+  <file path="src/backend/db/services/syncService.ts" lines="175" ext=".ts" imports="../constants/syncConfig, ../modules/sucursalDB, ../modules/bodegaDB, ../modules/picoDB, ../modules/tanqueDB" />
+  <file path="src/backend/db/modules/tanqueDB.ts" lines="204" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, ../schema, drizzle-orm, @/dto/TanqueDTO, ../constants/syncConfig, ./bodegaDB" />
+  <file path="src/backend/db/modules/ticketDB.ts" lines="100" ext=".ts" imports="drizzle-orm, ../client, ../schema, @/dto/TicketDTO" />
+  <file path="src/backend/db/modules/traspasoDB.ts" lines="92" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/TraspasoDTO" />
+  <file path="src/backend/db/modules/turnoBD.ts" lines="146" ext=".ts" imports="drizzle-orm, ../client, ../schema, ../services/turnoStatusService, ./bodegaDB, @/dto/BodegaDTO, @/dto/TurnoDTO, ../constants/turnoEstado" />
+  <file path="src/backend/db/constants/turnoEstado.ts" lines="12" ext=".ts" />
+  <file path="src/backend/db/services/turnoStatusService.ts" lines="186" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, ../constants/turnoEstado, drizzle-orm" />
+  <file path="src/backend/db/modules/usuarioDB.ts" lines="28" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm" />
+  <file path="src/backend/db/modules/vehiculoDB.ts" lines="375" ext=".ts" imports="@/backend/db/client, @/backend/db/schema, drizzle-orm, @/dto/VehiculoDTO, @/utils/AppError, ../constants/syncConfig" />
+</file_index>
+
+<dependency_graph>
+  <file path="src/screens/Config.tsx" depends_on="src\backend\db\seeds\seedLocalDB.ts" />
+  <file path="src/route/index.tsx" depends_on="src\hooks\useAuth.tsx, src\components\Loading.tsx" />
+  <file path="src/services/api.ts" depends_on="src\utils\AppError.ts, src\storage\storageAuthToken.ts, src\storage\storageServer.ts" />
+  <file path="src/route/app.routes.tsx" depends_on="src\screens\Home.tsx, src\screens\Config.tsx, src\screens\cliente\Cliente.tsx, src\screens\cliente\BuscarCliente.tsx, src\screens\persona\Persona.tsx, src\screens\turno\Turno.tsx, src\screens\persona\BuscarPersona.tsx, src\screens\persona\EditarPersona.tsx, src\screens\vehiculo\Vehiculo.tsx, src\screens\vehiculo\BuscarVehiculo.tsx, src\screens\vehiculo\CrearVehiculo.tsx, src\screens\turno\Medicion.tsx, src\dto\MedicionDTO.ts, src\screens\Firma.tsx, src\dto\PersonaDTO.ts, src\dto\VehiculoDTO.ts, src\screens\salida\Salida.tsx, src\dto\ClienteDTO.ts, src\screens\traspaso\Traspaso.tsx, src\screens\calibracion\Calibracion.tsx, src\screens\calibracion\Sequencias.tsx, src\dto\SequenciaCalibracionDTO.tsx, src\screens\abastecimiento\Abastecimiento.tsx, src\screens\abastecimiento\CargaCombustible.tsx, src\screens\abastecimiento\MedicionAbastecimiento.tsx, src\dto\CargaZetaDTO.ts" />
+  <file path="src/route/auth.routes.tsx" depends_on="src\screens\SignIn.tsx, src\screens\Setup.tsx" />
+  <file path="src/contexts/AuthContext.tsx" depends_on="src\dto\userDTO.ts, src\storage\storageUse.ts, src\dto\ClienteDTO.ts, src\dto\sucursalDTO.ts, src\storage\storageSucursal.ts, src\backend\api\httpClient.ts, src\backend\api\authAPI.ts, src\backend\db\modules\authDB.ts" />
+  <file path="src/components/ClienteCard.tsx" depends_on="src\dto\ClienteDTO.ts" />
+  <file path="src/route/config.routes.tsx" depends_on="src\screens\SignIn.tsx, src\screens\Setup.tsx" />
+  <file path="src/screens/Firma.tsx" depends_on="src\components\ScreenHeader.tsx, src\components\SignatureCapture.tsx, src\dto\PersonaDTO.ts" />
+  <file path="src/dto/HistoryByDayDTO.ts" depends_on="src\dto\HistoryDTO.ts" />
+  <file path="src/screens/Home.tsx" depends_on="src\components\HomeHeader.tsx, src\components\MenuCard.tsx, src\hooks\useAppContext.tsx, src\components\Loading.tsx, src\dto\MenuItens.tsx, src\dto\statusTurnoDTO.ts, src\backend\db\modules\turnoBD.ts, src\utils\toastMessage.ts, src\backend\db\seeds\seedLocalDB.ts, src\backend\db\modules\sucursalDB.ts, src\backend\db\modules\moduleDB.ts, src\hooks\useAuth.tsx" />
+  <file path="src/components/HomeHeader.tsx" depends_on="src\hooks\useAuth.tsx" />
+  <file path="src/components/MedicionesCard.tsx" depends_on="src\dto\MedicionDTO.ts" />
+  <file path="src/@types/navigation.d.ts" depends_on="src\dto\MedicionDTO.ts, src\dto\PersonaDTO.ts" />
+  <file path="src/components/PersonaCard.tsx" depends_on="src\dto\PersonaDTO.ts" />
+  <file path="src/components/Photo.tsx" depends_on="src\utils\toastMessage.ts" />
+  <file path="src/components/Select.tsx" depends_on="src\components\Loading.tsx" />
+  <file path="src/screens/Setup.tsx" depends_on="src\hooks\useAuth.tsx, src\components\Input.tsx, src\components\Button.tsx, src\utils\AppError.ts, src\utils\toastMessage.ts, src\components\InputCard.tsx" />
+  <file path="src/components/SignatureCapture.tsx" depends_on="src\components\Button.tsx, src\dto\PersonaDTO.ts" />
+  <file path="src/screens/SignIn.tsx" depends_on="src\hooks\useAuth.tsx, src\utils\useInitialSync.ts, src\utils\AppError.ts, src\utils\toastMessage.ts, src\components\Input.tsx, src\components\Button.tsx, src\components\InputCard.tsx, src\backend\db\seeds\seedLocalDB.ts" />
+  <file path="src/storage/storageAbastecimiento.ts" depends_on="src\storage\storageConfig.ts, src\dto\CargaZetaDTO.ts, src\dto\MedicionDTO.ts" />
+  <file path="src/storage/storageAuthToken.ts" depends_on="src\storage\storageConfig.ts" />
+  <file path="src/storage/storageMedicionAbastecimiento.ts" depends_on="src\dto\MedicionDTO.ts" />
+  <file path="src/storage/storagePersona.ts" depends_on="src\storage\storageConfig.ts, src\dto\PersonaDTO.ts" />
+  <file path="src/storage/storageSalida.ts" depends_on="src\storage\storageConfig.ts, src\dto\PersonaDTO.ts, src\dto\VehiculoDTO.ts" />
+  <file path="src/storage/storageServer.ts" depends_on="src\storage\storageConfig.ts" />
+  <file path="src/storage/storageSucursal.ts" depends_on="src\storage\storageConfig.ts, src\dto\sucursalDTO.ts" />
+  <file path="src/storage/storageTraspaso.ts" depends_on="src\storage\storageConfig.ts, src\dto\TraspasoDTO.ts" />
+  <file path="src/storage/storageUse.ts" depends_on="src\dto\userDTO.ts, src\storage\storageConfig.ts" />
+  <file path="src/dto/TraspasoDTO.ts" depends_on="src\dto\PersonaDTO.ts" />
+  <file path="src/hooks/useAppContext.tsx" depends_on="src\contexts\AuthContext.tsx" />
+  <file path="src/hooks/useAuth.tsx" depends_on="src\contexts\AuthContext.tsx" />
+  <file path="src/hooks/useCliente.tsx" depends_on="src\contexts\AuthContext.tsx" />
+  <file path="src/hooks/useInitialSync.ts" depends_on="src\backend\db\modules\clienteDB.ts, src\backend\db\modules\personaDB.ts, src\backend\db\modules\vehiculoDB.ts, src\backend\db\modules\sucursalDB.ts, src\backend\db\modules\bodegaDB.ts, src\backend\db\modules\picoDB.ts, src\backend\db\modules\tanqueDB.ts" />
+  <file path="src/utils/useInitialSync.ts" depends_on="src\backend\db\modules\clienteDB.ts, src\backend\db\modules\personaDB.ts, src\backend\db\modules\vehiculoDB.ts, src\backend\db\modules\sucursalDB.ts, src\backend\db\modules\bodegaDB.ts, src\backend\db\modules\picoDB.ts, src\backend\db\modules\tanqueDB.ts" />
+  <file path="src/hooks/useServerConfig.ts" depends_on="src\storage\storageServer.ts, src\storage\storageSucursal.ts" />
+  <file path="src/components/VehiculoCard.tsx" depends_on="src\dto\VehiculoDTO.ts" />
+  <file path="src/screens/abastecimiento/Abastecimiento.tsx" depends_on="src\components\InputCard.tsx, src\components\ScreenHeader.tsx, src\components\Select.tsx, src\hooks\useAppContext.tsx, src\utils\toastMessage.ts, src\services\api.ts, src\components\Input.tsx, src\dto\BodegaDTO.ts, src\components\Photo.tsx, src\components\Button.tsx, src\dto\CargaZetaDTO.ts, src\dto\MedicionDTO.ts, src\storage\storageMedicionAbastecimiento.ts, src\backend\db\modules\bodegaDB.ts, src\backend\db\modules\turnoBD.ts, src\backend\db\modules\abastecimientoDB.ts" />
+  <file path="src/backend/api/authAPI.ts" depends_on="src\backend\api\httpClient.ts" />
+  <file path="src/screens/cliente/BuscarCliente.tsx" depends_on="src\components\Input.tsx, src\components\InputCard.tsx, src\services\api.ts, src\backend\db\modules\clienteDB.ts, src\utils\AppError.ts, src\components\Loading.tsx, src\components\ClienteCard.tsx, src\dto\ClienteDTO.ts, src\hooks\useCliente.tsx, src\utils\toastMessage.ts, src\components\EmptyList.tsx, src\components\Button.tsx" />
+  <file path="src/screens/persona/BuscarPersona.tsx" depends_on="src\components\Input.tsx, src\components\InputCard.tsx, src\components\PersonaCard.tsx, src\services\api.ts, src\backend\db\modules\personaDB.ts, src\dto\PersonaDTO.ts, src\components\EmptyList.tsx, src\utils\toastMessage.ts, src\components\ScreenHeader.tsx" />
+  <file path="src/screens/vehiculo/BuscarVehiculo.tsx" depends_on="src\components\Input.tsx, src\components\InputCard.tsx, src\services\api.ts, src\dto\VehiculoDTO.ts, src\components\VehiculoCard.tsx, src\utils\toastMessage.ts, src\components\EmptyList.tsx, src\components\ScreenHeader.tsx, src\backend\db\modules\vehiculoDB.ts" />
+  <file path="src/screens/calibracion/Calibracion.tsx" depends_on="src\components\InputCard.tsx, src\components\Photo.tsx, src\components\ScreenHeader.tsx, src\components\Select.tsx, src\hooks\useAppContext.tsx, src\dto\PicosDTO.ts, src\utils\toastMessage.ts, src\components\Input.tsx, src\components\TextSearch.tsx, src\dto\PersonaDTO.ts, src\components\Button.tsx, src\dto\SequenciaCalibracionDTO.tsx, src\backend\db\modules\picoDB.ts, src\backend\db\modules\bodegaDB.ts, src\backend\db\modules\turnoBD.ts, src\backend\db\client.tsx, src\backend\db\schema.ts" />
+  <file path="src/screens/abastecimiento/CargaCombustible.tsx" depends_on="src\components\Button.tsx, src\components\InputCard.tsx, src\utils\toastMessage.ts, src\components\Select.tsx, src\dto\PicosDTO.ts, src\hooks\useAppContext.tsx, src\components\ScreenHeader.tsx, src\dto\CargaZetaDTO.ts, src\components\Input.tsx, src\backend\db\modules\picoDB.ts" />
+  <file path="src/backend/db/client.tsx" depends_on="src\backend\db\drizzle\migrations.js, src\components\Loading.tsx" />
+  <file path="src/screens/cliente/Cliente.tsx" depends_on="src\components\ScreenHeader.tsx, src\screens\cliente\BuscarCliente.tsx, src\screens\cliente\CrearCliente.tsx" />
+  <file path="src/backend/api/clienteAPI.ts" depends_on="src\backend\api\httpClient.ts, src\dto\ClienteDTO.ts" />
+  <file path="src/screens/cliente/CrearCliente.tsx" depends_on="src\components\Input.tsx, src\components\InputCard.tsx, src\components\Button.tsx, src\utils\AppError.ts, src\services\api.ts, src\backend\db\modules\clienteDB.ts, src\dto\ClienteDTO.ts, src\utils\toastMessage.ts" />
+  <file path="src/screens/persona/CrearPersona.tsx" depends_on="src\utils\toastMessage.ts, src\components\Input.tsx, src\components\InputCard.tsx, src\components\Button.tsx, src\utils\AppError.ts, src\services\api.ts, src\backend\db\modules\personaDB.ts" />
+  <file path="src/screens/vehiculo/CrearVehiculo.tsx" depends_on="src\utils\toastMessage.ts, src\components\Input.tsx, src\components\InputCard.tsx, src\components\Button.tsx, src\utils\AppError.ts, src\backend\db\modules\vehiculoDB.ts, src\hooks\useCliente.tsx" />
+  <file path="src/screens/persona/EditarPersona.tsx" depends_on="src\components\Input.tsx, src\components\InputCard.tsx, src\components\ScreenHeader.tsx, src\components\Button.tsx, src\utils\AppError.ts, src\utils\toastMessage.ts, src\services\api.ts, src\backend\db\modules\personaDB.ts" />
+  <file path="src/backend/api/httpClient.ts" depends_on="src\backend\api\httpClient.ts, src\storage\storageConfig.ts" />
+  <file path="src/screens/turno/Medicion.tsx" depends_on="src\components\ScreenHeader.tsx, src\components\Button.tsx, src\utils\toastMessage.ts, src\components\InputCard.tsx, src\components\Input.tsx, src\services\api.ts, src\backend\db\modules\tanqueDB.ts, src\dto\TanqueDTO.ts, src\dto\MedicionDTO.ts, src\components\Select.tsx, src\components\Photo.tsx" />
+  <file path="src/screens/abastecimiento/MedicionAbastecimiento.tsx" depends_on="src\components\ScreenHeader.tsx, src\components\Button.tsx, src\utils\toastMessage.ts, src\components\InputCard.tsx, src\components\Input.tsx, src\services\api.ts, src\dto\TanqueDTO.ts, src\dto\MedicionDTO.ts, src\components\Select.tsx, src\components\Photo.tsx, src\backend\db\modules\tanqueDB.ts" />
+  <file path="src/backend/api/modulosAPI.ts" depends_on="src\backend\api\httpClient.ts" />
+  <file path="src/backend/api/operacionesAPI.ts" depends_on="src\backend\api\httpClient.ts, src\backend\db\constants\syncConfig.ts, src\dto\TicketDTO.ts, src\dto\TraspasoDTO.ts, src\dto\CalibracionDTO.ts, src\dto\AbastecimientoDTO.ts, src\dto\TurnoDTO.ts" />
+  <file path="src/screens/persona/Persona.tsx" depends_on="src\components\ScreenHeader.tsx, src\screens\persona\BuscarPersona.tsx, src\screens\persona\CrearPersona.tsx" />
+  <file path="src/backend/api/personaAPI.ts" depends_on="src\backend\api\httpClient.ts, src\dto\PersonaDTO.ts" />
+  <file path="src/screens/salida/Salida.tsx" depends_on="src\components\Input.tsx, src\components\InputCard.tsx, src\components\ScreenHeader.tsx, src\components\TextSearch.tsx, src\dto\PersonaDTO.ts, src\dto\VehiculoDTO.ts, src\dto\BodegaDTO.ts, src\utils\toastMessage.ts, src\hooks\useAppContext.tsx, src\dto\PicosDTO.ts, src\components\Select.tsx, src\components\Button.tsx, src\components\Photo.tsx, src\backend\db\modules\ticketDB.ts, src\backend\db\services\turnoStatusService.ts, src\backend\db\modules\picoDB.ts, src\backend\db\modules\bodegaDB.ts, src\backend\db\modules\turnoBD.ts" />
+  <file path="src/screens/calibracion/Sequencias.tsx" depends_on="src\utils\toastMessage.ts, src\components\InputCard.tsx, src\components\Button.tsx, src\components\Select.tsx, src\dto\SequenciaCalibracionDTO.tsx, src\components\ScreenHeader.tsx, src\components\Photo.tsx, src\components\Input.tsx" />
+  <file path="src/screens/traspaso/Traspaso.tsx" depends_on="src\components\Input.tsx, src\components\InputCard.tsx, src\components\ScreenHeader.tsx, src\components\TextSearch.tsx, src\dto\PersonaDTO.ts, src\utils\toastMessage.ts, src\hooks\useAppContext.tsx, src\dto\PicosDTO.ts, src\components\Select.tsx, src\components\Button.tsx, src\components\Loading.tsx, src\dto\statusTurnoDTO.ts, src\dto\MedicionDTO.ts, src\dto\BodegaDTO.ts, src\dto\TraspasoDTO.ts, src\components\Photo.tsx, src\backend\db\modules\picoDB.ts, src\backend\db\modules\turnoBD.ts, src\backend\db\modules\traspasoDB.ts, src\backend\db\modules\despachoDB.ts" />
+  <file path="src/screens/turno/Turno.tsx" depends_on="src\components\ScreenHeader.tsx, src\components\InputCard.tsx, src\components\Button.tsx, src\utils\toastMessage.ts, src\components\Input.tsx, src\components\Select.tsx, src\dto\BodegaDTO.ts, src\dto\MedicionDTO.ts, src\dto\TurnoDTO.ts, src\dto\PicosDTO.ts, src\utils\AppError.ts, src\dto\statusTurnoDTO.ts, src\components\Photo.tsx, src\backend\db\modules\turnoBD.ts, src\backend\db\modules\bodegaDB.ts, src\backend\db\modules\picoDB.ts, src\backend\db\services\turnoStatusService.ts, src\backend\db\modules\sucursalDB.ts" />
+  <file path="src/screens/vehiculo/Vehiculo.tsx" depends_on="src\components\ScreenHeader.tsx, src\screens\vehiculo\BuscarVehiculo.tsx, src\screens\vehiculo\CrearVehiculo.tsx" />
+  <file path="src/backend/api/vehiculoAPI.ts" depends_on="src\backend\api\httpClient.ts, src\dto\VehiculoDTO.ts" />
+  <file path="src/backend/db/modules/abastecimientoDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\dto\AbastecimientoDTO.ts" />
+  <file path="src/backend/db/modules/authDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts" />
+  <file path="src/backend/db/modules/bodegaDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\dto\BodegaDTO.ts, src\backend\db\constants\syncConfig.ts" />
+  <file path="src/backend/db/modules/calibracionDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\dto\CalibracionDTO.ts" />
+  <file path="src/backend/db/modules/clienteDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\dto\ClienteDTO.ts, src\backend\db\constants\syncConfig.ts" />
+  <file path="src/backend/db/modules/despachoDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts" />
+  <file path="src/backend/db/modules/moduleDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\backend\api\modulosAPI.ts, src\dto\modulosDTO.ts" />
+  <file path="src/backend/db/modules/personaDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\dto\PersonaDTO.ts, src\backend\db\constants\syncConfig.ts" />
+  <file path="src/backend/db/modules/picoDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\dto\PicosDTO.ts, src\backend\db\constants\syncConfig.ts, src\backend\db\schema.ts, src\backend\db\modules\bodegaDB.ts" />
+  <file path="src/backend/db/seeds/seedLocalDB.ts" depends_on="src\backend\db\seeds\seedLocalDB.ts, src\backend\db\client.tsx, src\storage\storageSucursal.ts, src\storage\storageUse.ts, src\storage\storageAuthToken.ts" />
+  <file path="src/backend/db/modules/sucursalDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\dto\sucursalDTO.ts, src\backend\db\constants\syncConfig.ts" />
+  <file path="src/backend/db/constants/syncConfig.ts" depends_on="src\backend\api\httpClient.ts" />
+  <file path="src/backend/db/services/syncService.ts" depends_on="src\backend\db\constants\syncConfig.ts, src\backend\db\modules\sucursalDB.ts, src\backend\db\modules\bodegaDB.ts, src\backend\db\modules\picoDB.ts, src\backend\db\modules\tanqueDB.ts" />
+  <file path="src/backend/db/modules/tanqueDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\backend\db\schema.ts, src\dto\TanqueDTO.ts, src\backend\db\constants\syncConfig.ts, src\backend\db\modules\bodegaDB.ts" />
+  <file path="src/backend/db/modules/ticketDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\dto\TicketDTO.ts" />
+  <file path="src/backend/db/modules/traspasoDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\dto\TraspasoDTO.ts" />
+  <file path="src/backend/db/modules/turnoBD.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\backend\db\services\turnoStatusService.ts, src\backend\db\modules\bodegaDB.ts, src\dto\BodegaDTO.ts, src\dto\TurnoDTO.ts, src\backend\db\constants\turnoEstado.ts" />
+  <file path="src/backend/db/services/turnoStatusService.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\backend\db\constants\turnoEstado.ts" />
+  <file path="src/backend/db/modules/usuarioDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts" />
+  <file path="src/backend/db/modules/vehiculoDB.ts" depends_on="src\backend\db\client.tsx, src\backend\db\schema.ts, src\dto\VehiculoDTO.ts, src\utils\AppError.ts, src\backend\db\constants\syncConfig.ts" />
+</dependency_graph>
+
+<response_instructions>
+  You are receiving the structural map of a codebase (no source code).
+  Your task is defined in <task>.
+
+  STEP 1 — Analyze the structure:
+    Use <file_tree>, <file_index>, and <dependency_graph> to understand
+    the project layout, module sizes, and how files relate to each other.
+
+  STEP 2 — Identify relevant files:
+    Based on the structure and your task, determine which files you need
+    to read to provide a complete and accurate response.
+
+  STEP 3 — Output the follow-up command:
+    Output EXACTLY this block (copy-paste ready, no surrounding text),
+    replacing the placeholders with the actual file paths you need:
+
+    <follow_up_command>
+    contexto C:\dev\playero_2\mobile-playero --objetivo "al abrir la appp se queda cargando en la pantalla de carga(components/Loading) y no sale nunca de ese estado" --archivos [ruta/archivo1] [ruta/archivo2] ...
+    </follow_up_command>
+
+    Use forward slashes. Paths are relative to project_root.
+    Be selective — only request files genuinely needed for the task.
+</response_instructions>

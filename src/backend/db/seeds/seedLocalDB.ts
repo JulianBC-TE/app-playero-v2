@@ -100,7 +100,7 @@ async function upsertSync(tipo: string, fecha: number): Promise<void> {
 // ═════════════════════════════════════════════════════════════════════════════
 
 export async function seedLocalDB(): Promise<void> {
-  console.log("🌱 Iniciando seed de BD local...");
+  console.log(" Iniciando seed de BD local...");
   const now = Date.now();
 
   // ── 1. Sucursal ─────────────────────────────────────────────────────────────
@@ -341,7 +341,7 @@ await saveUser({ cedula: String(SEED_USER.cedula), name: SEED_USER.name });
 await saveAuthToken({ token: "dev_token_seed", refresh_token: "" });
 console.log("  ✅ AsyncStorage poblado");
 
-  console.log("🌱 Seed completado.");
+  console.log(" Seed completado.");
   console.log("──────────────────────────────────────────");
   console.log("   Login offline disponible:");
   console.log(`   Cédula   : ${SEED_USER.cedula}`);

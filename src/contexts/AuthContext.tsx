@@ -1,11 +1,19 @@
 // src/contexts/AuthContext.tsx
 
-import { createContext, useEffect, useState } from "react";
+import { createContext, useEffect, useState, useCallback } from "react";
 import { UserDTO } from "@dto/userDTO";
 import { saveUser, getStorageUser, removeUser } from "@storage/storageUse";
-import { getAuthToken, saveAuthToken, removeAuthToken } from "@storage/storageAuthToken";
+import {
+  getAuthToken,
+  saveAuthToken,
+  removeAuthToken,
+} from "@storage/storageAuthToken";
 import axios from "axios";
-import { getStorageServerUrl, saveServerUrl, removeServerUrl } from "@storage/storageServer";
+import {
+  getStorageServerUrl,
+  saveServerUrl,
+  removeServerUrl,
+} from "@storage/storageServer";
 import { ClienteDTO } from "@dto/ClienteDTO";
 import { SucursalDTO } from "@/dto/sucursalDTO";
 import { getStorageSucursal, saveSucursal } from "@/storage/storageSucursal";
@@ -71,7 +79,13 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 
         await saveAuthToken({ token: data.token, refresh_token: refreshToken });
         await saveUser(userData);
-        await saveUserLocally({ cedula, name: data.name, password, refreshToken, idSucursal: data.idSucursal });
+        await saveUserLocally({
+          cedula,
+          name: data.name,
+          password,
+          refreshToken,
+          idSucursal: data.idSucursal,
+        });
 
         httpClient.setToken(data.token);
         setUser(userData);
@@ -84,9 +98,11 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 
         if (!result.ok) {
           const messages: Record<typeof result.reason, string> = {
-            not_last_user: "Para cambiar de usuario necesitás conexión al servidor.",
+            not_last_user:
+              "Para cambiar de usuario necesitás conexión al servidor.",
             wrong_password: "Contraseña incorrecta.",
-            no_local_user: "No hay datos locales. Conectate al servidor para hacer el primer login.",
+            no_local_user:
+              "No hay datos locales. Conectate al servidor para hacer el primer login.",
             error: "Error al iniciar sesión offline.",
           };
           throw new Error(messages[result.reason]);
@@ -109,19 +125,19 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 
   // ── signOut ───────────────────────────────────────────────────────────────
 
-  async function signOut(): Promise<void> {
-    try {
-      setIsLoadingUserData(true);
-      if (user.cedula) await clearSession(user.cedula);
-      httpClient.clearToken();
-      setUser({} as UserDTO);
-      setIsOffline(false);
-      await removeUser();
-      await removeAuthToken();
-    } finally {
-      setIsLoadingUserData(false);
-    }
+  const signOut = useCallback(async (): Promise<void> => {
+  try {
+    setIsLoadingUserData(true);
+    if (user.cedula) await clearSession(user.cedula);
+    httpClient.clearToken();
+    setUser({} as UserDTO);
+    setIsOffline(false);
+    await removeUser();
+    await removeAuthToken();
+  } finally {
+    setIsLoadingUserData(false);
   }
+}, [user.cedula]);
 
   // ── updateUserProfile ─────────────────────────────────────────────────────
 
@@ -133,58 +149,48 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
   // ── Carga inicial ─────────────────────────────────────────────────────────
 
   async function loadUserData(): Promise<void> {
-    try {
-      setIsLoadingUserData(true);
-      const userLogged = await getStorageUser();
-      const { token } = await getAuthToken();
+  try {
+    setIsLoadingUserData(true);
+    const userLogged = await getStorageUser();
+    const { token } = await getAuthToken();
 
-      if (userLogged?.cedula) {
-        setUser(userLogged);
-        if (token) {
-          httpClient.setToken(token);
-          setIsOffline(false);
-        } else {
-          setIsOffline(true);
-        }
+    if (userLogged?.cedula) {
+      setUser(userLogged);
+      if (token) {
+        httpClient.setToken(token);
+        setIsOffline(false);
+      } else {
+        setIsOffline(true);
       }
-    } finally {
-      setIsLoadingUserData(false);
     }
+  } catch (error) {
+    console.warn("Fallo al leer almacenamiento en Bridgeless", error);
+  } finally {
+    setIsLoadingUserData(false); // ← siempre se ejecuta
+  }
+}
+
+  async function setServerIP(ip: string | null) {
+    if (ip !== null) {
+      await saveServerUrl(ip);
+    }
+    setServerIPState(ip);
   }
 
   async function loadServerIP() {
-    try {
-        const ip = await getStorageServerUrl();
-        const sucursal = await getStorageSucursal();
-
-        if (ip) {
-            // Verificar que el servidor realmente responde
-            try {
-                await axios.get(`http://${ip}/ping`, { timeout: 5000 });
-                // Si llegó acá, el servidor responde → todo bien
-                setServerIPState(ip);
-                setSucursal(sucursal);
-            } catch {
-                // El servidor no responde → limpiar la IP guardada
-                await removeServerUrl();
-                setServerIPState(null);
-            }
-        } else {
-            setServerIPState(null);
-        }
-    } catch (error) {
-        setServerIPState(null);
-    } finally {
-        setIsLoadingServerIP(false);
-    }
-}
+    const ip = await getStorageServerUrl();
+    const sucursal = await getStorageSucursal();
+    setServerIPState(ip);
+    setSucursal(sucursal);
+    setIsLoadingServerIP(false);
+  }
 
   // ── Setters ───────────────────────────────────────────────────────────────
 
-  async function setServerIP(ip: string | null): Promise<void> {
+  /*async function setServerIP(ip: string | null): Promise<void> {
     if (ip !== null) await saveServerUrl(ip);
     setServerIPState(ip);
-  }
+  }*/
 
   function setCliente(cliente: ClienteDTO | null): void {
     setClienteState(cliente ?? ({} as ClienteDTO));

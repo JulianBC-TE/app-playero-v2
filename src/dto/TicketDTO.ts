@@ -3,8 +3,8 @@ export type TicketDTO = {
   id_suc: number;
   id_bod: number;
   id_pico: number;
-  fecha: string;       // ISO string "YYYY-MM-DD"
-  hora: string;        // "HH:MM:SS"
+  fecha: number;       // ISO string "YYYY-MM-DD"
+  hora: number;        // "HH:MM:SS"
   ci_playero: number;
   litros: number;
   taxilitro_inicial: number;
@@ -13,5 +13,5 @@ export type TicketDTO = {
   ruc_cliente?: string;
   id_vehiculo?: string;
   obs?: string;
-  tipo: "CONTADO" | "CREDITO" | "INTERNO";
+  tipo: string;
 };
