@@ -11,6 +11,7 @@ import type {
   ModulosLocal,
   ModuloKey,
 } from "@/dto/modulosDTO";
+import { SYNC_CONFIG } from "@/backend/api/syncConfig";
 
 // Conjunto de claves válidas: coincide exactamente con las columnas de la tabla.
 const MODULOS_VALIDOS = new Set<ModuloKey>([
@@ -32,14 +33,20 @@ function isModuloKey(value: string): value is ModuloKey {
 
 /**
  * Llama al endpoint de privilegios con la cédula del operario autenticado.
+ * Utiliza las constantes de SYNC_CONFIG y el método especializado syncGet.
  *
  * @param cedula - Cédula del operario que inició sesión.
  * @returns Matriz de permisos en formato del servidor.
  */
-async function fetchModulos(cedula: string): Promise<ModulosServerResponse> {
-  const { data } = await httpClient.get<ModulosServerResponse>(
-    `/api/privilegios/${cedula}`
-  );
+async function fetchModulos(cedula: number): Promise<ModulosServerResponse> {
+  // 1. Obtenemos el template de la url: "api/app/privilegios/:cedula"
+  const endpointTemplate = SYNC_CONFIG.endpoints.modulos;
+
+  // 2. Reemplazamos el marcador ':cedula' por el valor real recibido por parámetro
+  const urlFinal = endpointTemplate.replace(":cedula", String(cedula));
+  // 3. Consumimos el servidor utilizando syncGet
+  const { data } = await httpClient.syncGet<ModulosServerResponse>(urlFinal);
+  
   return data;
 }
 
@@ -59,7 +66,7 @@ async function fetchModulos(cedula: string): Promise<ModulosServerResponse> {
  * @returns Objeto con todos los campos de `modulos_usuarios` completos.
  */
 export function translateModulos(
-  cedula: string,
+  cedula: number,
   serverData: ModulosServerResponse
 ): ModulosLocal {
   // Partir de todos los módulos deshabilitados por defecto
@@ -96,7 +103,7 @@ export function translateModulos(
  * @returns Objeto `ModulosLocal` listo para persistir en la BD.
  * @throws Si el servidor no está disponible o devuelve un error HTTP.
  */
-export async function getModulosTraducidos(cedula: string): Promise<ModulosLocal> {
+export async function getModulosTraducidos(cedula: number): Promise<ModulosLocal> {
   const serverData = await fetchModulos(cedula);
   return translateModulos(cedula, serverData);
 }

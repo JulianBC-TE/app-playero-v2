@@ -15,7 +15,8 @@
 //   DELETE /api/personas/:cedula   → eliminar
 
 import { httpClient } from "./httpClient";
-import { PersonaDTO } from "@/dto/PersonaDTO";
+import { PersonaDTO } from "@/dto/PersonaDTO";;
+import { SYNC_CONFIG } from "@/backend/api/syncConfig"; // <-- Ajusta la ruta relativa según tu proyecto
 
 // ---------------------------------------------------------------------------
 // Tipos de respuesta del servidor
@@ -106,4 +107,19 @@ export async function actualizarPersona(
 
 export async function eliminarPersona(cedula: number): Promise<void> {
   await httpClient.delete(`/api/personas/${cedula}`);
+}
+
+// ====================== SINCRONIZACIÓN ======================
+
+export async function syncGetPersonas(lastTimestamp: number = 0): Promise<PersonaDTO[]> {
+  const endpoint = SYNC_CONFIG.endpoints.personasGet;
+  const { data } = await httpClient.syncGet<PersonaDTO[]>(endpoint, {
+    params: { createdAt: lastTimestamp },
+  });
+  return Array.isArray(data) ? data : [];
+}
+
+export async function syncPostPersonas(personas: PersonaDTO[]): Promise<void> {
+  const endpoint = SYNC_CONFIG.endpoints.personasPost;
+  await httpClient.syncPost(endpoint, { personas });
 }

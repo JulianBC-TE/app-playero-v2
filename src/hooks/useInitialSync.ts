@@ -1,38 +1,31 @@
-// src/hooks/useInitialSync.ts
 import { syncClientesFromCentral } from "@/backend/db/modules/clienteDB";
-import { syncPersonasFromCentral } from "@/backend/db/modules/personaDB";
+import { syncPersonasFromCentralInit } from "@/backend/db/modules/personaDB";
 import { syncVehiculosFromCentral } from "@/backend/db/modules/vehiculoDB";
 import { syncSucursalesFromCentral } from "@/backend/db/modules/sucursalDB";
-import { syncBodegasFromCentral } from "@/backend/db/modules/bodegaDB";
-import { syncPicosFromCentral } from "@/backend/db/modules/picoDB";
-import { syncTanquesFromCentral } from "@/backend/db/modules/tanqueDB";
-/**
- * Hook que provee la función de sincronización inicial de datos desde el servidor central.
- * Sincroniza sucursales, bodegas, picos, tanques, clientes, personas y vehículos en orden.
- *
- * @param cedula - Cédula del usuario autenticado.
- * @param password - Contraseña del usuario autenticado.
- * @returns `syncInitialData` función asíncrona que ejecuta la sincronización completa.
- */
-export function useInitialSync(cedula: string, password: string) {
+import { syncCatalogoYTraspasosBodega } from "@/backend/db/modules/bodegaDB";
+import { syncPicosDelOperario } from "@/backend/db/modules/picoDB";
+import { syncTanquesDelOperario} from "@/backend/db/modules/tanqueDB";
+import { getSesionUsuarioActivoLocal } from "@/backend/db/modules/usuarioDB";
+import { sincronizarUltimosTurnosDesdeBackend } from "@/backend/db/modules/turnoBD";
+
+export function useInitialSync(cedula: number, id: number) {
+  const user = getSesionUsuarioActivoLocal();
   async function syncInitialData(): Promise<void> {
-    console.log("🚀 Iniciando sincronización inicial completa...");
+    console.log(`🔄 SYNC -> Iniciando sincronización (Usuario: ${cedula})`);
 
     try {
-      // Orden recomendado
       await syncSucursalesFromCentral();
-      await syncBodegasFromCentral(0); //aca puse cero temporalmente pero tiene que ser la id de la sucursal de usuario
-      await syncPicosFromCentral();
-      await syncTanquesFromCentral();
+      await syncCatalogoYTraspasosBodega(); 
+      await syncPicosDelOperario(cedula);
+      await syncTanquesDelOperario(cedula);
+      await sincronizarUltimosTurnosDesdeBackend((await user).idUser);
+      await syncClientesFromCentral();   
+      await syncPersonasFromCentralInit();
+      await syncVehiculosFromCentral();
 
-      await syncClientesFromCentral(0);   // 0 = primera vez
-      await syncPersonasFromCentral(0);
-      await syncVehiculosFromCentral(0);
-
-      console.log("✅ Sincronización inicial completada con éxito");
+      console.log("✅ SYNC -> Completada con éxito");
     } catch (error) {
-      console.error("❌ Falló alguna parte de la sincronización inicial:", error);
-      // No lanzamos error para no romper el login, solo logueamos
+      console.error("❌ SYNC -> Falló la sincronización inicial:", error);
     }
   }
 

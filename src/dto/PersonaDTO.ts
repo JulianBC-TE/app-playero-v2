@@ -1,4 +1,5 @@
 export type PersonaDTO = {
-	cedula: number;
-	nombre_apellido: string;
+  cedula: number;
+  nombre_apellido: string;
+  createdAt?: number;  // ✅ Agregado
 };

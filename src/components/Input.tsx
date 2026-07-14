@@ -74,10 +74,11 @@ export function Input({
             bg-white 
             text-black 
             rounded-md
+			text-xl
           `}
 					style={{
 						textAlign: align,
-						lineHeight: 20,
+						lineHeight: 30,
 						paddingTop: 0,
 						paddingBottom: 0,
 					}}

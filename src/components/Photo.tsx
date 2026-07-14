@@ -61,7 +61,7 @@ export function Photo({
       if (status !== "granted") {
         Alert.alert(
           "Permiso necesario",
-          "Precisamos de permiso para acceder a la cámara."
+          "Precisamos de permiso para acceder a la cámara.",
         );
         return;
       }
@@ -71,8 +71,8 @@ export function Photo({
         cameraType: ImagePicker.CameraType.back,
         allowsEditing: false,
         aspect: [4, 4],
-        quality: 1,      // sin compresión acá, la hacemos nosotros abajo
-        base64: false,   // solo necesitamos el URI para manipular
+        quality: 1, // sin compresión acá, la hacemos nosotros abajo
+        base64: false, // solo necesitamos el URI para manipular
       });
 
       if (!photoSelected.canceled) {
@@ -87,15 +87,19 @@ export function Photo({
             compress: 0.4,
             format: ImageManipulator.SaveFormat.JPEG,
             base64: true,
-          }
+          },
         );
 
         if (compressed.base64) {
           setImage(compressed.base64);
-          toastSuccess("Foto capturada", "La foto ha sido capturada con éxito.");
+          toastSuccess(
+            "Foto capturada",
+            "La foto ha sido capturada con éxito.",
+          );
         }
       }
     } catch (error) {
+      console.error("Error al capturar foto:", error); // ← agregá esto
       toastError("Error al capturar foto", "Intente nuevamente más tarde.");
     } finally {
       isLoading = false;

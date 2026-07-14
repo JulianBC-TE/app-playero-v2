@@ -39,14 +39,21 @@ import {
 import { crearTicketLocal } from "@DBmodules/ticketDB";
 import { normalizarFecha } from "@/backend/db/services/turnoStatusService";
 import { getPicosByBodega } from "@DBmodules/picoDB";
-import { getBodegasByIdSucursal } from "@DBmodules/bodegaDB";
-import { getTurnoStatusLocal } from "@DBmodules/turnoBD";
+import { getBodegasDelUsuario } from "@DBmodules/bodegaDB";
+import {
+  anularUltimoFinTurnoPorBodega,
+  getTipoByBodega,
+  getTurnoStatusLocal,
+} from "@DBmodules/turnoBD";
+import { TicketDTO } from "@/dto/TicketDTO";
 
 // ─── Form & Schema ────────────────────────────────────────────────────────────
 
 type FormData = {
   horometro?: string | null;
   kilometraje?: string | null;
+  taxilitro_inicial: string; // 🆕 Añadido
+  taxilitro_final: string; // 🆕 Añadido
   litros: string;
   observaciones?: string;
 };
@@ -62,6 +69,14 @@ const registrarSalidaSchema = yup.object({
     .nullable()
     .notRequired()
     .matches(/^[0-9]*$/, "Solo números permitidos"),
+  taxilitro_inicial: yup // 🆕 Validación añadida
+    .string()
+    .required("El taxilitro inicial es requerido")
+    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123.45)"),
+  taxilitro_final: yup // 🆕 Validación añadida
+    .string()
+    .required("El taxilitro final es requerido")
+    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123.45)"),
   litros: yup
     .string()
     .required("Los litros cargados son requeridos")
@@ -85,7 +100,9 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   );
   const [turnoCerrado, setTurnoCerrado] = useState(false);
   const [motivoConfirmado, setMotivoConfirmado] = useState(false);
-
+  const [valoresTemporales, setValoresTemporales] = useState<FormData | null>(
+    null,
+  );
   // ─── Datos ──────────────────────────────────────────────────────────────────
   const [bodegas, setBodegas] = useState<BodegaDTO[]>([]);
   const [picos, setPicos] = useState<PicoDTO[]>([]);
@@ -105,6 +122,8 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   const [base64Vehiculo, setBase64Vehiculo] = useState<string>("");
   const [base64Horometro, setBase64Horometro] = useState<string>("");
   const [base64Kilometraje, setBase64Kilometraje] = useState<string>("");
+  const [base64TaxInicio, setBase64TaxInicio] = useState<string>(""); // 🆕 Foto taxilitro inicial
+  const [base64TaxFin, setBase64TaxFin] = useState<string>(""); // 🆕 Foto taxilitro final
   const [base64Obs, setBase64Obs] = useState<string>("");
 
   const {
@@ -119,38 +138,21 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
     defaultValues: {
       horometro: "",
       kilometraje: "",
+      taxilitro_inicial: "", // 🆕 Inicializado
+      taxilitro_final: "", // 🆕 Inicializado
       litros: "",
       observaciones: "",
     },
   });
 
-  // watch() en lugar de control._formValues (API pública de RHF)
   const watchedValues = watch();
 
   // ─── Init: turno + bodegas ────────────────────────────────────────────────
-
   useEffect(() => {
     async function init() {
       setIsLoading(true);
-
-      // Estado del turno — local
       try {
-        const turnoData = await getTurnoStatusLocal(sucursal.id_sucursal);
-        if (
-          turnoData.status === "cerrado" ||
-          turnoData.status === "falta_cerrar"
-        ) {
-          setTurnoCerrado(true);
-        }
-      } catch (err) {
-        console.error("[Salida] Error al obtener estado del turno:", err);
-      }
-
-      // Bodegas de la sucursal — local
-      try {
-        const bodegasLocales = await getBodegasByIdSucursal(
-          sucursal.id_sucursal,
-        );
+        const bodegasLocales = await getBodegasDelUsuario(user.cedula);
         setBodegas(bodegasLocales);
       } catch (err) {
         console.error("[Salida] Error al obtener bodegas:", err);
@@ -162,7 +164,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 
     init();
 
-    // Permisos de ubicación
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") return;
@@ -184,7 +185,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       try {
         const picosLocales = await getPicosByBodega(Number(selectedBodega));
         setPicos(picosLocales);
-        setSelectedPico(""); // resetear pico al cambiar bodega
+        setSelectedPico("");
       } catch (err) {
         console.error("[Salida] Error al obtener picos:", err);
         toastError("Error", "No se pudieron cargar los picos.");
@@ -208,12 +209,18 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 
   // ─── Guardar ticket ───────────────────────────────────────────────────────
 
-  async function handleSaveAll({
-    horometro,
-    kilometraje,
-    litros,
-    observaciones,
-  }: FormData) {
+  async function handleSaveAll(data: FormData) {
+    // 1. Extraemos primero todas las propiedades de 'data' para que existan en las validaciones
+    const {
+      horometro,
+      kilometraje,
+      taxilitro_inicial,
+      taxilitro_final,
+      litros,
+      observaciones,
+    } = data;
+
+    // 2. Ahora sí, tus validaciones de UI existentes funcionarán sin errores de TypeScript
     if (!persona) {
       Alert.alert("Persona requerida", "Debe seleccionar un operador.");
       return;
@@ -223,10 +230,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       return;
     }
     if (!base64Vehiculo) {
-      Alert.alert(
-        "Foto requerida",
-        "Debe capturar una foto de la chapa o código del vehículo.",
-      );
+      Alert.alert("Foto requerida", "Debe capturar una foto...");
       return;
     }
     if (!selectedBodega) {
@@ -234,9 +238,25 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       return;
     }
     if (!selectedPico) {
-      Alert.alert("Pico requerido", "Debe seleccionar un pico expendedor.");
+      Alert.alert("Pico requerido", "Debe seleccionar un pico.");
       return;
     }
+    if (!base64TaxInicio) {
+      Alert.alert(
+        "Foto requerida",
+        "Debe capturar la foto de evidencia para el Taxilitro Inicial.",
+      );
+      return;
+    }
+    if (!base64TaxFin) {
+      Alert.alert(
+        "Foto requerida",
+        "Debe capturar la foto de evidencia para el Taxilitro Final.",
+      );
+      return;
+    }
+
+    // Línea 215 (¡Solucionada! Ahora 'kilometraje' y 'horometro' sí existen aquí)
     if (!kilometraje && !horometro) {
       Alert.alert(
         "Campos requeridos",
@@ -244,6 +264,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       );
       return;
     }
+
     if (horometro && !base64Horometro) {
       Alert.alert("Foto requerida", "Debe capturar una foto del horómetro.");
       return;
@@ -259,47 +280,73 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       return;
     }
 
-    const now = new Date();
-
-    const ticketJson = {
-      id_suc: sucursal.id_sucursal,
-      id_bod: Number(selectedBodega),
-      id_pico: Number(selectedPico),
-      id_vehiculo: vehiculo.id_vehiculo ?? "",
-      id_playero: Number(user.cedula),
-      id_operador: Number(persona.cedula),
-      litros: Number((litros ?? "0").replace(",", ".")),
-      kilometraje: Number(kilometraje) || 0,
-      horometro: Number((horometro ?? "").replace(",", ".")) || 0,
-      inicio_taxilitro: 0,
-      fin_taxilitro: 0,
-      ruc_cliente: "",
-      fecha: now.toISOString().slice(0, 10),
-      hora: now.toTimeString().slice(0, 8),
-      precio: 0,
-      foto_chapa: base64Vehiculo ? [base64Vehiculo] : [],
-      firma_conductor: firma ? [firma] : [],
-      foto_kilometraje: base64Kilometraje ? [base64Kilometraje] : [],
-      foto_horometro: base64Horometro ? [base64Horometro] : [],
-      ubicacion_carga: location
-        ? `https://www.google.com/maps?q=${location.coords.latitude},${location.coords.longitude}`
-        : "",
-      observaciones_ticket: `${observaciones ?? ""} >> ${obsAdicional}`,
-      foto_observaciones: base64Obs ? [base64Obs] : [],
-    };
-
     try {
       setIsLoading(true);
-      await crearTicketLocal({
-        json: ticketJson,
-        tipo: "salida",
-        fecha: normalizarFecha(now),
-        hora: Date.now(),
-      });
 
+      // Verificación del estado del turno al momento de guardar
+      const tipoTurno = await getTipoByBodega(Number(selectedBodega));
+      const turnoData = await getTurnoStatusLocal(user.cedula);
+      console.log(turnoData.status);
+      const estaCerrado =
+        turnoData.status === "cerrado" || turnoData.status === "falta_cerrar";
+
+      if ((estaCerrado || tipoTurno === "2") && !motivoConfirmado) {
+        setValoresTemporales(data); // Respaldamos el objeto data completo
+        setTurnoCerrado(true); // Muestra el modal del motivo
+        setIsLoading(false);
+        return;
+      }
+
+      // 3. PROCESO DE GUARDADO NORMAL / EXCEPCIONAL
+      const {
+        horometro,
+        kilometraje,
+        taxilitro_inicial,
+        taxilitro_final,
+        litros,
+        observaciones,
+      } = data;
+      const now = new Date();
+
+      const ticket: TicketDTO = {
+        id_suc: sucursal.id_sucursal,
+        id_bod: Number(selectedBodega),
+        id_pico: Number(selectedPico),
+        id_vehiculo: vehiculo.id_vehiculo ?? "",
+        ci_playero: Number(user.cedula),
+        id_operador: Number(persona.cedula),
+        litros: Number((litros ?? "0").replace(",", ".")),
+        kilometraje: Number(kilometraje) || 0,
+        horometro: Number((horometro ?? "").replace(",", ".")) || 0,
+        taxilitro_inicial: Number((taxilitro_inicial ?? "0").replace(",", ".")),
+        taxilitro_final: Number((taxilitro_final ?? "0").replace(",", ".")),
+        monto: 0,
+        ruc_cliente: "",
+        fecha: now.toISOString().slice(0, 10),
+        hora: now.toTimeString().slice(0, 8),
+        tipo: "salida",
+        foto_chapa: base64Vehiculo ? [base64Vehiculo] : [],
+        firma_conductor: firma ? [firma] : [],
+        foto_kilometraje: base64Kilometraje ? [base64Kilometraje] : [],
+        foto_horometro: base64Horometro ? [base64Horometro] : [],
+        foto_taxilitro: base64TaxInicio ? [base64TaxInicio] : [],
+        foto_taxilitro_fin: base64TaxFin ? [base64TaxFin] : [],
+        ubicacion_carga: location
+          ? `https://www.google.com/maps?q=${location.coords.latitude},${location.coords.longitude}`
+          : "",
+        obs: observaciones ?? "",
+        // Si fue excepcional, concatena el obsAdicional (motivo) ingresado en el modal
+        observaciones_ticket: motivoConfirmado
+          ? `${observaciones ?? ""} >> MOTIVO EXCEPCIONAL: ${obsAdicional}`
+          : (observaciones ?? ""),
+        foto_observaciones: base64Obs ? [base64Obs] : [],
+      };
+
+      await crearTicketLocal(ticket, normalizarFecha(now), Date.now());
+      await anularUltimoFinTurnoPorBodega(ticket.id_bod, obsAdicional);
       await removeSalida();
 
-      // Reset completo
+      // Reset de los estados
       setPersona(null);
       setVehiculo(null);
       setFirma(null);
@@ -308,8 +355,12 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       setBase64Vehiculo("");
       setBase64Horometro("");
       setBase64Kilometraje("");
+      setBase64TaxInicio("");
+      setBase64TaxFin("");
       setBase64Obs("");
       setObsAdicional("");
+      setMotivoConfirmado(false);
+      setValoresTemporales(null);
       reset();
 
       toastSuccess("Registro de Salida", "Salida registrada localmente.");
@@ -322,7 +373,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
     }
   }
 
-  // ─── Persistencia ─────────────────────────────────────────────────────────
+  // ─── Persistencia (Borrador) ──────────────────────────────────────────────
 
   const guardarEstado = useCallback(async () => {
     if (!estadoRestaurado) return;
@@ -333,17 +384,21 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
         firma,
         selectedBodega,
         selectedPico,
-        idPico_surtidor: 0, // obsoleto, se mantiene por compatibilidad del tipo
-        salida: 0, // obsoleto, se mantiene por compatibilidad del tipo
+        idPico_surtidor: 0,
+        salida: 0,
         cargaCombustible: watchedValues.litros ?? "",
         totalizadorPicoInicial: 0,
         totalizadorPicoFinal: 0,
         base64Vehiculo,
         base64Horometro,
         base64Kilometraje,
+        base64TaxInicio, // 🆕 Guardado en borrador
+        base64TaxFin, // 🆕 Guardado en borrador
         base64Obs,
         horometro: watchedValues.horometro ?? "",
         kilometraje: watchedValues.kilometraje ?? "",
+        taxilitro_inicial: watchedValues.taxilitro_inicial ?? "", // 🆕 Guardado en borrador
+        taxilitro_final: watchedValues.taxilitro_final ?? "", // 🆕 Guardado en borrador
         observaciones: watchedValues.observaciones ?? "",
         obsAdicional,
         turnoCerrado,
@@ -362,6 +417,8 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
     base64Vehiculo,
     base64Horometro,
     base64Kilometraje,
+    base64TaxInicio,
+    base64TaxFin,
     base64Obs,
     obsAdicional,
     turnoCerrado,
@@ -388,9 +445,13 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
           setBase64Vehiculo(guardado.base64Vehiculo);
           setBase64Horometro(guardado.base64Horometro);
           setBase64Kilometraje(guardado.base64Kilometraje);
+          setBase64TaxInicio(guardado.base64TaxInicio ?? ""); // 🆕 Restauración foto
+          setBase64TaxFin(guardado.base64TaxFin ?? ""); // 🆕 Restauración foto
           setBase64Obs(guardado.base64Obs);
           setValue("horometro", guardado.horometro);
           setValue("kilometraje", guardado.kilometraje);
+          setValue("taxilitro_inicial", guardado.taxilitro_inicial ?? ""); // 🆕 Restauración texto
+          setValue("taxilitro_final", guardado.taxilitro_final ?? ""); // 🆕 Restauración texto
           setValue("litros", guardado.cargaCombustible);
           setValue("observaciones", guardado.observaciones);
           setObsAdicional(guardado.obsAdicional);
@@ -416,9 +477,13 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
             base64Vehiculo: "",
             base64Horometro: "",
             base64Kilometraje: "",
+            base64TaxInicio: "",
+            base64TaxFin: "",
             base64Obs: "",
             horometro: "",
             kilometraje: "",
+            taxilitro_inicial: "",
+            taxilitro_final: "",
             observaciones: "",
             obsAdicional: "",
             turnoCerrado: false,
@@ -503,6 +568,8 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                     onChangeText={setObsAdicional}
                   />
                 </InputCard>
+                // Busca el botón dentro del bloque "if (turnoCerrado &&
+                !motivoConfirmado)" y modifícalo:
                 <TouchableOpacity
                   style={styles.button}
                   onPress={() => {
@@ -513,11 +580,23 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                       );
                       return;
                     }
+
+                    // Cambiamos los estados reflejando que ya se rellenó el motivo
                     setMotivoConfirmado(true);
                     setTurnoCerrado(false);
+
+                    // Si tenemos los datos del formulario respaldados, ejecutamos el guardado directamente
+                    if (valoresTemporales) {
+                      // Usamos un setTimeout muy pequeño para asegurar que React procese el cambio de 'motivoConfirmado' antes de lanzar la función
+                      setTimeout(() => {
+                        handleSaveAll(valoresTemporales);
+                      }, 100);
+                    }
                   }}
                 >
-                  <Text style={styles.buttonText}>Guardar</Text>
+                  <Text style={styles.buttonText}>
+                    Confirmar y Grabar Salida
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -569,8 +648,10 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                     })
                   }
                 />
+              </View>
+              <View className="flex-row items-center p-2 gap-2">
                 <Photo
-                  form="icon"
+                  form="button"
                   iconSize="lg"
                   iconColor={base64Vehiculo ? "#05a722" : "#000"}
                   setImage={setBase64Vehiculo}
@@ -590,7 +671,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
               />
             </InputCard>
 
-            {/* Pico expendedor — solo habilitado si hay bodega seleccionada */}
+            {/* Pico expendedor */}
             <InputCard title="Pico expendedor" required>
               <Select
                 data={picos}
@@ -619,8 +700,10 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                     />
                   )}
                 />
+              </View>
+              <View className="flex-row items-center p-2 gap-2">
                 <Photo
-                  form="icon"
+                  form="button"
                   iconSize="lg"
                   iconColor={base64Horometro ? "#05a722" : "#000"}
                   setImage={setBase64Horometro}
@@ -645,11 +728,41 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                     />
                   )}
                 />
+              </View>
+              <View className="flex-row items-center p-2 gap-2">
                 <Photo
-                  form="icon"
+                  form="button"
                   iconSize="lg"
                   iconColor={base64Kilometraje ? "#05a722" : "#000"}
                   setImage={setBase64Kilometraje}
+                />
+              </View>
+            </InputCard>
+
+            {/* 🆕 Taxilitro Inicial */}
+            <InputCard title="Taxilitro Inicial" required>
+              <View className="flex-row items-center p-2 gap-2">
+                <Controller
+                  control={control}
+                  name="taxilitro_inicial"
+                  render={({ field: { onChange, value } }) => (
+                    <Input
+                      keyboardType="decimal-pad"
+                      align="center"
+                      placeholder="Ingrese taxilitro inicial"
+                      value={value ?? ""}
+                      onChangeText={onChange}
+                      errorMessage={errors.taxilitro_inicial?.message}
+                    />
+                  )}
+                />
+              </View>
+              <View className="flex-row items-center p-2 gap-2">
+                <Photo
+                  form="button"
+                  iconSize="lg"
+                  iconColor={base64TaxInicio ? "#05a722" : "#000"}
+                  setImage={setBase64TaxInicio}
                 />
               </View>
             </InputCard>
@@ -670,6 +783,34 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                   />
                 )}
               />
+            </InputCard>
+
+            {/* 🆕 Taxilitro Final */}
+            <InputCard title="Taxilitro Final" required>
+              <View className="flex-row items-center p-2 gap-2">
+                <Controller
+                  control={control}
+                  name="taxilitro_final"
+                  render={({ field: { onChange, value } }) => (
+                    <Input
+                      keyboardType="decimal-pad"
+                      align="center"
+                      placeholder="Ingrese taxilitro final"
+                      value={value ?? ""}
+                      onChangeText={onChange}
+                      errorMessage={errors.taxilitro_final?.message}
+                    />
+                  )}
+                />
+              </View>
+              <View className="flex-row items-center p-2 gap-2">
+                <Photo
+                  form="button"
+                  iconSize="lg"
+                  iconColor={base64TaxFin ? "#05a722" : "#000"}
+                  setImage={setBase64TaxFin}
+                />
+              </View>
             </InputCard>
 
             {/* Observaciones */}
@@ -757,3 +898,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+

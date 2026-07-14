@@ -9,43 +9,226 @@
  */
 
 import { db } from "@/backend/db/client";
-import { abastecimientos, syncs } from "@/backend/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { abastecimientos, medicionesTanque, syncs } from "@/backend/db/schema";
+import { eq, desc, inArray } from "drizzle-orm";
 import { AbastecimientoDTO } from "@/dto/AbastecimientoDTO";
 
 const SYNC_KEY = "__last_sync_abastecimientos__";
 
-
 /**
- * Inserta un nuevo abastecimiento pendiente de sincronización.
+ * Inserta un nuevo abastecimiento pendiente de sincronización y sus respectivas mediciones.
+ * Utiliza una transacción para asegurar que todo se guarde correctamente o nada lo haga.
  *
- * @param input - Datos del abastecimiento a guardar.
- * @returns ID generado por SQLite (`lastInsertRowId`).
+ * @param dto - Datos del abastecimiento a guardar (aplanados, tal como definimos el DTO).
+ * @returns ID generado por SQLite (`idAbastecimiento`).
  */
-export async function saveAbastecimientoLocal(dto: AbastecimientoDTO): Promise<number> {
-  const result = await db.insert(abastecimientos).values({
-    json: JSON.stringify(dto),
-    tipo: "ABASTECIMIENTO",
-    sync: 0,
-    fecha: Date.now(),
-    hora: Date.now(),
+export async function saveAbastecimientoLocal(
+  dto: AbastecimientoDTO,
+): Promise<number> {
+  return await db.transaction(async (tx) => {
+    // 1. Insertar el registro principal en la tabla de abastecimientos
+    //console.log(dto.foto_rev_docs);
+    console.log(dto.foto_rev_docs[0].slice(0, 10));
+    console.log("...", dto.foto_rev_docs[0].slice(-10));
+    //console.log(dto.foto_obs_repos);
+    //console.log(dto.foto_obs_repos.slice(0, 10));
+    //console.log('...', dto.foto_obs_repos.slice(-10));
+    const [result] = await tx
+      .insert(abastecimientos)
+      .values({
+        tipo: "ABASTECIMIENTO",
+        sync: 0,
+        idSuc: dto.id_suc,
+        idBod: dto.id_bod,
+        fecha: dto.fecha,
+        hora: dto.hora,
+        nroOc: dto.nro_oc,
+        nroRemision: dto.nro_remision,
+        litrosRemision: dto.litros_remision,
+        playero: dto.playero,
+        fotoRevDocs: dto.foto_rev_docs,
+        zetaNoLlega: dto.zeta_no_llega,
+        idPicoParaZeta: dto.id_pico_para_zeta,
+        taxilitroInicial: dto.taxilitro_inicial,
+        taxilitroFinal: dto.taxilitro_final,
+        litrosZeta: dto.litros_zeta,
+        obsRepos: dto.obs_repos,
+        fotoObsRepos: dto.foto_obs_repos,
+        litrosTotalRepos: dto.litros_total_repos,
+        fotoTaxilitro: dto.foto_taxilitro || "",
+        fotoTaxilitroFin: dto.foto_taxilitro_fin || "",
+      })
+      .returning({ idInserted: abastecimientos.idAbastecimiento });
+
+    const abastecimientoId = result?.idInserted;
+
+    if (!abastecimientoId) {
+      throw new Error("No se pudo obtener el ID del abastecimiento insertado");
+    }
+
+    // 2. Insertar las mediciones de tanque asociadas (si existen)
+    if (
+      Array.isArray(dto.mediciones_tanque) &&
+      dto.mediciones_tanque.length > 0
+    ) {
+      const medicionesParaInsertar = dto.mediciones_tanque.map((med) => ({
+        abastecimientoId: abastecimientoId,
+        idTanque: med.id_tanque,
+        inicioRegla: med.inicio.regla,
+        inicioTemperatura: med.inicio.temperatura,
+        inicioLitros: med.inicio.litros,
+        inicioFotoMedicion: med.inicio.foto_medicion,
+        finRegla: med.fin.regla,
+        finTemperatura: med.fin.temperatura,
+        finLitros: med.fin.litros,
+        finFotoMedicion: med.fin.foto_medicion,
+      }));
+
+      await tx.insert(medicionesTanque).values(medicionesParaInsertar);
+    }
+
+    return abastecimientoId;
   });
-  return (result as any).lastInsertRowId ?? 0;
 }
 
 /**
  * Devuelve todos los abastecimientos que aún no han sido sincronizados (`sync = 0`),
- * ordenados por fecha descendente.
+ * mapeados uno a uno con la interfaz estricta de `AbastecimientoDTO`.
+ * Incluye un campo `clave` alfanumérico para identificar de forma única cada abastecimiento.
  *
- * @returns Lista de registros con el campo `json` ya parseado a `AbastecimientoInput`.
+ * @returns Lista de abastecimientos con sus mediciones listas para el payload del backend.
  */
-export async function getAbastecimientosPendientes() {
-  const rows = await db.select().from(abastecimientos).where(eq(abastecimientos.sync, 0)).orderBy(desc(abastecimientos.fecha));
-  return rows.map((r) => ({
-    ...r,
-    dto: JSON.parse(r.json) as AbastecimientoDTO,
-  }));
+export async function getAbastecimientosPendientes(): Promise<
+  AbastecimientoDTO[]
+> {
+  // 1. Consultar todos los abastecimientos pendientes de forma tradicional
+  const rows = await db
+    .select()
+    .from(abastecimientos)
+    .where(eq(abastecimientos.sync, 0))
+    .orderBy(desc(abastecimientos.idAbastecimiento));
+  if (rows.length === 0) {
+    console.log("⚪ ABASTECIMIENTO -> Nada pendiente para subir");
+    return [];
+  }
+
+  // 2. Traer de golpe todas las mediciones asociadas a esos abastecimientos
+  const ids = rows.map((r) => r.idAbastecimiento);
+
+  // Usamos una consulta normal que TypeScript puede inferir perfectamente sin db.query
+  const todasLasMediciones = await db
+    .select()
+    .from(medicionesTanque)
+    .where(inArray(medicionesTanque.abastecimientoId, ids)); // 💡 Nota: Asegúrate de importar `inArray` de "drizzle-orm" arriba
+
+  // 3. Re-mapeamos y unimos las relaciones de forma manual y segura
+  return rows.map((r) => {
+    // Filtrar las mediciones que pertenecen a este abastecimiento específico
+    const misMediciones = todasLasMediciones.filter(
+      (med) => med.abastecimientoId === r.idAbastecimiento,
+    );
+
+    // Construimos la clave en formato: "id_bodega-fecha-id_abastecimiento_local"
+    const clave = `${r.idBod}-${r.fecha}-${r.hora}-${r.idAbastecimiento}`;
+    // Dentro del return rows.map((r) => { ... })
+
+    // Función auxiliar para asegurar que el frente envíe un Array real
+    const normalizarArrayFotos = (campo: any): string[] => {
+      if (Array.isArray(campo)) return campo;
+
+      if (typeof campo === "string" && campo.trim() !== "") {
+        let limpio = campo.trim();
+
+        // Si el texto está envuelto en corchetes mal formados (ej: [/9j/4...])
+        if (limpio.startsWith("[") && limpio.endsWith("]")) {
+          // Le quitamos el primer y último carácter ([ y ])
+          limpio = limpio.slice(1, -1).trim();
+
+          // Si después de quitar corchetes quedó vacío, mandamos array vacío
+          if (!limpio) return [];
+
+          // Si empieza con comilla, es que SÍ era un JSON real válido.
+          // Si no empieza con comilla, es tu Base64 crudo.
+          if (!limpio.startsWith('"') && !limpio.startsWith("'")) {
+            return [limpio]; // Lo envolvemos directamente en el array y listo
+          }
+        }
+
+        // Respaldo por si en algún momento sí viene un JSON bien hecho
+        try {
+          const parsed = JSON.parse(campo);
+          return Array.isArray(parsed) ? parsed : [String(parsed)];
+        } catch {
+          // Si todo lo demás falla, devolvemos el string original en un array
+          return [campo];
+        }
+      }
+
+      return [];
+    };
+
+    return {
+      id_abastecimiento: r.idAbastecimiento,
+      clave: clave,
+      id_suc: r.idSuc,
+      id_bod: r.idBod,
+      fecha: r.fecha,
+      hora: r.hora,
+      nro_oc: r.nroOc,
+      nro_remision: r.nroRemision,
+      litros_remision: r.litrosRemision,
+      playero: r.playero,
+
+      // CORRECCIÓN AQUÍ: Garantizar un array legítimo de strings
+      foto_rev_docs: normalizarArrayFotos(r.fotoRevDocs),
+
+      zeta_no_llega: r.zetaNoLlega,
+      id_pico_para_zeta: r.idPicoParaZeta,
+      taxilitro_inicial: r.taxilitroInicial,
+      taxilitro_final: r.taxilitroFinal,
+      litros_zeta: r.litrosZeta,
+      obs_repos: r.obsRepos,
+
+      // CORRECCIÓN AQUÍ: Garantizar un array legítimo de strings
+      foto_obs_repos: normalizarArrayFotos(r.fotoObsRepos),
+
+      litros_total_repos: r.litrosTotalRepos,
+      foto_taxilitro: r.fotoTaxilitro,
+      foto_taxilitro_fin: r.fotoTaxilitroFin,
+      mediciones_tanque: misMediciones.map((med) => ({
+        id_tanque: med.idTanque,
+        inicio: {
+          regla: med.inicioRegla,
+          temperatura: med.inicioTemperatura,
+          litros: med.inicioLitros,
+          foto_medicion: med.inicioFotoMedicion,
+        },
+        fin: {
+          regla: med.finRegla,
+          temperatura: med.finTemperatura,
+          litros: med.finLitros,
+          foto_medicion: med.finFotoMedicion,
+        },
+      })),
+    };
+  });
 }
+
+/*mediciones_tanque: misMediciones.map((med) => ({
+        id_tanque: med.idTanque,
+        inicio: {
+          regla: med.inicioRegla,
+          temperatura: med.inicioTemperatura,
+          litros: med.inicioLitros,
+          foto_medicion: med.inicioFotoMedicion,
+        },
+        fin: {
+          regla: med.finRegla,
+          temperatura: med.finTemperatura,
+          litros: med.finLitros,
+          foto_medicion: med.finFotoMedicion,
+        },
+      })), */
 
 /**
  * Marca un abastecimiento como sincronizado con el servidor (`sync = 1`).
@@ -60,17 +243,17 @@ export async function marcarAbastecimientoSync(id: number): Promise<void> {
 }
 
 /**
- * Marca un abastecimiento con error de sincronización (`sync = -1`).
- * Permite reintentar en el próximo ciclo de sync.
+ * Marca un abastecimiento con error de sincronización o listo para reintento (`sync = 0`).
  *
  * @param id - ID del abastecimiento en la tabla local.
  */
 export async function marcarAbastecimientoErrorSync(id: number): Promise<void> {
   await db
     .update(abastecimientos)
-    .set({ sync: -1 })
+    .set({ sync: 0 })
     .where(eq(abastecimientos.idAbastecimiento, id));
 }
+
 /**
  * Devuelve el timestamp de la última sincronización exitosa de abastecimientos.
  *

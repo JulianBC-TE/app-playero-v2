@@ -49,24 +49,24 @@ import * as Crypto from "expo-crypto";
 import { saveSucursal } from "@/storage/storageSucursal";
 import { saveUser } from "@/storage/storageUse";
 import { saveAuthToken } from "@/storage/storageAuthToken";
-
+import { modulosUsuarios } from "@/backend/db/schema"; // agregá al import de arriba
 // ── Constantes de las claves de sync (copiadas de cada módulo DB) ─────────────
 const SYNC_KEYS = {
-  lastUser:    "__last_online_user__",
-  sucursales:  "__last_sync_sucursales__",
-  bodegas:     "__last_sync_bodegas__",
-  picos:       "__last_sync_picos__",
-  tanques:     "__last_sync_tanques__",
-  clientes:    "__last_sync_clientes__",
-  personas:    "__last_sync_personas__",
-  vehiculos:   "__last_sync_vehiculos__",
+  lastUser: "__last_online_user__",
+  sucursales: "__last_sync_sucursales__",
+  bodegas: "__last_sync_bodegas__",
+  picos: "__last_sync_picos__",
+  tanques: "__last_sync_tanques__",
+  clientes: "__last_sync_clientes__",
+  personas: "__last_sync_personas__",
+  vehiculos: "__last_sync_vehiculos__",
 };
 
 // ── Credenciales de prueba ────────────────────────────────────────────────────
 const SEED_USER = {
-  cedula:   12345678,
-  name:     "Juan Perez",
-  password: "1234",        // contraseña en texto plano → se hashea abajo
+  cedula: 12345678,
+  name: "Juan Perez",
+  password: "1234", // contraseña en texto plano → se hashea abajo
   idSucursal: 1,
 };
 
@@ -119,8 +119,18 @@ export async function seedLocalDB(): Promise<void> {
   //   bodega 1 → normal
   //   bodega 2 → habilitada para traspaso
   const bodegasData = [
-    { idBodega: 1, descripcionBodega: "Bodega Principal",   idSucursal: 1, trapaso: false },
-    { idBodega: 2, descripcionBodega: "Bodega Secundaria",  idSucursal: 1, trapaso: true  },
+    {
+      idBodega: 1,
+      descripcionBodega: "Bodega Principal",
+      idSucursal: 1,
+      trapaso: false,
+    },
+    {
+      idBodega: 2,
+      descripcionBodega: "Bodega Secundaria",
+      idSucursal: 1,
+      trapaso: true,
+    },
   ];
 
   for (const b of bodegasData) {
@@ -142,10 +152,30 @@ export async function seedLocalDB(): Promise<void> {
 
   // ── 3. Picos ────────────────────────────────────────────────────────────────
   const picosData = [
-    { idPico: 1, descripcionPico: "Pico 1 - Nafta",   idBodega: 1, idPicoSurtidor: 101 },
-    { idPico: 2, descripcionPico: "Pico 2 - Diesel",  idBodega: 1, idPicoSurtidor: 102 },
-    { idPico: 3, descripcionPico: "Pico 3 - Nafta",   idBodega: 2, idPicoSurtidor: 201 },
-    { idPico: 4, descripcionPico: "Pico 4 - GNC",     idBodega: 2, idPicoSurtidor: 202 },
+    {
+      idPico: 1,
+      descripcionPico: "Pico 1 - Nafta",
+      idBodega: 1,
+      idPicoSurtidor: 101,
+    },
+    {
+      idPico: 2,
+      descripcionPico: "Pico 2 - Diesel",
+      idBodega: 1,
+      idPicoSurtidor: 102,
+    },
+    {
+      idPico: 3,
+      descripcionPico: "Pico 3 - Nafta",
+      idBodega: 2,
+      idPicoSurtidor: 201,
+    },
+    {
+      idPico: 4,
+      descripcionPico: "Pico 4 - GNC",
+      idBodega: 2,
+      idPicoSurtidor: 202,
+    },
   ];
 
   for (const p of picosData) {
@@ -167,10 +197,30 @@ export async function seedLocalDB(): Promise<void> {
 
   // ── 4. Tanques ──────────────────────────────────────────────────────────────
   const tanquesData = [
-    { idTanque: 1, descripcionTanque: "Tanque Nafta 95",  idBodega: 1, capacidadLitros: 20000 },
-    { idTanque: 2, descripcionTanque: "Tanque Diesel",    idBodega: 1, capacidadLitros: 30000 },
-    { idTanque: 3, descripcionTanque: "Tanque Nafta P",   idBodega: 2, capacidadLitros: 15000 },
-    { idTanque: 4, descripcionTanque: "Tanque GNC",       idBodega: 2, capacidadLitros: 10000 },
+    {
+      idTanque: 1,
+      descripcionTanque: "Tanque Nafta 95",
+      idBodega: 1,
+      capacidadLitros: 20000,
+    },
+    {
+      idTanque: 2,
+      descripcionTanque: "Tanque Diesel",
+      idBodega: 1,
+      capacidadLitros: 30000,
+    },
+    {
+      idTanque: 3,
+      descripcionTanque: "Tanque Nafta P",
+      idBodega: 2,
+      capacidadLitros: 15000,
+    },
+    {
+      idTanque: 4,
+      descripcionTanque: "Tanque GNC",
+      idBodega: 2,
+      capacidadLitros: 10000,
+    },
   ];
 
   for (const t of tanquesData) {
@@ -194,16 +244,25 @@ export async function seedLocalDB(): Promise<void> {
   const clientesData = [
     { ruc: "80012345-1", descripcionCliente: "Transportes García S.A." },
     { ruc: "80098765-2", descripcionCliente: "Logística del Sur S.R.L." },
-    { ruc: "4567890-1",  descripcionCliente: "Juan Comerciante" },
+    { ruc: "4567890-1", descripcionCliente: "Juan Comerciante" },
   ];
 
   for (const c of clientesData) {
     await db
       .insert(clientes)
-      .values({ ruc: c.ruc, descripcionCliente: c.descripcionCliente, timestamp: now, sync: 1 })
+      .values({
+        ruc: c.ruc,
+        descripcionCliente: c.descripcionCliente,
+        timestamp: now,
+        sync: 1,
+      })
       .onConflictDoUpdate({
         target: clientes.ruc,
-        set: { descripcionCliente: c.descripcionCliente, timestamp: now, sync: 1 },
+        set: {
+          descripcionCliente: c.descripcionCliente,
+          timestamp: now,
+          sync: 1,
+        },
       });
   }
 
@@ -213,14 +272,19 @@ export async function seedLocalDB(): Promise<void> {
   // ── 6. Personas ─────────────────────────────────────────────────────────────
   const personasData = [
     { cedula: SEED_USER.cedula, nombreApellido: SEED_USER.name },
-    { cedula: 87654321,         nombreApellido: "Maria Lopez"  },
-    { cedula: 11223344,         nombreApellido: "Carlos Rojas" },
+    { cedula: 87654321, nombreApellido: "Maria Lopez" },
+    { cedula: 11223344, nombreApellido: "Carlos Rojas" },
   ];
 
   for (const p of personasData) {
     await db
       .insert(personas)
-      .values({ cedula: p.cedula, nombreApellido: p.nombreApellido, timestamp: now, sync: 1 })
+      .values({
+        cedula: p.cedula,
+        nombreApellido: p.nombreApellido,
+        timestamp: now,
+        sync: 1,
+      })
       .onConflictDoUpdate({
         target: personas.cedula,
         set: { nombreApellido: p.nombreApellido, timestamp: now, sync: 1 },
@@ -230,44 +294,92 @@ export async function seedLocalDB(): Promise<void> {
   await upsertSync(SYNC_KEYS.personas, now);
   console.log("  ✅ Personas insertadas");
 
-// ── 7. Usuario app ──────────────────────────────────────────────────────────
-try {
-  const salt      = await generateSalt();
-  const claveHash = await hashPassword(SEED_USER.password, salt);
+  // ── 7. Usuario app ──────────────────────────────────────────────────────────
+  try {
+    const salt = await generateSalt();
+    const claveHash = await hashPassword(SEED_USER.password, salt);
 
+    await db
+      .insert(usuariosApp)
+      .values({
+        cedula: SEED_USER.cedula,
+        clave: claveHash,
+        salt,
+        refreshToken: null,
+        bloqueado: false,
+        idSucursal: SEED_USER.idSucursal,
+      })
+      .onConflictDoUpdate({
+        target: usuariosApp.cedula,
+        set: { clave: claveHash, salt, idSucursal: SEED_USER.idSucursal },
+      });
+
+    await upsertSync(SYNC_KEYS.lastUser, SEED_USER.cedula);
+    console.log(
+      `  ✅ Usuario app creado  →  cédula: ${SEED_USER.cedula}  |  pass: "${SEED_USER.password}"`,
+    );
+  } catch (e) {
+    console.error("  ❌ Error en usuario app:", e);
+  }
+  // ── 7b. Módulos del usuario ──────────────────────────────────────────────────
   await db
-    .insert(usuariosApp)
+    .insert(modulosUsuarios)
     .values({
-      cedula:       SEED_USER.cedula,
-      clave:        claveHash,
-      salt,
-      refreshToken: null,
-      bloqueado:    false,
-      idSucursal:   SEED_USER.idSucursal,
+      cedula: SEED_USER.cedula,
+      abastecimiento: true,
+      calibracion: false,
+      traspaso: true,
+      salida: true,
+      vehiculo: false, // ← deshabilitado: no verá la pestaña Crear
+      persona: false, // ← habilitado: verá la pestaña Crear
     })
     .onConflictDoUpdate({
-      target: usuariosApp.cedula,
-      set: { clave: claveHash, salt, idSucursal: SEED_USER.idSucursal },
+      target: modulosUsuarios.cedula,
+      set: {
+        abastecimiento: true,
+        calibracion: false,
+        traspaso: true,
+        salida: true,
+        vehiculo: false,
+        persona: false,
+      },
     });
 
-  await upsertSync(SYNC_KEYS.lastUser, SEED_USER.cedula);
-  console.log(`  ✅ Usuario app creado  →  cédula: ${SEED_USER.cedula}  |  pass: "${SEED_USER.password}"`);
-} catch (e) {
-  console.error("  ❌ Error en usuario app:", e);
-}
+  console.log(
+    "  ✅ Módulos del usuario insertados (persona=true, vehiculo=false)",
+  );
   // ── 8. Vehículos ─────────────────────────────────────────────────────────────
   const vehiculosData = [
-    { idVehiculo: "ABC123", descripcionVehiculo: "Camión Ford F-4000",  ruc: "80012345-1" },
-    { idVehiculo: "XYZ789", descripcionVehiculo: "Utilitario Toyota",   ruc: "80098765-2" },
+    {
+      idVehiculo: "ABC123",
+      descripcionVehiculo: "Camión Ford F-4000",
+      ruc: "80012345-1",
+    },
+    {
+      idVehiculo: "XYZ789",
+      descripcionVehiculo: "Utilitario Toyota",
+      ruc: "80098765-2",
+    },
   ];
 
   for (const v of vehiculosData) {
     await db
       .insert(vehiculos)
-      .values({ idVehiculo: v.idVehiculo, descripcionVehiculo: v.descripcionVehiculo, ruc: v.ruc, timestamp: now, sync: 1 })
+      .values({
+        idVehiculo: v.idVehiculo,
+        descripcionVehiculo: v.descripcionVehiculo,
+        ruc: v.ruc,
+        timestamp: now,
+        sync: 1,
+      })
       .onConflictDoUpdate({
         target: vehiculos.idVehiculo,
-        set: { descripcionVehiculo: v.descripcionVehiculo, ruc: v.ruc, timestamp: now, sync: 1 },
+        set: {
+          descripcionVehiculo: v.descripcionVehiculo,
+          ruc: v.ruc,
+          timestamp: now,
+          sync: 1,
+        },
       });
   }
 
@@ -279,15 +391,15 @@ try {
   //   estado=1 (ACTIVO), tipo="inicio" → la Home mostrará status "iniciado".
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
-  const fechaHoy = hoy.getTime();        // timestamp inicio del día
-  const horaApertura = 800;             // 08:00
+  const fechaHoy = hoy.getTime(); // timestamp inicio del día
+  const horaApertura = 800; // 08:00
 
   const turnoJson = {
-    id_bodega:       1,
-    tipo:            "inicio",
+    id_bodega: 1,
+    tipo: "INICIO",
     cedula_operador: SEED_USER.cedula,
     nombre_operador: SEED_USER.name,
-    observacion:     "Apertura seed",
+    observacion: "Apertura seed",
   };
 
   // Insertamos solo si no existe ya un turno de inicio para bodega 1 hoy
@@ -298,7 +410,7 @@ try {
       // drizzle no importa and() aquí porque es TypeScript puro; lo hacemos manual:
       // WHERE id_bodega=1 AND tipo='inicio' AND fecha=fechaHoy AND estado=1
       // Para evitar importar `and` en el seed usamos un select amplio y filtramos
-      undefined
+      undefined,
     )
     .limit(100);
 
@@ -306,40 +418,45 @@ try {
     (t: any) =>
       // La tabla no tiene campo tipo/fecha seleccionados en el select anterior;
       // re-hacemos la query completa:
-      false // placeholder — ver nota abajo
+      false, // placeholder — ver nota abajo
   );
 
   // Nota: drizzle requiere `and()` para múltiples where. Para simplificar el seed
   // (sin importar helpers extra) usamos insert con onConflictDoNothing.
   // Como id_turno es autoincrement no hay conflicto garantizado, así que
   // verificamos por separado antes de insertar.
-  const turnosHoy = await db
-    .select()
-    .from(turnos);
+  const turnosHoy = await db.select().from(turnos);
 
   const yaHayApertura = turnosHoy.some(
-    (t) => t.idBodega === 1 && t.tipo === "inicio" && t.fecha === fechaHoy && t.estado === 1
+    (t) =>
+      t.idBodega === 1 &&
+      t.tipo === "INICIO" &&
+      t.fecha === fechaHoy &&
+      t.estado === 1,
   );
 
   if (!yaHayApertura) {
     await db.insert(turnos).values({
       idBodega: 1,
-      json:     JSON.stringify(turnoJson),
-      tipo:     "inicio",
-      fecha:    fechaHoy,
-      hora:     horaApertura,
-      sync:     0,          // pendiente de enviar al servidor
-      estado:   1,          // TurnoEstado.ACTIVO
+      json: JSON.stringify(turnoJson),
+      tipo: "inicio",
+      fecha: fechaHoy,
+      hora: horaApertura,
+      sync: 0, // pendiente de enviar al servidor
+      estado: 1, // TurnoEstado.ACTIVO
     });
     console.log("  ✅ Turno apertura insertado (bodega 1, hoy, 08:00)");
   } else {
     console.log("  ⏭️  Turno apertura ya existía, se omitió");
   }
 
-await saveSucursal({ id_sucursal: 1, descripcion_sucursal: "Sucursal Central" });
-await saveUser({ cedula: String(SEED_USER.cedula), name: SEED_USER.name });
-await saveAuthToken({ token: "dev_token_seed", refresh_token: "" });
-console.log("  ✅ AsyncStorage poblado");
+  await saveSucursal({
+    id_sucursal: 1,
+    descripcion_sucursal: "Sucursal Central",
+  });
+  await saveUser({ cedula: String(SEED_USER.cedula), name: SEED_USER.name });
+  await saveAuthToken({ token: "dev_token_seed", refresh_token: "" });
+  console.log("  ✅ AsyncStorage poblado");
 
   console.log(" Seed completado.");
   console.log("──────────────────────────────────────────");

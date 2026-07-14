@@ -1,17 +1,10 @@
 // src/screens/calibracion/Sequencias.tsx
-//
-// Pantalla de secuencias de verificación — flujo MANUAL.
-// El usuario ingresa los valores medidos directamente (taxilitro inicial,
-// taxilitro final, litros cargados) sin dispensadores inteligentes.
-// Puede registrar múltiples secuencias antes de finalizar y volver a Calibracion.
-
 import { StackRoutesProps } from "@/route/app.routes";
 import { toastError } from "@/utils/toastMessage";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, ScrollView, Text, View } from "react-native";
 import { InputCard } from "@/components/InputCard";
 import { Button } from "@/components/Button";
-import { ListCheck, Plus } from "lucide-react-native";
 import { Select } from "@/components/Select";
 import { SequenciaCalibracionDTO } from "@/dto/SequenciaCalibracionDTO";
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -23,58 +16,79 @@ import {
   calibracionDTO,
 } from "@/storage/storageCalibracion";
 
-// Opciones de medición en mililitros (-200 a +200 en pasos de 20)
 const OPCIONES_MEDICION = Array.from({ length: 21 }, (_, i) => {
   const valor = -200 + i * 20;
   return { label: `${valor} ml`, value: valor.toString() };
 });
+
+// Interfaz extendida localmente para manejar el flujo de fotos de taxilitros
+interface SequenciaCalibracionExtendidaDTO extends Omit<
+  SequenciaCalibracionDTO,
+  "sequencias"
+> {
+  fotoInicialTaxilitro: string;
+  fotoFinalTaxilitro: string;
+  sequencias: {
+    valor_medicion: string;
+    foto_medicion: string;
+    taxilitro: number;
+    litros_cargados: number;
+    foto_taxilitro_carga: string;
+  }[];
+}
 
 export function Sequencias({
   navigation,
   route,
 }: StackRoutesProps<"sequencias">) {
   const [isLoading, setIsLoading] = useState(false);
-
-  // ─── Datos del pico (vienen desde Calibracion vía route.params) ──────────
   const [pico, setPico] = useState<number>(0);
+  const [descripcionPico, setDescripcionPico] = useState<string>("");
 
-  // ─── Campos que el usuario ingresa para cada secuencia ───────────────────
+  // Campos de Texto
   const [taxilitroInicial, setTaxilitroInicial] = useState("");
   const [taxilitroFinal, setTaxilitroFinal] = useState("");
   const [litrosCargados, setLitrosCargados] = useState("");
   const [valorMedicion, setValorMedicion] = useState("");
-  const [photoSequencia, setPhotoSequencia] = useState("");
 
-  // ─── Acumulado de todas las secuencias registradas ───────────────────────
-  const [mediciones, setMediciones] = useState<SequenciaCalibracionDTO>({
-    taxilitroInicial: 0,
-    taxilitroFinal: 0,
-    totalMediciones: 0,
-    sequencias: [],
-  });
+  // Fotos de la Secuencia
+  const [photoSequencia, setPhotoSequencia] = useState(""); // Foto de la Medición (Balde)
+  const [photoTaxInicial, setPhotoTaxInicial] = useState(""); // Foto del Taxilitro Inicial (Solo 1ra vez)
+  const [photoTaxFinal, setPhotoTaxFinal] = useState(""); // Foto del Taxilitro Final (Detalle/Carga)
+
+  const [mediciones, setMediciones] =
+    useState<SequenciaCalibracionExtendidaDTO>({
+      taxilitroInicial: 0,
+      taxilitroFinal: 0,
+      fotoInicialTaxilitro: "",
+      fotoFinalTaxilitro: "",
+      totalMediciones: 0,
+      sequencias: [],
+    });
 
   const medicionesRef = useRef(mediciones);
   useEffect(() => {
     medicionesRef.current = mediciones;
   }, [mediciones]);
 
-  // ─── Persistir en storage ante cierres inesperados ───────────────────────
   const persistirMediciones = useCallback(
-    async (mediacionesActuales: SequenciaCalibracionDTO) => {
+    async (actuales: SequenciaCalibracionExtendidaDTO) => {
       try {
         const estadoGuardado = await getStorageCalibracion();
         if (!estadoGuardado) return;
 
         const actualizado: calibracionDTO = {
           ...estadoGuardado,
-          taxilitroInicial: mediacionesActuales.taxilitroInicial,
-          taxilitroFinal: mediacionesActuales.taxilitroFinal,
-          totalMediciones: mediacionesActuales.totalMediciones,
-          sequencias: mediacionesActuales.sequencias,
+          taxilitroInicial: actuales.taxilitroInicial,
+          taxilitroFinal: actuales.taxilitroFinal,
+          fotoInicialTaxilitro: actuales.fotoInicialTaxilitro,
+          fotoFinalTaxilitro: actuales.fotoFinalTaxilitro,
+          totalMediciones: actuales.totalMediciones,
+          sequencias: actuales.sequencias,
         };
         await saveCalibracion(actualizado);
       } catch (error) {
-        console.log("[Sequencias] Error al persistir mediciones:", error);
+        console.log("[Sequencias] Error persistiendo:", error);
       }
     },
     [],
@@ -84,15 +98,13 @@ export function Sequencias({
     persistirMediciones(mediciones);
   }, [mediciones, persistirMediciones]);
 
-  // ─── Bloquear retroceso si ya hay secuencias registradas ─────────────────
   useEffect(() => {
     const unsubscribe = navigation.addListener("beforeRemove", (e) => {
       if (medicionesRef.current.totalMediciones === 0) return;
-
       e.preventDefault();
       Alert.alert(
         "¿Desea finalizar la verificación?",
-        "Si sale ahora, las mediciones registradas hasta el momento se conservarán.",
+        "Las mediciones registradas hasta el momento se guardarán.",
         [
           { text: "Cancelar", style: "cancel" },
           {
@@ -110,21 +122,32 @@ export function Sequencias({
     return unsubscribe;
   }, [navigation]);
 
-  // ─── Leer pico desde parámetros de ruta ──────────────────────────────────
   useEffect(() => {
     if (route.params?.pico_surtidor) {
       setPico(route.params.pico_surtidor);
     }
-  }, [route.params?.pico_surtidor]);
+    if (route.params?.descripcion_pico) {
+      setDescripcionPico(route.params.descripcion_pico); // ← Guardar descripción
+    }
+  }, [route.params?.pico_surtidor, route.params?.descripcion_pico]);
 
-  // ─── Validar y registrar una secuencia ───────────────────────────────────
   function handleRegistrarSecuencia() {
+    const esLaPrimera = mediciones.totalMediciones === 0;
+
     if (!taxilitroInicial || isNaN(Number(taxilitroInicial))) {
       toastError("Validación", "Ingrese un taxilitro inicial válido.");
       return;
     }
+    if (esLaPrimera && !photoTaxInicial) {
+      toastError("Validación", "Debe capturar la foto del taxilitro inicial.");
+      return;
+    }
     if (!taxilitroFinal || isNaN(Number(taxilitroFinal))) {
       toastError("Validación", "Ingrese un taxilitro final válido.");
+      return;
+    }
+    if (!photoTaxFinal) {
+      toastError("Validación", "Debe capturar la foto del taxilitro final.");
       return;
     }
     if (!litrosCargados || isNaN(Number(litrosCargados))) {
@@ -136,7 +159,10 @@ export function Sequencias({
       return;
     }
     if (!photoSequencia) {
-      toastError("Validación", "Debe tomar una foto de la medición.");
+      toastError(
+        "Validación",
+        "Debe tomar una foto de la medición en el balde.",
+      );
       return;
     }
 
@@ -145,12 +171,13 @@ export function Sequencias({
     const litros = Number(litrosCargados);
 
     setMediciones((prev) => {
-      const esLaPrimera = prev.totalMediciones === 0;
       return {
-        // taxilitroInicial global: solo se fija en la primera secuencia
         taxilitroInicial: esLaPrimera ? txIni : prev.taxilitroInicial,
-        // taxilitroFinal global: siempre se actualiza al de la última secuencia
         taxilitroFinal: txFin,
+        fotoInicialTaxilitro: esLaPrimera
+          ? photoTaxInicial
+          : prev.fotoInicialTaxilitro,
+        fotoFinalTaxilitro: photoTaxFinal, // Siempre mantiene la del último taxilitro capturado
         totalMediciones: prev.totalMediciones + 1,
         sequencias: [
           ...prev.sequencias,
@@ -159,17 +186,19 @@ export function Sequencias({
             litros_cargados: litros,
             valor_medicion: valorMedicion,
             foto_medicion: photoSequencia,
+            foto_taxilitro_carga: photoTaxFinal,
           },
         ],
       };
     });
 
-    // Limpiar campos para la próxima secuencia
-    setTaxilitroInicial("");
+    // Resetear formulario para la siguiente secuencia (arrastrando el inicial automáticamente)
+    setTaxilitroInicial(taxilitroFinal); // El final de esta se vuelve el inicial de la próxima
     setTaxilitroFinal("");
     setLitrosCargados("");
     setValorMedicion("");
     setPhotoSequencia("");
+    setPhotoTaxFinal("");
   }
 
   function handleFinalizar() {
@@ -180,116 +209,197 @@ export function Sequencias({
     navigation.navigate("calibracion", { onSequencia: medicionesRef.current });
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  const esPrimeraCarga = mediciones.totalMediciones === 0;
+
   return (
-    <View className="flex-1">
+    <View className="flex-1" style={{ backgroundColor: "#F9FAFB" }}>
       <ScreenHeader title="Secuencia de Verificación" />
       <ScrollView
         contentContainerStyle={{ flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View className="flex-1 items-center p-4 gap-4">
-          {/* Pico seleccionado (solo informativo, viene de Calibracion) */}
-          <InputCard title="Pico surtidor" locked>
-            <Text className="text-lg text-black font-bold p-2">
-              Pico N.º {pico}
-            </Text>
-          </InputCard>
+        <View className="flex-1 px-4 py-6 gap-5">
+          {/* Info del Pico */}
+          <View className="rounded-lg overflow-hidden" style={{ elevation: 4 }}>
+            <View style={{ backgroundColor: "#3B82F6" }}>
+              <InputCard title={descripcionPico ? " " : "Pico surtidor"} locked>
+                <Text className="text-3xl text-white text-center font-bold py-2 px-4">
+                  {descripcionPico || `Pico N.º ${pico}`}
+                </Text>
+              </InputCard>
+            </View>
+          </View>
 
-          {/* Resumen de secuencias ya registradas */}
+          {/* Resumen Acumulado */}
           {mediciones.totalMediciones > 0 && (
-            <InputCard title="Secuencias registradas">
-              <Text className="text-black text-base p-2">
-                Total: {mediciones.totalMediciones}
-              </Text>
-              <Text className="text-black text-base p-2">
-                Taxilitro inicial: {mediciones.taxilitroInicial}
-              </Text>
-              <Text className="text-black text-base p-2">
-                Taxilitro final: {mediciones.taxilitroFinal}
-              </Text>
-            </InputCard>
+            <View
+              className="rounded-lg overflow-hidden"
+              style={{ elevation: 3 }}
+            >
+              <View
+                style={{
+                  backgroundColor: "#F0FDF4",
+                  borderWidth: 1,
+                  borderColor: "#BBF7D0",
+                }}
+              >
+                <InputCard title="Secuencias acumuladas">
+                  <View className="p-4 gap-2 w-full">
+                    <Text className="text-gray-700 text-center text-3xl">
+                      Secuencias:{" "}
+                      <Text className="text-red-700 font-bold">
+                        {mediciones.totalMediciones}
+                      </Text>
+                    </Text>
+                  </View>
+                </InputCard>
+              </View>
+            </View>
           )}
 
-          {/* Formulario de nueva secuencia */}
-          <InputCard title="Nueva secuencia" required>
-            <View className="p-2 gap-3">
-              <Text className="text-black font-semibold">
-                Taxilitro inicial
-              </Text>
-              <Input
-                keyboardType="numeric"
-                placeholder="Ej: 12345"
-                value={taxilitroInicial}
-                onChangeText={setTaxilitroInicial}
-                editable={!isLoading}
-              />
+          {/* Formulario de Registro */}
+          <View className="rounded-lg overflow-hidden " style={{ elevation: 3 }}>
+            <View style={{ backgroundColor: "#FFFFFF" }}>
+              <InputCard title="Formulario de secuencia" required>
+                <View className="p-4 gap-4 w-full">
+                  {/* SECCIÓN TAXILITROS */}
+                  <Text className="text-gray-900 font-bold text-center tracking-wider text-xl">
+                    LECTURAS DEL TAXILITRO
+                  </Text>
 
-              <Text className="text-black font-semibold">Taxilitro final</Text>
-              <Input
-                keyboardType="numeric"
-                placeholder="Ej: 12400"
-                value={taxilitroFinal}
-                onChangeText={setTaxilitroFinal}
-                editable={!isLoading}
-              />
+                  {/* Taxilitro Inicial (Con foto obligatoria si es la primera) */}
+                  <View
+                    className="gap-2 p-3 rounded-lg"
+                    style={{ backgroundColor: "#F3F4F6" }}
+                  >
+                    <Text className="text-gray-700 font-semibold text-xl">
+                      Taxilitro Inicial
+                    </Text>
+                    <View className="flex-row items-center gap-2">
+                      <View className="flex-1">
+                        <Input
+                          keyboardType="numeric"
+                          placeholder="0.00"
+                          value={taxilitroInicial}
+                          onChangeText={setTaxilitroInicial}
+                          editable={esPrimeraCarga && !isLoading}
+                        />
+                      </View>
+                    </View>
+                    <View className="items-center gap-2">
+                      {esPrimeraCarga ? (
+                      <Photo
+                        form="button"
+                        iconSize="lg"
+                        iconColor={photoTaxInicial ? "#059669" : "#9CA3AF"}
+                        setImage={setPhotoTaxInicial}
+                        disabled={isLoading}
+                      />
+                    ) : (
+                      <Text className="text-green-600 text-xs font-bold px-2">
+                        ✓ Foto OK
+                      </Text>
+                    )}
+                    </View>
+                  </View>
+                  {/* Taxilitro Final (Con foto en cada iteración) */}
+                  <View
+                    className="gap-2 p-3 rounded-lg"
+                    style={{ backgroundColor: "#F3F4F6" }}
+                  >
+                    <Text className="text-gray-700 font-semibold text-xl">
+                      Taxilitro Final
+                    </Text>
+                    <View className="flex-row items-center gap-2">
+                      <View className="flex-1">
+                        <Input
+                          keyboardType="numeric"
+                          placeholder="0.00"
+                          value={taxilitroFinal}
+                          onChangeText={setTaxilitroFinal}
+                          editable={!isLoading}
+                        />
+                      </View>
+                    </View>
+                    <View className="items-center gap-2">
+                      <Photo
+                        form="button"
+                        iconSize="lg"
+                        iconColor={photoTaxFinal ? "#059669" : "#9CA3AF"}
+                        setImage={setPhotoTaxFinal}
+                        disabled={isLoading}
+                      />
+                    </View>
+                  </View>
+                  <View className="h-px bg-gray-200" />
 
-              <Text className="text-black font-semibold">Litros cargados</Text>
-              <Input
-                keyboardType="numeric"
-                placeholder="Ej: 20.5"
-                value={litrosCargados}
-                onChangeText={setLitrosCargados}
-                editable={!isLoading}
-              />
+                  {/* SECCIÓN DETALLES FÍSICOS */}
+                  <Text className="text-gray-900 font-bold text-center tracking-wider text-xl">
+                    MEDICIÓN FISICA (BALDE)
+                  </Text>
+                  <View
+                    className="gap-3 p-3 rounded-lg"
+                    style={{ backgroundColor: "#F9FAFB" }}
+                  >
+                    <View>
+                      <Text className="text-gray-700 font-semibold text-xl">
+                        Litros cargados
+                      </Text>
+                      <Input
+                        keyboardType="numeric"
+                        placeholder="20"
+                        value={litrosCargados}
+                        onChangeText={setLitrosCargados}
+                        editable={!isLoading}
+                      />
+                    </View>
+                    <View>
+                      <Text className="text-gray-700 font-semibold text-xl">
+                        Error de medición (ml)
+                      </Text>
+                      <Select
+                        data={OPCIONES_MEDICION}
+                        isLoading={isLoading}
+                        selectedValue={valorMedicion}
+                        setSelectedValue={setValorMedicion}
+                        labelField="label"
+                        valueField="value"
+                      />
+                    </View>
 
-              <Text className="text-black font-semibold">
-                Valor de medición (ml)
-              </Text>
-              <Select
-                data={OPCIONES_MEDICION}
-                isLoading={isLoading}
-                selectedValue={valorMedicion}
-                setSelectedValue={setValorMedicion}
-                labelField="label"
-                valueField="value"
-              />
-
-              <View className="flex-row items-center justify-between mt-2">
-                <Text className="text-black font-semibold">
-                  Foto de la medición
-                </Text>
-                <Photo
-                  form="icon"
-                  iconSize="lg"
-                  iconColor={photoSequencia ? "#05a722" : "#000"}
-                  setImage={setPhotoSequencia}
-                  disabled={isLoading}
-                />
-              </View>
-              {photoSequencia ? (
-                <Text className="text-green-600 text-sm">✓ Foto capturada</Text>
-              ) : null}
+                    {/* Foto de la Medición */}
+                    <View className="flex-row items-center justify-between mt-2 p-3 rounded-md bg-blue-50 border border-blue-200">
+                      <Text className="text-gray-900 font-medium text-xl flex-1">
+                        Foto del balde graduado
+                      </Text>
+                      <Photo
+                        form="icon"
+                        iconSize="lg"
+                        iconColor={photoSequencia ? "#059669" : "#9CA3AF"}
+                        setImage={setPhotoSequencia}
+                        disabled={isLoading}
+                      />
+                    </View>
+                  </View>
+                </View>
+              </InputCard>
             </View>
-          </InputCard>
+          </View>
 
-          {/* Botones */}
-          <View className="flex-row gap-4">
+          {/* Botones de Control */}
+          <View className="flex-row gap-4 justify-center items-center mt-2 pb-6">
             <Button
               title="Registrar"
-              icon={Plus}
-              iconColor="#000"
               isLoading={isLoading}
               onPress={handleRegistrarSecuencia}
             />
             {mediciones.totalMediciones > 0 && (
               <Button
                 title="Finalizar"
-                icon={ListCheck}
-                iconColor="#000"
                 isLoading={isLoading}
                 onPress={handleFinalizar}
+                style={{ backgroundColor: "#059669" }}
               />
             )}
           </View>

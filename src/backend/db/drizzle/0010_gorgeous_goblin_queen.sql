@@ -1,0 +1,1 @@
+ALTER TABLE `calibraciones` DROP COLUMN `id_calibracion`;

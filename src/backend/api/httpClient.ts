@@ -188,10 +188,27 @@ export const httpClient = {
     return axiosInstance.delete<T>(url, config);
   },
 
+  /**
+   * GET para endpoints de sincronización.
+   * Usa automáticamente el token JWT del usuario (sin clave hardcodeada).
+   * El token se inyecta en el interceptor de REQUEST.
+   */
+  syncGet<T = any>(url: string, config?: AxiosRequestConfig) {
+    return axiosInstance.get<T>(url, config);
+  },
+
+  /**
+   * POST para endpoints de sincronización.
+   * Usa automáticamente el token JWT del usuario.
+   */
+  syncPost<T = any>(url: string, data?: any, config?: AxiosRequestConfig) {
+    return axiosInstance.post<T>(url, data, config);
+  },
+
   /** Verificar conectividad al servidor (usado para detectar modo offline) */
   async isOnline(): Promise<boolean> {
     try {
-      await axiosInstance.get("/api/health", { timeout: 5000 });
+      await axiosInstance.get("/ping", { timeout: 5000 });
       return true;
     } catch {
       return false;

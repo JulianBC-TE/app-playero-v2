@@ -149,7 +149,7 @@ export function BuscarPersona({
         <InputCard title="Busqueda:" required={false}>
           <View className="flex-row w-full items-center relative">
             <Input
-              className="ml-10"
+              className="ml-10 text-2xl"
               value={query}
               onChangeText={handleSearch}
               placeholder="Informe nombre o cédula"
@@ -157,7 +157,7 @@ export function BuscarPersona({
             />
 
             <View className="absolute left-3 mt-2">
-              <Search className="absolute left-3 mt-2" size={18} color="#666" />
+              <Search className="absolute left-3 mt-2 text-xl" size={20} color="#666" />
             </View>
 
             {debouncedQuery.length > 0 ? (

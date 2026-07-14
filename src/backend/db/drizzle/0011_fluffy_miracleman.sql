@@ -1,0 +1,1 @@
+ALTER TABLE `calibraciones` ADD `id_calibracion` text NOT NULL;

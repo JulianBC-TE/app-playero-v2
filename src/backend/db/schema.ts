@@ -9,6 +9,7 @@
  */
 import { sqliteTable, integer, text, real, primaryKey } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
+import { CalibracionDetalleDTO } from "@/dto/CalibracionDTO";
 
 /** Tabla de personas físicas identificadas por cédula. */
 export const personas = sqliteTable("personas", {
@@ -33,8 +34,7 @@ export const usuariosApp = sqliteTable("usuarios_app", {
   bloqueado: integer("bloqueado", { mode: "boolean" })
     .notNull()
     .default(false),
-
-  // nuevo: sucursal asignada
+  idUser: integer("id_user").notNull(),
   idSucursal: integer("id_sucursal").notNull(),
 });
 
@@ -120,56 +120,205 @@ export const turnos = sqliteTable("turnos", {
  * Tabla de tickets de operación.
  * El payload completo se serializa en el campo `json`.
  */
+// En tu archivo de schema (ej: src/backend/db/schema.ts)
+
 export const tickets = sqliteTable("tickets", {
   idTicket: integer("id_ticket").primaryKey({ autoIncrement: true }),
-  json: text("json").notNull(),
+  id_suc: integer("id_suc").notNull(),
+  id_bod: integer("id_bod").notNull(),
+  id_pico: integer("id_pico").notNull(),
+  fecha: text("fecha").notNull(),
+  hora: text("hora").notNull(),
+  ci_playero: integer("ci_playero").notNull(),
+  id_operador: integer("id_operador").notNull(),
+  litros: real("litros").notNull(),
+  taxilitro_inicial: real("taxilitro_inicial").notNull(),
+  taxilitro_final: real("taxilitro_final").notNull(),
+  monto: real("monto").notNull(),
+  ruc_cliente: text("ruc_cliente"),
+  id_vehiculo: text("id_vehiculo"),
   tipo: text("tipo").notNull(),
+  kilometraje: integer("kilometraje"),
+  horometro: real("horometro"),
+  obs: text("obs"),
+  observaciones_ticket: text("observaciones_ticket"),
+  ubicacion_carga: text("ubicacion_carga"),
+  foto_chapa: text("foto_chapa", { mode: "json" }).$type<string[]>(),
+  firma_conductor: text("firma_conductor", { mode: "json" }).$type<string[]>(),
+  foto_kilometraje: text("foto_kilometraje", { mode: "json" }).$type<string[]>(),
+  foto_horometro: text("foto_horometro", { mode: "json" }).$type<string[]>(),
+  foto_observaciones: text("foto_observaciones", { mode: "json" }).$type<string[]>(),
+  foto_taxilitro: text("foto_taxilitro", { mode: "json" }).$type<string[]>(),
+  foto_taxilitro_fin: text("foto_taxilitro_fin", { mode: "json" }).$type<string[]>(),
   sync: integer("sync").notNull().default(0),
-  fecha: integer("fecha"),
-  hora: integer("hora"),
   estado: integer("estado").notNull().default(1),
+  fecha_registro: integer("fecha_registro"),
+  hora_registro: integer("hora_registro"),
 });
 
 /**
  * Tabla de traspasos de combustible entre bodegas.
- * El payload completo se serializa en el campo `json`.
+ * Campos normalizados directamente de TraspasoDTO, sin JSON serializado.
  */
 export const trapasos = sqliteTable("trapasos", {
+  // Identificadores
   idTrapaso: integer("id_trapaso").primaryKey({ autoIncrement: true }),
-  json: text("json").notNull(),
-  tipo: text("tipo").notNull(),
-  sync: integer("sync").notNull().default(0),
-  fecha: integer("fecha"),
-  hora: integer("hora"),
+  idTraspasoMongo: text("id_trapaso_mongo"), // id_trapaso de MongoDB (opcional)
+
+  // Bodegas y tanques
+  bodOrigen: integer("bod_origen").notNull(),
+  bodDestino: integer("bod_destino").notNull(),
+  idTanqueDestino: integer("id_tanque_destino").notNull(),
+
+  // Mediciones de altura/volumen
+  reglaAlturaInicial: text("regla_altura_inicial").notNull(),
+  reglaAlturaFinal: text("regla_altura_final").notNull(),
+  litrosTanqueInicial: real("litros_tanque_inicial").notNull(),
+  litrosTanqueFinal: real("litros_tanque_final").notNull(),
+
+  // Temperaturas
+  tempInicial: real("temp_inicial").notNull(),
+  tempFinal: real("temp_final").notNull(),
+
+  // Pico y taxímetro
+  idPico: integer("id_pico").notNull(),
+  taxilitroInicial: real("taxilitro_inicial").notNull(),
+  taxilitroFinal: real("taxilitro_final").notNull(),
+  litrosPico: real("litros_pico").notNull(),
+
+  // Observaciones
+  obsTraspaso: text("obs_traspaso").notNull(),
+  obsAdicional: text("obs_adicional"),
+
+  // Fecha y hora
+  fecha: text("fecha").notNull(), // YYYY-MM-DD
+  hora: text("hora").notNull(),   // HH:MM:SS
+
+  // Usuarios
+  idPlayero: integer("id_playero").notNull(),
+  idEncargadoReceptor: integer("id_encargado_receptor").notNull(),
+  idAutorizado: integer("id_autorizado"),
+
+  // Fotografías (JSON arrays)
+  fotoMedicionInicial: text("foto_medicion_inicial"), // JSON stringified array
+  fotoMedicionFinal: text("foto_medicion_final"),     // JSON stringified array
+  firmaReceptor: text("firma_receptor"),              // JSON stringified array
+  fotoObsTraspaso: text("foto_obs_traspaso"),         // JSON stringified array
+  fotoTaxilitro: text("foto_taxilitro"),       // ◄ CAMBIO: Ahora guarda el JSON string de la foto inicial real
+  fotoTaxilitroFin: text("foto_taxilitro_fin"),
+
+  // Metadata
+  corteId: integer("corte_id"),
+  lastIdSalida: integer("last_id_salida"),
   estado: integer("estado").notNull().default(1),
+  sync: integer("sync").notNull().default(0), // 0: pendiente, 1: sincronizado, -1: error
+  fechaCreacion: integer("fecha_creacion"), // timestamp
+  fechaSincronizacion: integer("fecha_sincronizacion"), // timestamp
 });
 
-/**
- * Tabla de calibraciones / verificaciones de picos.
- * `tipo` puede ser `"VERIFICACION"` o `"CALIBRACION"`.
- * El payload completo se serializa en el campo `json`.
- */
+export type Traspaso = typeof trapasos.$inferSelect;
+export type TraspasoInsert = typeof trapasos.$inferInsert;
+
 export const calibraciones = sqliteTable("calibraciones", {
   idCalibracion: integer("id_calibracion").primaryKey({ autoIncrement: true }),
-  json: text("json").notNull(),
-  tipo: text("tipo").notNull(),
+
+  fechaHora: text("fecha_hora").notNull(),
+  hora: text("hora").notNull(),
+  bodega: integer("bodega").notNull(),
+  ciEncargado: integer("ci_encargado").notNull(),
+  nombreEncargado: text("nombre_encargado").notNull(),
+  pico: integer("pico").notNull(),
+  taxilitroInicial: integer("taxilitro_inicial").notNull(),
+  taxilitroFinal: integer("taxilitro_final").notNull(),
+  
+  fotoPrecintoRetirado: text("foto_precinto_retirado").notNull(),
+  fotoPrecintoColocado: text("foto_precinto_colocado").notNull(),
+  firmaCalibrador: text("firma_calibrador").notNull(),
+
+  // ◄ NUEVOS: Columnas para persistir localmente el Base64 de los taxilitros
+  fotoInicialTaxilitro: text("foto_inicial_taxilitro"), 
+  fotoFinalTaxilitro: text("foto_final_taxilitro"),
+
+  obsGral: text("obs_gral"),
+  nroPrecintoRetirado: text("nro_precinto_retirado"),
+  nroPrecintoColocado: text("nro_precinto_colocado"),
+  
+  tipoOperacion: text("tipo_operacion")
+    .$type<"VERIFICACION" | "CALIBRACION">()
+    .notNull()
+    .default("CALIBRACION"),
+
+  // Al actualizar el tipo CalibracionDetalleDTO, Drizzle/TS exigirá foto_taxilitro_carga dentro del JSON
+  detalles: text("detalles", { mode: "json" })
+    .$type<CalibracionDetalleDTO[]>()
+    .notNull(),
+
   sync: integer("sync").notNull().default(0),
-  fecha: integer("fecha"),
-  hora: integer("hora"),
 });
 
 /**
- * Tabla de abastecimientos (reposiciones de combustible desde un camión).
- * El payload completo se serializa en el campo `json`.
+ * Tabla Principal: Abastecimientos
+ * Mapeada 1:1 con los campos del DTO (aplanando el antiguo campo JSON)
  */
 export const abastecimientos = sqliteTable("abastecimientos", {
+  // Cambiado a text o integer según prefieras para UUIDs/IDs Mongo, pero mantenemos tu primaryKey
   idAbastecimiento: integer("id_abastecimiento").primaryKey({ autoIncrement: true }),
-  json: text("json").notNull(),
+  
+  // Control local del front
   tipo: text("tipo").notNull(),
   sync: integer("sync").notNull().default(0),
-  fecha: integer("fecha"),
-  hora: integer("hora"),
+
+  // Campos del DTO
+  idSuc: integer("id_suc").notNull(),
+  idBod: integer("id_bod").notNull(),
+  fecha: text("fecha").notNull(), // El DTO envía string (ej: '2026-06-18')
+  hora: text("hora").notNull(),   // El DTO envía string (ej: '14:30:00')
+  nroOc: integer("nro_oc").notNull(),
+  nroRemision: text("nro_remision").notNull(),
+  litrosRemision: integer("litros_remision").notNull(),
+  playero: integer("playero").notNull(),
+  
+  // SQLite no tiene Arrays, usamos text y le indicamos el tipo a Drizzle para que los serialice automáticamente
+  fotoRevDocs: text("foto_rev_docs", { mode: "json" }).$type<string[]>().notNull(),  
+  zetaNoLlega: integer("zeta_no_llega").notNull(), // Se guarda como 0 o 1
+  idPicoParaZeta: integer("id_pico_para_zeta"), // Opcional (permite null si no llega)
+  taxilitroInicial: integer("taxilitro_inicial").notNull(),
+  taxilitroFinal: integer("taxilitro_final").notNull(),
+  litrosZeta: integer("litros_zeta").notNull(),
+  obsRepos: text("obs_repos").notNull(),
+  
+  fotoObsRepos: text("foto_obs_repos", { mode: "json" }).$type<string[]>().notNull(),  
+  litrosTotalRepos: text("litros_total_repos").notNull(),
+  fotoTaxilitro: text("foto_taxilitro").notNull().default(""),
+  fotoTaxilitroFin: text("foto_taxilitro_fin").notNull().default(""),
 });
+
+/**
+ * Tabla Secundaria: Mediciones de Tanque
+ * Resuelve la relación de array de objetos del DTO
+ */
+export const medicionesTanque = sqliteTable("mediciones_tanque", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  // Llave foránea vinculada a la tabla de arriba
+  abastecimientoId: integer("abastecimiento_id")
+    .notNull()
+    .references(() => abastecimientos.idAbastecimiento, { onDelete: "cascade" }),
+
+  idTanque: integer("id_tanque").notNull(),
+
+  // Datos de INICIO (Aplanados en la tabla para SQLite)
+  inicioRegla: text("inicio_regla").notNull(),
+  inicioTemperatura: real("inicio_temperatura").notNull(), // real = float en SQLite
+  inicioLitros: real("inicio_litros").notNull(),
+  inicioFotoMedicion: text("inicio_foto_medicion").notNull(),
+
+  // Datos de FIN
+  finRegla: text("fin_regla").notNull(),
+  finTemperatura: real("fin_temperatura").notNull(),
+  finLitros: real("fin_litros").notNull(),
+  finFotoMedicion: text("fin_foto_medicion").notNull(),
+});
+
 
 /**
  * Tabla de despachos escritos directamente por el surtidor.
@@ -210,16 +359,6 @@ export const syncs = sqliteTable("syncs", {
   fecha: integer("fecha").notNull(),
 });
 
-/** Tabla de administradores con acceso al panel web. */
-export const usuariosAdmin = sqliteTable("usuarios_admin", {
-  correo: text("correo").primaryKey(),
-  nombre: text("nombre").notNull(),
-  salt: text("salt").notNull(),
-  clave: text("clave").notNull(),
-  refreshToken: text("refresh_token"),
-  timestamp: integer("timestamp"),
-});
-
 /**
  * Tabla de permisos de traspaso entre sucursal y bodega.
  * Clave primaria compuesta: (idSucursal, idBodega).
@@ -233,10 +372,6 @@ export const habilitadosTrapaso = sqliteTable(
     // bodega relacionada
     idBodega: integer("id_bodega").notNull(),
 
-    // permiso explícito
-    permitido: integer("permitido", { mode: "boolean" })
-      .notNull()
-      .default(false),
   },
   (table) => ({
     pk: primaryKey({
@@ -386,5 +521,21 @@ export const modulosUsuariosRelations = relations(modulosUsuarios, ({ one }) => 
   usuario: one(usuariosApp, {
     fields: [modulosUsuarios.cedula],
     references: [usuariosApp.cedula],
+  }),
+}));
+
+/**
+ * Definición de relaciones (Drizzle Relations)
+ * Esto te facilitará hacer queries del tipo `with: { medicionesTanque: true }` 
+ * para armar tu DTO exacto antes de mandarlo al backend.
+ */
+export const abastecimientosRelations = relations(abastecimientos, ({ many }) => ({
+  medicionesTanque: many(medicionesTanque),
+}));
+
+export const medicionesTanqueRelations = relations(medicionesTanque, ({ one }) => ({
+  abastecimiento: one(abastecimientos, {
+    fields: [medicionesTanque.abastecimientoId],
+    references: [abastecimientos.idAbastecimiento],
   }),
 }));

@@ -16,6 +16,7 @@
 
 import { httpClient } from "./httpClient";
 import { VehiculoDTO } from "@/dto/VehiculoDTO";
+import { SYNC_CONFIG } from "@/backend/api/syncConfig";
 
 // ---------------------------------------------------------------------------
 // Tipos de respuesta del servidor
@@ -122,4 +123,19 @@ export async function actualizarVehiculo(
 
 export async function eliminarVehiculo(idVehiculo: string): Promise<void> {
   await httpClient.delete(`/api/vehiculos/${idVehiculo}`);
+}
+
+// ====================== SINCRONIZACIÓN ======================
+
+export async function syncGetVehiculos(lastTimestamp: number = 0): Promise<VehiculoDTO[]> {
+  const endpoint = SYNC_CONFIG.endpoints.vehiculosGet;
+  const { data } = await httpClient.syncGet<VehiculoDTO[]>(endpoint, {
+    params: { createdAt: lastTimestamp },
+  });
+  return data;
+}
+
+export async function syncPostVehiculos(vehiculos: VehiculoDTO[]): Promise<void> {
+  const endpoint = SYNC_CONFIG.endpoints.vehiculosPost;
+  await httpClient.syncPost(endpoint, { vehiculos });
 }

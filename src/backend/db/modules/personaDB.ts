@@ -13,7 +13,8 @@ import { db } from "@/backend/db/client";
 import { personas, syncs } from "@/backend/db/schema";
 import { eq, like, or, sql } from "drizzle-orm";
 import { PersonaDTO } from "@/dto/PersonaDTO";
-import { SYNC_CONFIG } from "../constants/syncConfig";
+import { syncGetPersonas, syncPostPersonas } from "@/backend/api/personaAPI";
+import { syncsController } from "./syncsDB";
 
 // Clave en tabla syncs para registrar la última sincronización de personas.
 const SYNC_KEY = "__last_sync_personas__";
@@ -198,14 +199,16 @@ export async function getPersonasPendientesSync(): Promise<PersonaDTO[]> {
   const rows = await db
     .select({
       cedula: personas.cedula,
-      nombreApellido: personas.nombreApellido,
+      nombre_apellido: personas.nombreApellido,
+      createdAt: personas.timestamp,  // ✅ Agregado
     })
     .from(personas)
     .where(eq(personas.sync, 0));
 
   return rows.map((r) => ({
     cedula: r.cedula,
-    nombre_apellido: r.nombreApellido,
+    nombre_apellido: r.nombre_apellido,
+    createdAt: r.createdAt?? Date.now(),  // ✅ Agregado
   }));
 }
 
@@ -253,20 +256,17 @@ export async function eliminarPersonaLocal(cedula: number): Promise<void> {
 }
 
 /**
- * Timestamp de la última sync de personas.
+ * Devuelve el timestamp de la última sincronización de personas utilizando el controlador.
  *
- * @returns ms Unix o `null` si nunca se sincronizó.
+ * @returns Timestamp Unix en ms, o `null` si nunca se sincronizó.
+ * @description Lee directamente de la caché en memoria de forma ultra rápida.
  */
 export async function getLastSyncDate(): Promise<number | null> {
   try {
-    const result = await db
-      .select({ fecha: syncs.fecha })
-      .from(syncs)
-      .where(eq(syncs.tipo, SYNC_KEY))
-      .limit(1);
-
-    return result[0] ? result[0].fecha : null;
-  } catch {
+    // Obtenemos el timestamp directamente desde la caché en memoria del controlador
+    return await syncsController.getTimestamp(SYNC_KEY);
+  } catch (error) {
+    console.error("❌ Error en getLastSyncDate:", error);
     return null;
   }
 }
@@ -280,22 +280,34 @@ export async function getLastSyncDate(): Promise<number | null> {
  * @returns Número de personas sincronizadas.
  * @throws Error si la petición HTTP falla.
  */
-export async function syncPersonasFromCentral(lastTimestamp: number = 0) {
+export async function syncPersonasFromCentral(): Promise<number> {
   try {
-    // ✅ CORREGIDO: usar personasGet, no clientesGet
-    const { data } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.personasGet, {
-      params: { createdAt: lastTimestamp },
-    });
-
-    const items = Array.isArray(data) ? data : [];
-
+    const items = await syncGetPersonas(await syncsController.getTimestamp(SYNC_KEY));
     if (items.length > 0) {
       await savePersonas(items);
-      console.log(`✅ ${items.length} personas sincronizadas desde central`);
     }
+    await syncsController.saveOrUpdate(SYNC_KEY, Date.now());
+    
+    console.log(`✅ PERSONAS -> ok (+${items.length})`);
     return items.length;
   } catch (error) {
-    console.error("❌ Error syncPersonasFromCentral:", error);
+    console.error("❌ PERSONAS -> Error:", error.message || error);
+    throw error;
+  }
+}
+
+export async function syncPersonasFromCentralInit(): Promise<number> {
+  try {
+    const items = await syncGetPersonas(0);
+    if (items.length > 0) {
+      await savePersonas(items);
+    }
+    await syncsController.saveOrUpdate(SYNC_KEY, Date.now());
+    
+    console.log(`✅ PERSONAS -> ok (+${items.length})`);
+    return items.length;
+  } catch (error) {
+    console.error("❌ PERSONAS -> Error:", error.message || error);
     throw error;
   }
 }
@@ -306,25 +318,24 @@ export async function syncPersonasFromCentral(lastTimestamp: number = 0) {
  * @returns Número de personas enviadas.
  * @throws Error si la petición HTTP falla.
  */
-export async function syncPersonasToCentral() {
+export async function syncPersonasToCentral(): Promise<number> {
   const pendientes = await getPersonasPendientesSync();
-  if (pendientes.length === 0) return 0;
+  if (pendientes.length === 0) {
+    console.log("⚪ PERSONAS -> Nada pendiente para subir");
+    return 0;
+  }
 
   try {
-    // ✅ CORREGIDO: usar personasPost y payload { personas }, no { clientes }
-    await SYNC_CONFIG.http.post(SYNC_CONFIG.endpoints.personasPost, {
-      personas: pendientes,
-    });
-
+    await syncPostPersonas(pendientes);
+    
     for (const p of pendientes) {
-      // ✅ CORREGIDO: marcar por cedula (PK real), no por ruc
       await markPersonaAsSynced(p.cedula);
     }
 
-    console.log(`✅ ${pendientes.length} personas enviadas al central`);
+    console.log(`➡️ PERSONAS -> subidas ok (-${pendientes.length})`);
     return pendientes.length;
   } catch (error) {
-    console.error("❌ Error syncPersonasToCentral:", error);
+    console.error("❌ PERSONAS -> Error al subir:", error.message || error);
     throw error;
   }
 }

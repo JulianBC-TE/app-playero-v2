@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "playero",
-    "slug": "app-playero",
+    "slug": "app-playero-2",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -35,7 +35,8 @@
         }
       ],
       "expo-sqlite",
-      "expo-asset"
+      "expo-asset",
+      "@react-native-community/datetimepicker"
     ],
     "owner": "tecnoedil",
     "ios": {
@@ -43,7 +44,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "814d9950-1119-490e-be96-57c420897927"
+        "projectId": "4eff74e1-4b9f-4c33-a576-7eae325d3a57"
       }
     }
   }

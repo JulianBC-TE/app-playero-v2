@@ -42,7 +42,7 @@ export function InputCard({
 				)}
 			>
 				{title && (
-					<Text className='text-lg text-black font-bold mt-2'>{title}</Text>
+					<Text className='text-xl text-black font-bold mt-2'>{title}</Text>
 				)}
 				{children}
 			</View>

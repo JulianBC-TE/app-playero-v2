@@ -16,8 +16,8 @@ import { tanques, syncs } from "@/backend/db/schema";
 import { bodegas } from "../schema";   // ← Agregar esta línea
 import { eq } from "drizzle-orm";
 import { TanqueDTO } from "@/dto/TanqueDTO";
-import { SYNC_CONFIG } from "../constants/syncConfig";
 import { getIdsBodegasDelUsuario } from "./bodegaDB";
+import { fetchTanquesPorBodegas } from "@/backend/api/tanqueAPI";
 
 
 // Clave en tabla syncs para registrar la última sincronización de tanques.
@@ -167,38 +167,37 @@ export async function getLastSyncDate(): Promise<number | null> {
 // Envía los IDs de bodegas autorizadas como filtro a la API.
 // ---------------------------------------------------------------------------
 
+// Asegúrate de importar la instancia de tu bd y la tabla bodegas si no lo están ya
+// import { db } from "./tu-archivo-db";
+// import { bodegas } from "./tu-archivo-schema";
+
 /**
- * Descarga únicamente los tanques de las bodegas autorizadas para el operario.
- * Lee los IDs desde `usuarios_bodegas` (sin internet) y los envía
- * como query param a la API para que filtre en el servidor.
+ * Descarga y sincroniza los tanques de TODAS las bodegas registradas
+ * en el sistema.
  *
- * @param cedula - Cédula del operario autenticado.
+ * @param cedula - Cédula del operario que dispara la acción.
  * @returns Cantidad de tanques sincronizados.
- * @throws Si la llamada al servidor falla.
+ * @throws Si la llamada al servidor falla o hay error en persistencia.
  */
-export async function syncTanquesDelOperario(cedula: string): Promise<number> {
-  console.log(`🔄 Sincronizando tanques del operario ${cedula}...`);
-
-  const idsBodegas = await getIdsBodegasDelUsuario(cedula);
-
-  if (idsBodegas.length === 0) {
-    console.log("⚠️ Sin bodegas autorizadas — se omite sync de tanques");
-    return 0;
+export async function syncTanquesDelOperario(cedula: number): Promise<number> {
+  try {
+    const todasLasBodegas = await db.select({ idBodega: bodegas.idBodega }).from(bodegas);
+    const idsBodegas = todasLasBodegas.map((b) => b.idBodega);
+   
+    if (idsBodegas.length === 0) {
+      console.log("⚠️ TANQUES -> Omitido (no hay bodegas)");
+      return 0;
+    }
+   
+    const tanques = await fetchTanquesPorBodegas(idsBodegas);
+    if (tanques.length > 0) {
+      await saveTanques(tanques);
+    }
+   
+    console.log(`✅ TANQUES -> ok (+${tanques.length})`);
+    return tanques.length;
+  } catch (error) {
+    console.error("❌ TANQUES -> Error:", error.message || error);
+    throw error;
   }
-
-  // Enviar los IDs como query param: /api/tanques?bodegas=1,2,3
-  const { data: tanquesServidor } = await SYNC_CONFIG.http.get(
-    SYNC_CONFIG.endpoints.tanques,
-    { params: { bodegas: idsBodegas.join(",") } }
-  );
-
-  if (!Array.isArray(tanquesServidor) || tanquesServidor.length === 0) {
-    console.log("📭 No se recibieron tanques");
-    return 0;
-  }
-
-  await saveTanques(tanquesServidor);
-
-  console.log(`✅ ${tanquesServidor.length} tanques sincronizados`);
-  return tanquesServidor.length;
 }

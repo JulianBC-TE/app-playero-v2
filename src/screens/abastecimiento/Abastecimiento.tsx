@@ -38,8 +38,14 @@ import {
 } from "@/storage/storageAbastecimiento";
 import { removeMedicionAbastecimiento } from "@/storage/storageMedicionAbastecimiento"; // ← agregar
 import { getBodegasByIdSucursal } from "@DBmodules/bodegaDB";
-import { getTurnoStatusLocal } from "@DBmodules/turnoBD";
+import {
+  anularUltimoFinTurnoPorBodega,
+  getTipoByBodega,
+  getTurnoStatusLocal,
+} from "@DBmodules/turnoBD";
 import { saveAbastecimientoLocal } from "@DBmodules/abastecimientoDB";
+import { number } from "yup";
+import { removeCargaCombustible } from "@/storage/storageCargaCombustible";
 
 export function Abastecimiento({
   navigation,
@@ -190,6 +196,7 @@ export function Abastecimiento({
                     style: "destructive",
                     onPress: async () => {
                       await removeAbastecimiento();
+                      await removeCargaCombustible();
                       await removeMedicionAbastecimiento();
                       setEstadoInicial(null);
                       navigation.dispatch(e.data.action);
@@ -383,7 +390,12 @@ export function Abastecimiento({
       medicionInicial?.reduce((acc, med) => acc + med.litros, 0) || 0;
     const litrosTotalMedicionFinal =
       medicionFinal?.reduce((acc, med) => acc + med.litros, 0) || 0;
-
+    const tipoTurno = await getTipoByBodega(Number(selectedBodega));
+    if (tipoTurno === "2" && !motivoConfirmado) {
+      setTurnoCerrado(true); // Muestra el modal del motivo
+      setIsLoading(false);
+      return;
+    }
     const payload = {
       id_suc: sucursal.id_sucursal,
       id_bod: Number(selectedBodega),
@@ -395,7 +407,9 @@ export function Abastecimiento({
       playero: Number(user.cedula),
       foto_rev_docs: base64Images,
       zeta_no_llega: Number(tipoOperacionSeleccionado),
-      id_pico_para_zeta: Number(cargaZeta?.id_pico_para_zeta) || 0,
+      id_pico_para_zeta: cargaZeta?.id_pico_para_zeta
+        ? Number(cargaZeta.id_pico_para_zeta)
+        : null,
       taxilitro_inicial: Number(cargaZeta?.taxilitro_inicial) || 0,
       taxilitro_final: Number(cargaZeta?.taxilitro_final) || 0,
       litros_zeta: Number(cargaZeta?.litros_zeta) || 0,
@@ -406,6 +420,8 @@ export function Abastecimiento({
           litrosTotalMedicionInicial -
           (Number(cargaZeta?.litros_zeta) || 0),
       ),
+      foto_taxilitro: cargaZeta?.foto_taxilitro || "",
+      foto_taxilitro_fin: cargaZeta?.foto_taxilitro_fin || "",
       mediciones_tanque: medicionInicial?.map((med, index) => ({
         id_tanque: Number(med.id_tanque),
         inicio: {
@@ -427,8 +443,11 @@ export function Abastecimiento({
       setIsLoading(true);
       // Guardar en BD local (pendiente de sync con el servidor)
       await saveAbastecimientoLocal(payload);
+      await anularUltimoFinTurnoPorBodega(payload.id_bod, obsAdicional);
       // Limpiar storage temporal
       await removeAbastecimiento();
+      await removeCargaCombustible();
+      await removeMedicionAbastecimiento();
       toastSuccess("Abastecimiento", "Abastecimiento registrado con éxito");
       navigation.navigate("home");
     } catch (error) {

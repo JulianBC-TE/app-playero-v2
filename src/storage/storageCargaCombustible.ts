@@ -1,16 +1,22 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const STORAGE_CARGA_COMBUSTIBLE =
-  "@app:carga_combustible";
+const STORAGE_CARGA_COMBUSTIBLE = "@app:carga_combustible";
 
 export type CargaCombustibleStorageDTO = {
   selectedPico: string;
   idPico_surtidor: number;
   salida: number; // 0 = inicial, 1 = cargando, 2 = terminado
-  cargaCombustible: number;
-  totalizadorPicoInicial: number;
-  totalizadorPicoFinal: number;
+  cargaCombustible?: number;
+  totalizadorPicoInicial?: number;
+  totalizadorPicoFinal?: number;
   idBodega: string;
+
+  // ── NUEVOS CAMPOS ADICIONADOS PARA EL PERSISTIDO DE INPUTS Y FOTOS ──
+  taxilitroInicial?: string;
+  taxilitroFinal?: string;
+  litrosCargados?: string;
+  base64FotoTaxilitro?: string;
+  base64FotoTaxilitroFin?: string;
 };
 
 export async function saveCargaCombustible(

@@ -13,8 +13,8 @@ import { db } from "@/backend/db/client";
 import { clientes, syncs } from "@/backend/db/schema";
 import { eq, and } from "drizzle-orm";
 import { ClienteDTO } from "@/dto/ClienteDTO";
-import { SYNC_CONFIG } from "../constants/syncConfig";
-import axios from "axios"; // solo como fallback
+import { syncGetClientes, syncPostClientes } from "@/backend/api/clienteAPI";
+import { syncsController } from "./syncsDB";
 
 // Clave en tabla syncs para registrar la última sincronización de clientes.
 const SYNC_KEY = "__last_sync_clientes__";
@@ -208,20 +208,17 @@ export async function eliminarClienteLocal(ruc: string): Promise<void> {
 }
 
 /**
- * Devuelve el timestamp de la última sincronización de clientes.
+ * Devuelve el timestamp de la última sincronización de clientes utilizando el controlador.
  *
  * @returns Timestamp Unix en ms, o `null` si nunca se sincronizó.
+ * @description Lee directamente de la caché en memoria de forma ultra rápida.
  */
 export async function getLastSyncDate(): Promise<number | null> {
   try {
-    const result = await db
-      .select({ fecha: syncs.fecha })
-      .from(syncs)
-      .where(eq(syncs.tipo, SYNC_KEY))
-      .limit(1);
-
-    return result[0] ? result[0].fecha : null;
-  } catch {
+    // Obtenemos el timestamp directamente desde la caché en memoria del controlador
+    return await syncsController.getTimestamp(SYNC_KEY);
+  } catch (error) {
+    console.error("❌ Error en getLastSyncDate:", error);
     return null;
   }
 }
@@ -234,48 +231,18 @@ export async function getLastSyncDate(): Promise<number | null> {
  * @returns Número de clientes sincronizados.
  * @throws Error si la petición HTTP falla.
  */
-export async function syncClientesFromCentral(lastTimestamp: number = 0) {
+export async function syncClientesFromCentral(): Promise<number> {
   try {
-    const { data } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.clientesGet, {
-      params: { createdAt: lastTimestamp },
-    });
-
-    const items = Array.isArray(data) ? data : [];
-    
+    const items = await syncGetClientes(await syncsController.getTimestamp(SYNC_KEY));
     if (items.length > 0) {
       await saveClientes(items);
-      console.log(`✅ ${items.length} clientes sincronizados desde central`);
     }
+    await syncsController.saveOrUpdate(SYNC_KEY, Date.now());
+    
+    console.log(`✅ CLIENTES -> ok (+${items.length})`);
     return items.length;
   } catch (error) {
-    console.error("❌ Error syncClientesFromCentral:", error);
-    throw error;
-  }
-}
-
-/**
- * Envía al servidor central los clientes creados offline pendientes de sync.
- *
- * @returns Número de clientes enviados.
- * @throws Error si la petición HTTP falla.
- */
-export async function syncClientesToCentral() {
-  const pendientes = await getClientesPendientesSync();
-  if (pendientes.length === 0) return 0;
-
-  try {
-    await SYNC_CONFIG.http.post(SYNC_CONFIG.endpoints.clientesPost, {
-      clientes: pendientes,
-    });
-
-    for (const c of pendientes) {
-      await markClienteAsSynced(c.ruc);
-    }
-
-    console.log(`✅ ${pendientes.length} clientes enviados al central`);
-    return pendientes.length;
-  } catch (error) {
-    console.error("❌ Error syncClientesToCentral:", error);
+    console.error("❌ CLIENTES -> Error:", error.message || error);
     throw error;
   }
 }

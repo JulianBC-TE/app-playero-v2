@@ -21,6 +21,8 @@ import { getStorageSucursal, saveSucursal } from "@/storage/storageSucursal";
 import { httpClient } from "@/backend/api/httpClient";
 import { login } from "@/backend/api/authAPI";
 import { saveUserLocally, loginOffline, clearSession } from "@DBmodules/authDB";
+import { sincronizarModulos } from "@/backend/db/modules/moduleDB";
+import { useInitialSync } from "@/hooks/useInitialSync";
 
 // ---------------------------------------------------------------------------
 // Tipos del contexto
@@ -31,8 +33,8 @@ export type AuthContextDataProps = {
   updateUserProfile: (userUpdated: UserDTO) => Promise<void>;
   // Devuelve true si el login fue online, false si fue offline.
   // SignIn usa este valor para saber si debe llamar al hook de sync.
-  signIn: (cedula: string, password: string) => Promise<boolean>;
-  signOut: () => Promise<void>;
+  signIn: (cedula: number, password: string, onSyncInitialData?: () => Promise<void>,) => Promise<boolean>;
+  signOut: (wipeDatabase?: boolean) => Promise<void>; // ◄ Parámetro opcional añadido aquí
   isLoadingUserData: boolean;
   isOffline: boolean;
   cliente: ClienteDTO;
@@ -66,28 +68,109 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
   // ── signIn ────────────────────────────────────────────────────────────────
   // Retorna true si el login fue online (para que el caller decida si sincronizar).
 
-  async function signIn(cedula: string, password: string): Promise<boolean> {
+  /*async function signIn(cedula: number, password: string): Promise<boolean> {
+  setIsLoadingUserData(true);
+  try {
+    const online = await httpClient.isOnline();
+
+    if (online) {
+      // ── Login online ──────────────────────────────────────────────────
+      const loginData = await login(cedula, password);
+      
+      const userData: UserDTO = { 
+        cedula: loginData.persona.cedula, 
+        name: loginData.persona.nombreApellido 
+      };
+      
+      await saveAuthToken({ 
+        token: loginData.token, 
+        refresh_token: loginData.usuarioApp.refreshToken ?? "" 
+      });
+      
+      await saveUser(userData);
+      
+      // Guardar datos localmente con las funciones compartidas
+      await saveUserLocally(loginData);
+
+      httpClient.setToken(loginData.token);
+      setUser(userData);
+      setIsOffline(false);
+
+      return true; // ← online
+    } else {
+      // ── Login offline ─────────────────────────────────────────────────
+      const result = await loginOffline(cedula, password);
+
+      if (!result.ok) {
+        const messages: Record<typeof result.reason, string> = {
+          not_last_user:
+            "Para cambiar de usuario necesitás conexión al servidor.",
+          wrong_password: "Contraseña incorrecta.",
+          no_local_user:
+            "No hay datos locales. Conectate al servidor para hacer el primer login.",
+          error: "Error al iniciar sesión offline.",
+        };
+        throw new Error(messages[result.reason]);
+      }
+
+      const userData: UserDTO = {
+        cedula: Number(result.user.cedula),
+        name: result.user.name,
+      };
+      await saveUser(userData);
+      setUser(userData);
+      setIsOffline(true);
+
+      return false; // ← offline
+    }
+  } finally {
+    setIsLoadingUserData(false);
+  }
+}*/
+  async function signIn(cedula: number, password: string, onSyncInitialData?: () => Promise<void>): Promise<boolean> {
     setIsLoadingUserData(true);
     try {
       const online = await httpClient.isOnline();
 
       if (online) {
         // ── Login online ──────────────────────────────────────────────────
-        const data = await login(cedula, password);
-        const refreshToken = data.refresh_token ?? "";
-        const userData: UserDTO = { cedula, name: data.name };
+        const loginData = await login(cedula, password);
+        // ✨ Ahora guardamos TODOS los datos recibidos
+        const userData: UserDTO = {
+          cedula: loginData.persona.cedula,
+          name: loginData.persona.nombreApellido,
+          timestamp: loginData.persona.timestamp,
+          sync: loginData.persona.sync,
+          idUser: loginData.usuarioApp.idUser,
+          idSucursal: loginData.usuarioApp.idSucursal,
+          bloqueado: loginData.usuarioApp.bloqueado,
+          expirationTime: loginData.expirationTime,
+        };
 
-        await saveAuthToken({ token: data.token, refresh_token: refreshToken });
-        await saveUser(userData);
-        await saveUserLocally({
-          cedula,
-          name: data.name,
-          password,
-          refreshToken,
-          idSucursal: data.idSucursal,
+        await saveAuthToken({
+          token: loginData.token,
+          refresh_token: loginData.usuarioApp.refreshToken ?? "",
         });
 
-        httpClient.setToken(data.token);
+        await saveUser(userData);
+
+        // Guardar sucursal en el contexto
+        const sucursalData: SucursalDTO = {
+          id_sucursal: loginData.sucursal.idSucursal,
+          descripcion_sucursal: loginData.sucursal.descripcionSucursal,
+        };
+        await setSucursal(sucursalData);
+        await sincronizarModulos(cedula);
+        await saveUserLocally(loginData, password);
+        
+        if(userData.idUser){
+          const { syncInitialData } = useInitialSync(cedula, userData.idUser);
+        if (onSyncInitialData) {
+          await syncInitialData();
+        }
+        }
+
+        httpClient.setToken(loginData.token);
         setUser(userData);
         setIsOffline(false);
 
@@ -105,11 +188,12 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
               "No hay datos locales. Conectate al servidor para hacer el primer login.",
             error: "Error al iniciar sesión offline.",
           };
+          console.log(messages[result.reason]);
           throw new Error(messages[result.reason]);
         }
 
         const userData: UserDTO = {
-          cedula: result.user.cedula,
+          cedula: Number(result.user.cedula),
           name: result.user.name,
         };
         await saveUser(userData);
@@ -125,19 +209,28 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 
   // ── signOut ───────────────────────────────────────────────────────────────
 
-  const signOut = useCallback(async (): Promise<void> => {
-  try {
-    setIsLoadingUserData(true);
-    if (user.cedula) await clearSession(user.cedula);
-    httpClient.clearToken();
-    setUser({} as UserDTO);
-    setIsOffline(false);
-    await removeUser();
-    await removeAuthToken();
-  } finally {
-    setIsLoadingUserData(false);
-  }
-}, [user.cedula]);
+  const signOut = useCallback(async (wipeDatabase: boolean = false): Promise<void> => {
+    try {
+      setIsLoadingUserData(true);
+      if (user.cedula) await clearSession(user.cedula);
+      
+      httpClient.clearToken();
+      setUser({} as UserDTO);
+      setIsOffline(false);
+      await removeUser();
+      await removeAuthToken();
+
+      if (wipeDatabase) {
+        console.log("Procediendo a borrar toda la base de datos local...");
+        // ◄ EJECUTA AQUÍ TU LÓGICA DE BORRADO DE BD LOCAL
+        // Ejemplo: await limpiarTodaLaBaseDeDatosLocal();
+      }
+    } catch (error) {
+      console.error("Error durante el logout:", error);
+    } finally {
+      setIsLoadingUserData(false);
+    }
+  }, [user.cedula]);
 
   // ── updateUserProfile ─────────────────────────────────────────────────────
 
@@ -149,26 +242,26 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
   // ── Carga inicial ─────────────────────────────────────────────────────────
 
   async function loadUserData(): Promise<void> {
-  try {
-    setIsLoadingUserData(true);
-    const userLogged = await getStorageUser();
-    const { token } = await getAuthToken();
+    try {
+      setIsLoadingUserData(true);
+      const userLogged = await getStorageUser();
+      const { token } = await getAuthToken();
 
-    if (userLogged?.cedula) {
-      setUser(userLogged);
-      if (token) {
-        httpClient.setToken(token);
-        setIsOffline(false);
-      } else {
-        setIsOffline(true);
+      if (userLogged?.cedula) {
+        setUser(userLogged);
+        if (token) {
+          httpClient.setToken(token);
+          setIsOffline(false);
+        } else {
+          setIsOffline(true);
+        }
       }
+    } catch (error) {
+      console.warn("Fallo al leer almacenamiento en Bridgeless", error);
+    } finally {
+      setIsLoadingUserData(false); // ← siempre se ejecuta
     }
-  } catch (error) {
-    console.warn("Fallo al leer almacenamiento en Bridgeless", error);
-  } finally {
-    setIsLoadingUserData(false); // ← siempre se ejecuta
   }
-}
 
   async function setServerIP(ip: string | null) {
     if (ip !== null) {

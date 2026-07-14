@@ -18,7 +18,9 @@ import { vehiculos, syncs } from "@/backend/db/schema";
 import { eq, like, or } from "drizzle-orm";
 import { VehiculoDTO } from "@/dto/VehiculoDTO";
 import { AppError } from "@/utils/AppError";
-import { SYNC_CONFIG } from "../constants/syncConfig";
+import { syncGetVehiculos, syncPostVehiculos } from "@/backend/api/vehiculoAPI";
+import { syncsController } from "./syncsDB";
+
 
 // Clave en tabla syncs para registrar la última sincronización de vehículos.
 const SYNC_KEY = "__last_sync_vehiculos__";
@@ -297,21 +299,18 @@ export async function eliminarVehiculoLocal(idVehiculo: string): Promise<void> {
   await db.delete(vehiculos).where(eq(vehiculos.idVehiculo, idVehiculo));
 }
 
-// ---------------------------------------------------------------------------
-// getLastSyncDate
-// Devuelve la fecha de la última sincronización con el servidor.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve el timestamp de la última sincronización de vahículos utilizando el controlador.
+ *
+ * @returns Timestamp Unix en ms, o `null` si nunca se sincronizó.
+ * @description Lee directamente de la caché en memoria de forma ultra rápida.
+ */
 export async function getLastSyncDate(): Promise<number | null> {
   try {
-    const result = await db
-      .select({ fecha: syncs.fecha })
-      .from(syncs)
-      .where(eq(syncs.tipo, SYNC_KEY))
-      .limit(1);
-
-    return result[0] ? result[0].fecha : null;
-  } catch {
+    // Obtenemos el timestamp directamente desde la caché en memoria del controlador
+    return await syncsController.getTimestamp(SYNC_KEY);
+  } catch (error) {
+    console.error("❌ Error en getLastSyncDate:", error);
     return null;
   }
 }
@@ -325,22 +324,18 @@ export async function getLastSyncDate(): Promise<number | null> {
  * @returns Número de vehículos sincronizados.
  * @throws Error si la petición HTTP falla.
  */
-export async function syncVehiculosFromCentral(lastTimestamp: number = 0) {
+export async function syncVehiculosFromCentral(): Promise<number> {
   try {
-    // ✅ CORREGIDO: usar vehiculosGet, no clientesGet
-    const { data } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.vehiculosGet, {
-      params: { createdAt: lastTimestamp },
-    });
-
-    const items = Array.isArray(data) ? data : [];
-
+    const items = await syncGetVehiculos(await syncsController.getTimestamp(SYNC_KEY));
     if (items.length > 0) {
       await saveVehiculos(items);
-      console.log(`✅ ${items.length} vehículos sincronizados desde central`);
     }
+    await syncsController.saveOrUpdate(SYNC_KEY, Date.now());
+    
+    console.log(`✅ VEHÍCULOS -> ok (+${items.length})`);
     return items.length;
   } catch (error) {
-    console.error("❌ Error syncVehiculosFromCentral:", error);
+    console.error("❌ VEHÍCULOS -> Error:", error.message || error);
     throw error;
   }
 }
@@ -351,25 +346,24 @@ export async function syncVehiculosFromCentral(lastTimestamp: number = 0) {
  * @returns Número de vehículos enviados.
  * @throws Error si la petición HTTP falla.
  */
-export async function syncVehiculosToCentral() {
+export async function syncVehiculosToCentral(): Promise<number> {
   const pendientes = await getVehiculosPendientesSync();
-  if (pendientes.length === 0) return 0;
+  if (pendientes.length === 0) {
+    console.log("⚪ VEHÍCULOS -> Nada pendiente para subir");
+    return 0;
+  }
 
   try {
-    // ✅ CORREGIDO: usar vehiculosPost y payload { vehiculos }, no { clientes }
-    await SYNC_CONFIG.http.post(SYNC_CONFIG.endpoints.vehiculosPost, {
-      vehiculos: pendientes,
-    });
+    await syncPostVehiculos(pendientes);
 
     for (const v of pendientes) {
-      // ✅ CORREGIDO: marcar por id_vehiculo (PK real), no por ruc
       await markVehiculoAsSynced(v.id_vehiculo);
     }
 
-    console.log(`✅ ${pendientes.length} vehículos enviados al central`);
+    console.log(`➡️ VEHÍCULOS -> subidos ok (-${pendientes.length})`);
     return pendientes.length;
   } catch (error) {
-    console.error("❌ Error syncVehiculosToCentral:", error);
+    console.error("❌ VEHÍCULOS -> Error al subir:", error.message || error);
     throw error;
   }
 }

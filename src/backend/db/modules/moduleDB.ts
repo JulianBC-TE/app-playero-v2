@@ -34,9 +34,8 @@ import type { ModulosLocal } from "@/dto/modulosDTO";
  * await sincronizarModulos(cedula);
  * ```
  */
-export async function sincronizarModulos(cedula: string): Promise<ModulosLocal> {
+export async function sincronizarModulos(cedula: number): Promise<ModulosLocal> {
   const modulos = await getModulosTraducidos(cedula);
-
   await db
     .insert(modulosUsuarios)
     .values(modulos)
@@ -75,13 +74,13 @@ export async function sincronizarModulos(cedula: string): Promise<ModulosLocal> 
  * ```
  */
 export async function getModulosDelUsuario(
-  cedula: string
+  cedula: number
 ): Promise<ModulosLocal | null> {
   try {
     const rows = await db
       .select()
       .from(modulosUsuarios)
-      .where(eq(modulosUsuarios.cedula, Number(cedula)))
+      .where(eq(modulosUsuarios.cedula, cedula))
       .limit(1);
 
     if (!rows[0]) return null;

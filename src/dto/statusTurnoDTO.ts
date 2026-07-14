@@ -1,18 +1,7 @@
-// {
-//     "Fin_turno":
-//     {
-//         "falta": [1016, 1017],
-//         "ok": false
-//     },
-//     "Inicio_turno":
-//     {
-//         "falta": [1016, 1017],
-//         "ok": false
-//     }
-// }
+import { TurnoStatus } from "@/backend/db/services/turnoStatusService";
 
 export type StatusTurnoDTO = {
-	status: string;
+	status: TurnoStatus;
 	Inicio_turno: {
 		ok: boolean;
 		falta: number[];

@@ -18,7 +18,8 @@ export type TurnoStatus =
   | "normal"
   | "iniciado"
   | "cerrado"
-  | "falta_cerrar";
+  | "falta_cerrar"
+  | "falta_inicio";
 
 export interface StatusResult {
   status: TurnoStatus;
@@ -48,10 +49,14 @@ export function normalizarFecha(fecha: Date): number {
 /**
  * Calcula estado de turnos por lista de bodegas
  */
+/**
+ * Calcula estado de turnos por lista de bodegas
+ */
 export async function calcularEstadoTurno(
   idsBodegas: number[],
   fechaParam?: string,
 ): Promise<StatusResult> {
+
   if (idsBodegas.length === 0) {
     return {
       status: "normal",
@@ -62,104 +67,129 @@ export async function calcularEstadoTurno(
   }
 
   const hoy = new Date();
-  const fecha = fechaParam
-    ? normalizarFecha(new Date(fechaParam))
-    : normalizarFecha(hoy);
+  const fecha = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const fechaTimestamp = Math.floor(fecha.getTime() / 1000); 
 
-  // -----------------------------
-  // 1️⃣ Turnos del día actual
-  // -----------------------------
-  const turnosHoy = await db
+  // ================== FASE 1 ==================
+
+  const turnosHoyRaw = await db
     .select({
       idBodega: turnos.idBodega,
       tipo: turnos.tipo,
       estado: turnos.estado,
+      idTurno: turnos.idTurno, // ✅ Cambio: 'id' → 'idTurno'
     })
     .from(turnos)
-    .where(and(inArray(turnos.idBodega, idsBodegas), eq(turnos.fecha, fecha)));
+    .where(
+      and(
+        inArray(turnos.idBodega, idsBodegas),
+        eq(turnos.fecha, fechaTimestamp) // ✅ Cambio: comparar con timestamp
+      )
+    )
+    .orderBy(desc(turnos.idTurno)); // ✅ Cambio: 'id' → 'idTurno'
+
+  // 🔧 DEDUPLICAR: Mantener solo el más reciente de cada (bodega, tipo)
+  const seen = new Set<string>();
+  const turnosHoy = turnosHoyRaw.filter((t) => {
+    const key = `${t.idBodega}-${t.tipo}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 
   const inicioHoy = new Set(
     turnosHoy
-      .filter((t) => t.tipo === "inicio" && t.estado === TurnoEstado.ACTIVO)
+      .filter((t) => t.tipo === "INICIO-TURNO" && t.estado === 1)
       .map((t) => t.idBodega),
   );
 
-  // Reemplazar "FIN" por "fin" para ser consistente con lo que inserta crearTurnoLocal
+
   const cierreHoyOK = new Set(
     turnosHoy
-      .filter((t) => t.tipo === "fin" && t.estado === TurnoEstado.ACTIVO)
+      .filter((t) => t.tipo === "FIN-TURNO" && t.estado === 1)
       .map((t) => t.idBodega),
   );
+
 
   const cierreHoyAnulados = new Set(
     turnosHoy
-      .filter((t) => t.tipo === "fin" && t.estado === TurnoEstado.ANULADO)
+      .filter((t) => t.tipo === "FIN-TURNO" && t.estado === 0)
       .map((t) => t.idBodega),
   );
 
-  const faltanInicio = idsBodegas.filter((id) => !inicioHoy.has(id));
 
+  const faltanInicio = idsBodegas.filter((id) => !inicioHoy.has(id));
   const sinCierre = idsBodegas.filter(
     (id) => !cierreHoyOK.has(id) && !cierreHoyAnulados.has(id),
   );
-
   const finAnulados = idsBodegas.filter(
     (id) => cierreHoyAnulados.has(id) && !cierreHoyOK.has(id),
   );
 
   const inicioTurnoOK = faltanInicio.length === 0;
   const finTurnoHoyOK = sinCierre.length === 0;
+  // ================== FASE 2 ==================
 
-  // -----------------------------
-  // 2️⃣ Buscar última fecha anterior
-  // -----------------------------
   const ultimaFecha = await db
     .select({ fecha: turnos.fecha })
     .from(turnos)
-    .where(and(inArray(turnos.idBodega, idsBodegas), lt(turnos.fecha, fecha)))
+    .where(
+      and(
+        inArray(turnos.idBodega, idsBodegas),
+        lt(turnos.fecha, fechaTimestamp) // ✅ Cambio: comparar con timestamp
+      )
+    )
     .orderBy(desc(turnos.fecha))
     .limit(1);
 
   let finTurnoAnteriorFaltantes: number[] = [];
 
-  if (ultimaFecha.length > 0) {
-    const fechaAnterior = ultimaFecha[0].fecha;
-
-    if (fechaAnterior == null) {
-      return {
-        status: "normal",
-        Inicio_turno: { ok: inicioTurnoOK, falta: faltanInicio },
-        Fin_turno: { ok: finTurnoHoyOK, falta: [...sinCierre, ...finAnulados] },
-        Fin_turno_anterior: { ok: true, falta: [] },
-      };
-    }
+  if (ultimaFecha.length > 0 && ultimaFecha[0].fecha != null) {
+    const fechaAnteriorTimestamp = ultimaFecha[0].fecha;
 
     const turnosPrevios = await db
       .select({
         idBodega: turnos.idBodega,
         estado: turnos.estado,
+        idTurno: turnos.idTurno, // ✅ Cambio: 'id' → 'idTurno'
       })
       .from(turnos)
       .where(
         and(
           inArray(turnos.idBodega, idsBodegas),
-          eq(turnos.fecha, fechaAnterior),
-          eq(turnos.tipo, "fin"),
+          eq(turnos.fecha, fechaAnteriorTimestamp), // ✅ Ya es timestamp
+          eq(turnos.tipo, "FIN-TURNO"),
         ),
-      );
+      )
+      .orderBy(desc(turnos.idTurno)); 
+
+    // 🔧 DEDUPLICAR: Mantener solo el más reciente por bodega
+    const seenPrevios = new Set<number>();
+    const turnosPreviosUnicos = turnosPrevios.filter((t) => {
+      if (seenPrevios.has(t.idBodega)) {
+        return false;
+      }
+      seenPrevios.add(t.idBodega);
+      return true;
+    });
 
     const cierrePrevioOK = new Set(
-      turnosPrevios.filter((t) => t.estado === TurnoEstado.ACTIVO).map((t) => t.idBodega),
+      turnosPreviosUnicos
+        .filter((t) => t.estado === 1)
+        .map((t) => t.idBodega),
     );
 
     finTurnoAnteriorFaltantes = idsBodegas.filter(
       (id) => !cierrePrevioOK.has(id),
     );
+  } else {
+    console.log(`  ℹ️  No hay turnos anteriores registrados`);
   }
 
-  // -----------------------------
-  // 3️⃣ Determinar status
-  // -----------------------------
+  // ================== FASE 3 ==================
+
   let status: TurnoStatus;
 
   if (finTurnoAnteriorFaltantes.length > 0 && !inicioTurnoOK) {
@@ -174,7 +204,7 @@ export async function calcularEstadoTurno(
     status = "normal";
   }
 
-  return {
+  const result: StatusResult = {
     status,
     Inicio_turno: { ok: inicioTurnoOK, falta: faltanInicio },
     Fin_turno: { ok: finTurnoHoyOK, falta: [...sinCierre, ...finAnulados] },
@@ -183,4 +213,6 @@ export async function calcularEstadoTurno(
       falta: finTurnoAnteriorFaltantes,
     },
   };
+
+  return result;
 }

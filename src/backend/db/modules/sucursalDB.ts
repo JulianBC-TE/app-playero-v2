@@ -1,32 +1,30 @@
 /**
+ * Módulo de acceso a datos para sucursales.
+ *
+ * @remarks
+ * - Las sucursales son un catálogo de solo lectura que se sincroniza desde el servidor.
+ * - `saveSucursales()` hace upsert masivo de datos del servidor.
+ * - `syncSucursalesFromCentral()` descarga las sucursales disponibles para el usuario actual,
+ *   enviando su `idSucursal` al servidor.
+ * - Solo hay un usuario app guardado en cada momento.
+ *
  * @module Playero/Backend/DB/Modules/Sucursal
  * @category Database Modules
  */
-// Módulo de base de datos para sucursales.
-// Las sucursales son un catálogo de solo lectura que se sincroniza desde el servidor.
-//
-// REGLAS DE NEGOCIO:
-//   - Las sucursales no se crean localmente, solo se descargan del servidor.
-//   - saveSucursales() hace upsert masivo para mantener el catálogo actualizado.
-//   - getSucursales() devuelve todas las sucursales para el Select de Setup.
-//   - getSucursalById() devuelve una sucursal por ID para mostrar en la UI.
-
 import { db } from "@/backend/db/client";
 import { sucursales, syncs, usuariosApp } from "@/backend/db/schema";
 import { eq } from "drizzle-orm";
 import { SucursalDTO } from "@/dto/sucursalDTO";
-import { SYNC_CONFIG } from "../constants/syncConfig";
-import axios from "axios"; // solo como fallback
+import { getSucursalesDestinoTraspaso, syncGetSucursales } from "@/backend/api/sucursalAPI";
 
 // Clave en tabla syncs para registrar la última sincronización de sucursales.
 const SYNC_KEY = "__last_sync_sucursales__";
 
-// ---------------------------------------------------------------------------
-// saveSucursales
-// Upsert masivo de sucursales recibidas del servidor.
-// Llamar tras un fetch exitoso a /api/sucursales (o similar).
-// ---------------------------------------------------------------------------
-
+/**
+ * Upsert masivo de sucursales recibidas del servidor.
+ *
+ * @param items - Lista de {@link SucursalDTO} a insertar o actualizar.
+ */
 export async function saveSucursales(items: SucursalDTO[]): Promise<void> {
   if (items.length === 0) return;
 
@@ -53,12 +51,11 @@ export async function saveSucursales(items: SucursalDTO[]): Promise<void> {
     });
 }
 
-// ---------------------------------------------------------------------------
-// getSucursales
-// Devuelve todas las sucursales del catálogo local.
-// Usado en el Select de la pantalla Setup.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve todas las sucursales del catálogo local.
+ *
+ * @returns Lista de {@link SucursalDTO}.
+ */
 export async function getSucursales(): Promise<SucursalDTO[]> {
   const rows = await db
     .select({
@@ -73,12 +70,12 @@ export async function getSucursales(): Promise<SucursalDTO[]> {
   }));
 }
 
-// ---------------------------------------------------------------------------
-// getSucursalById
-// Devuelve una sucursal por su ID.
-// Usado para mostrar el nombre de la sucursal activa en la UI.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve una sucursal por su ID.
+ *
+ * @param idSucursal - ID de la sucursal.
+ * @returns un {@link SucursalDTO} o `null` si no existe.
+ */
 export async function getSucursalById(
   idSucursal: number,
 ): Promise<SucursalDTO | null> {
@@ -99,12 +96,11 @@ export async function getSucursalById(
   };
 }
 
-// ---------------------------------------------------------------------------
-// getLastSyncDate
-// Devuelve el timestamp de la última sincronización de sucursales.
-// Retorna null si nunca se sincronizó.
-// ---------------------------------------------------------------------------
-
+/**
+ * Devuelve el timestamp de la última sincronización de sucursales.
+ *
+ * @returns Timestamp Unix en ms, o `null` si nunca se sincronizó.
+ */
 export async function getLastSyncDate(): Promise<number | null> {
   try {
     const result = await db
@@ -119,34 +115,77 @@ export async function getLastSyncDate(): Promise<number | null> {
   }
 }
 
-//Sync
-export async function syncSucursalesFromCentral() {
+/**
+ * Obtiene el idSucursal del usuario app actualmente guardado.
+ * Como solo hay un usuario app en cada momento, devuelve el primero.
+ *
+ * @returns `idSucursal` del usuario actual, o `null` si no hay usuario guardado.
+ */
+export async function getCurrentUserAppIdSucursal(): Promise<number | null> {
   try {
-    const { data } = await SYNC_CONFIG.http.get(SYNC_CONFIG.endpoints.sucursales);
-    await saveSucursales(data);
-    console.log(`✅ ${data.length} sucursales sincronizadas`);
-    return data.length;
+    const result = await db
+      .select({ idSucursal: usuariosApp.idSucursal })
+      .from(usuariosApp)
+      .limit(1);
+
+    return result[0] ? result[0].idSucursal : null;
   } catch (error) {
-    console.error("❌ Error sync sucursales:", error);
-    throw error;
+    console.error("Error obtener idSucursal del usuario actual:", error);
+    return null;
   }
 }
 
+/**
+ * Obtiene los datos completos del usuario app actualmente guardado.
+ * Incluye la sucursal asociada.
+ *
+ * @returns Objeto con datos del usuario y sucursal, o `null` si no existe.
+ */
 export async function getSucursalUsuarioActivoLocal() {
   try {
     const resultado = await db
       .select({
-        cedula: usuariosApp.cedula,               // <-- Asegúrate de pedir la cédula aquí
-        id_sucursal: sucursales.idSucursal,
-        descripcion_sucursal: sucursales.descripcionSucursal,
+        cedula: usuariosApp.cedula,
+        idSucursal: sucursales.idSucursal,
+        descripcionSucursal: sucursales.descripcionSucursal,
       })
       .from(usuariosApp)
-      .innerJoin(sucursales, eq(usuariosApp.idSucursal, sucursales.idSucursal))
+      .innerJoin(
+        sucursales,
+        eq(usuariosApp.idSucursal, sucursales.idSucursal),
+      )
       .limit(1);
 
-    return resultado[0] || null; 
+    return resultado[0] || null;
   } catch (error) {
-    console.error(error);
+    console.error("Error getSucursalUsuarioActivoLocal:", error);
+    return null;
+  }
+}
+
+// ====================== SINCRONIZACIÓN ======================
+
+/**
+ * Descarga las sucursales disponibles para el usuario actual desde el servidor central.
+ * Envía el idSucursal del usuario app para que el servidor devuelva su catálogo específico.
+ *
+ * @returns Número de sucursales sincronizadas.
+ * @throws Error si la petición HTTP falla o no hay usuario guardado.
+ */
+export async function syncSucursalesFromCentral(): Promise<number> {
+  try {
+    const idSucursal = await getCurrentUserAppIdSucursal();
+    if (!idSucursal) throw new Error("No se detectó sucursal del usuario app.");
+
+    const items = await getSucursalesDestinoTraspaso(idSucursal);
+    if (items.length > 0) {
+      await saveSucursales(items);
+    }
+
+    console.log(`✅ SUCURSALES -> ok (+${items.length})`);
+    return items.length;
+  } catch (error) {
+    console.error("❌ SUCURSALES -> Error:", error.message || error);
     throw error;
   }
 }

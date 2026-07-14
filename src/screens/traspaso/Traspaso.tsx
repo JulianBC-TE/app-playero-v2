@@ -4,7 +4,7 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { TextSearch } from "@/components/TextSearch";
 import { PersonaDTO } from "@/dto/PersonaDTO";
 import { StackRoutesProps } from "@/route/app.routes";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,6 @@ import {
 } from "react-native";
 import {
   CheckCheck,
-  Fuel,
   Pencil,
   RulerDimensionLine,
   SaveAll,
@@ -27,10 +26,6 @@ import { useAppContext } from "@/hooks/useAppContext";
 import { PicoDTO } from "@/dto/PicosDTO";
 import { Select } from "@/components/Select";
 import { Button } from "@/components/Button";
-import { Loading } from "@/components/Loading";
-import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
-import { MedicionDTO } from "@/dto/MedicionDTO";
-import { BodegaDTO } from "@/dto/BodegaDTO";
 import { TraspasoDTO } from "@/dto/TraspasoDTO";
 import {
   getStorageTraspaso,
@@ -44,29 +39,23 @@ import {
 } from "@/storage/storagePersona";
 import { Photo } from "@/components/Photo";
 // BD — reemplaza api
-import {
-  getBodegasByIdSucursal,
-  getBodegasTraspaso,
-} from "@DBmodules/bodegaDB";
+import { getBodegasDelUsuario, getBodegasTraspaso } from "@DBmodules/bodegaDB";
 import { getPicosByBodega } from "@DBmodules/picoDB";
-import { getTurnoStatusLocal } from "@DBmodules/turnoBD";
+import {
+  anularUltimoFinTurnoPorBodega,
+  getTipoByBodega,
+  getTurnoStatusLocal,
+} from "@DBmodules/turnoBD";
 import { saveTraspasoLocal } from "@DBmodules/traspasoDB";
-import { getNuevoDespachoByPico } from "@DBmodules/despachoDB";
-
-//let idAutorizado = 0;
-//let continuarCarga = false;
+import { BodegaDTO } from "@/dto/BodegaDTO";
+import { MedicionDTO } from "@/dto/MedicionDTO";
 
 export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
-  const idAutorizadoRef = useRef<number>(0);
-  const continuarCargaRef = useRef<boolean>(false);
-  const lastIdProcesadoRef = useRef<number>(0);
-  const timestampReferenciaRef = useRef<number>(0);
-  const n = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-  const [selectedBodegaOrigem, setSelectedBodegaOrigem] = useState<string>("");
+  const [selectedBodegaOrigem, setSelectedBodegaOrigem] = useState<string>(" ");
   const [selectedBodegaDestino, setSelectedBodegaDestino] =
-    useState<string>("");
+    useState<string>(" ");
   const [bodegaOrigem, setBodegaOrigem] = useState<BodegaDTO[]>([]);
-  const [bodegaDestino, setBodegaDestino] = useState<BodegaDTO[]>([]);
+  const [bodygaDestino, setBodegaDestino] = useState<BodegaDTO[]>([]);
   const { sucursal, user } = useAppContext();
   const [isLoading, setIsLoading] = useState(false);
   const [turnoCerrado, setTurnoCerrado] = useState(false);
@@ -75,25 +64,23 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   const [picos, setPicos] = useState<PicoDTO[]>([]);
   const [persona, setPersona] = useState<PersonaDTO | null>(null);
   const [firma, setFirma] = useState<string | null>(null);
-  const [salida, setSalida] = useState<number>(0);
 
   const [motivoConfirmado, setMotivoConfirmado] = useState(false);
-  //const [cargaCombustible, setCargaCombustible] = useState<number>(0.0);
-  const [cargaCombustible, setCargaCombustible] = useState<string>("000,00");
-  const [selectedPico, setSelectedPico] = useState<string>("");
-  const [idPico_surtidor, setIdPicoSurtidor] = useState<number>(0);
-  const [totalizadorPicoInicial, setTotalizadorPicoInicial] =
-    useState<number>(0);
-  const [totalizadorPicoFinal, setTotalizadorPicoFinal] = useState<number>(0);
+  const [cargaCombustible, setCargaCombustible] = useState<string>("");
+  const [selectedPico, setSelectedPico] = useState<string>(" ");
 
   const [base64Obs, setBase64Obs] = useState<string>("");
   const [obs, setObs] = useState<string>("");
   const [obsAdicional, setObsAdicional] = useState<string>("");
-  const [shouldContinue, setShouldContinue] = useState(false);
-  const shouldContinueRef = useRef(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // ◄ NUEVOS ESTADOS: Taxímetros de inicio y fin (Texto y Fotos)
+  const [taxilitroInicial, setTaxilitroInicial] = useState<string>("");
+  const [base64TaxilitroInicial, setBase64TaxilitroInicial] =
+    useState<string>("");
+  const [taxilitroFinal, setTaxilitroFinal] = useState<string>("");
+  const [base64TaxilitroFinal, setBase64TaxilitroFinal] = useState<string>("");
+
   const [estadoRestaurado, setEstadoRestaurado] = useState(false);
-  const [litrosCarga, setLitrosCarga] = useState(false);
   const [estadoInicial, setEstadoInicial] = useState<{
     persona: PersonaDTO | null;
     selectedBodegaOrigem: string;
@@ -101,19 +88,15 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     selectedPico: string;
     obs: string;
     obsAdicional: string;
+    cargaCombustible: string;
+    taxilitroInicial: string;
+    taxilitroFinal: string;
   } | null>(null);
 
-  const setAndRefShouldContinue = (val: boolean) => {
-    shouldContinueRef.current = val;
-    setShouldContinue(val);
-  };
-
-  // helper para converter string "1.234,56" ou "1234.56" em número
   const toNumber = (v: unknown) => {
     if (typeof v === "number") return v;
     const s = String(v ?? "").trim();
     if (!s) return 0;
-    // remove separador de milhar e normaliza vírgula para ponto
     return Number(s.replace(/\./g, "").replace(",", "."));
   };
 
@@ -141,13 +124,12 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   async function fetchBodegas() {
     try {
       setIsLoading(true);
-      const bodegasOrigen = await getBodegasByIdSucursal(sucursal.id_sucursal);
-      setBodegaOrigem(bodegasOrigen);
-      if (bodegasOrigen.length === 1) {
-        setSelectedBodegaOrigem(bodegasOrigen[0].id_bodega);
-      }
+      const bodegasOrigen = await getBodegasDelUsuario(user.cedula);
+      await setBodegaOrigem(bodegasOrigen);
+      await setSelectedBodegaOrigem(bodegasOrigen[0].id_bodega);
       const bodegasDestino = await getBodegasTraspaso(sucursal.id_sucursal);
-      setBodegaDestino(bodegasDestino);
+      await setBodegaDestino(bodegasDestino);
+      await setSelectedBodegaDestino(bodegasDestino[0].id_bodega)
     } catch (error) {
       toastError("Error al buscar bodega", "Intente nuevamente más tarde.");
     } finally {
@@ -156,47 +138,45 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   }
 
   async function saveState() {
-    if (continuarCargaRef.current) return;
-
     const now = new Date();
-
     const fecha = now.toISOString().slice(0, 10);
     const hora = now.toTimeString().slice(0, 8);
 
-    // Leer lo que ya hay en storage para no pisar litros ni totalizadores
     const existing = await getStorageTraspaso();
 
     const data: TraspasoDTO = {
-      json: {
-        bod_origen: Number(selectedBodegaOrigem),
-        bod_destino: Number(selectedBodegaDestino),
-        id_tanque_destino: Number(medicionInicial[0]?.id_tanque ?? 0),
-        regla_altura_inicial: medicionInicial[0]?.regla.toString() ?? "",
-        litros_tanque_inicial: medicionInicial[0]?.litros ?? 0,
-        temp_inicial: medicionInicial[0]?.temperatura ?? 0,
-        regla_altura_final: existing?.json?.regla_altura_final ?? "",
-        litros_tanque_final: existing?.json?.litros_tanque_final ?? 0,
-        temp_final: existing?.json?.temp_final ?? 0,
-        foto_medicion_final: existing?.json?.foto_medicion_final ?? [],
-        id_pico: Number(selectedPico),
-        taxilitro_inicial:
-          existing?.json?.taxilitro_inicial ?? totalizadorPicoInicial,
-        taxilitro_final:
-          existing?.json?.taxilitro_final ?? totalizadorPicoFinal,
-        litros_pico: existing?.json?.litros_pico ?? 0, // ← preserva lo que fetchBox guardó
-        last_id_salida: existing?.json?.last_id_salida ?? 0,
-        obs_traspaso: obs,
-        obs_adicional: obsAdicional,
-        foto_obs_traspaso: base64Obs ? [base64Obs] : [],
-        foto_medicion_inicial: medicionInicial[0]?.foto_tanque
-          ? [medicionInicial[0].foto_tanque]
-          : [],
-        fecha: existing?.json?.fecha ?? fecha,
-        hora: existing?.json?.hora ?? hora,
-        firma_receptor: existing?.json?.firma_receptor ?? [],
-        id_playero: Number(user.cedula),
-        id_encargado_receptor: Number(persona?.cedula) || 0,
-      },
+      bod_origen: Number(selectedBodegaOrigem),
+      bod_destino: Number(selectedBodegaDestino),
+      id_tanque_destino: Number(medicionInicial[0]?.id_tanque ?? 0),
+      regla_altura_inicial: medicionInicial[0]?.regla.toString() ?? "",
+      litros_tanque_inicial: medicionInicial[0]?.litros ?? 0,
+      temp_inicial: medicionInicial[0]?.temperatura ?? 0,
+      regla_altura_final: existing?.regla_altura_final ?? "",
+      litros_tanque_final: existing?.litros_tanque_final ?? 0,
+      temp_final: existing?.temp_final ?? 0,
+      foto_medicion_final: existing?.foto_medicion_final ?? [],
+      id_pico: Number(selectedPico),
+      taxilitro_inicial: toNumber(taxilitroInicial), // ◄ CAMBIO: Mapeo dinámico
+      taxilitro_final: toNumber(taxilitroFinal), // ◄ CAMBIO: Mapeo dinámico
+      litros_pico: toNumber(cargaCombustible),
+      last_id_salida: 0,
+      obs_traspaso: obs,
+      obs_adicional: obsAdicional,
+      foto_obs_traspaso: base64Obs ? [base64Obs] : [],
+      foto_medicion_inicial: medicionInicial[0]?.foto_tanque
+        ? [medicionInicial[0].foto_tanque]
+        : [],
+      foto_taxilitro: base64TaxilitroInicial
+        ? [base64TaxilitroInicial]
+        : (existing?.foto_taxilitro ?? []), // ◄ GUARDADO LOCAL
+      foto_taxilitro_fin: base64TaxilitroFinal
+        ? [base64TaxilitroFinal]
+        : (existing?.foto_taxilitro_fin ?? []), // ◄ GUARDADO LOCAL
+      fecha: existing?.fecha ?? fecha,
+      hora: existing?.hora ?? hora,
+      firma_receptor: existing?.firma_receptor ?? [],
+      id_playero: Number(user.cedula),
+      id_encargado_receptor: Number(persona?.cedula) || 0,
     };
 
     await saveTraspaso(data);
@@ -213,6 +193,9 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       selectedPico,
       obs,
       obsAdicional,
+      cargaCombustible,
+      taxilitroInicial,
+      taxilitroFinal,
     };
     return JSON.stringify(actual) !== JSON.stringify(estadoInicial);
   }, [
@@ -224,17 +207,14 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     selectedPico,
     obs,
     obsAdicional,
+    cargaCombustible,
+    taxilitroInicial,
+    taxilitroFinal,
   ]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("beforeRemove", (e) => {
       if (isLoading || !estadoRestaurado) return;
-      // Bloquear completamente si hay carga activa
-      if (salida === 1) {
-        e.preventDefault();
-        return;
-      }
-      //if (!huboCambios()) return;
 
       e.preventDefault();
 
@@ -269,11 +249,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
           {
             text: "Guardar y salir",
             onPress: async () => {
-              // En traspaso el estado ya se guarda explícitamente con saveState()
-              // Solo navegamos — el storage ya tiene lo último guardado
-              //saveState();
-              if (medicionInicial?.length > 0) {
-                console.log("guardando medicion inicial");
+              if (medicionInicial && medicionInicial?.length > 0) {
                 saveState();
               }
               navigation.dispatch(e.data.action);
@@ -284,69 +260,9 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     });
 
     return unsubscribe;
-  }, [
-    navigation,
-    huboCambios,
-    isLoading,
-    estadoRestaurado,
-    salida,
-    removeTraspaso,
-    removePersona,
-  ]);
+  }, [navigation, huboCambios, isLoading, estadoRestaurado, medicionInicial]);
 
   async function handleSaveAll() {
-    if (medicionFinal.length === 0) {
-      Alert.alert(
-        "Medición final es requerida",
-        "Debe registrar la medición final del tanque receptor.",
-      );
-      return;
-    }
-    if (!firma) {
-      Alert.alert("Firma requerida", "Debe registrar la firma del receptor.");
-      return;
-    }
-
-    try {
-      const data: TraspasoDTO = await getStorageTraspaso();
-
-      data.json.firma_receptor = firma ? [firma] : [];
-      data.json.regla_altura_final = medicionFinal[0].regla.toString();
-      data.json.litros_tanque_final = medicionFinal[0].litros;
-      data.json.temp_final = medicionFinal[0].temperatura;
-      data.json.foto_medicion_final = medicionFinal[0].foto_tanque
-        ? [medicionFinal[0].foto_tanque]
-        : [];
-      data.json.obs_traspaso = [data.json.obs_traspaso, obsAdicional]
-        .filter((s) => s?.trim())
-        .join(" >> ");
-      data.json.litros_pico = Number(cargaCombustible.replace(",", "."));
-      data.json.taxilitro_inicial = totalizadorPicoInicial;
-      data.json.taxilitro_final = totalizadorPicoFinal;
-
-      // Clonar y limpiar campos internos
-      const payload = { ...data.json };
-      delete (payload as any).last_id_salida;
-      delete (payload as any).obs_adicional;
-
-      setIsLoading(true);
-
-      // Guardar en BD local (pendiente de sync con el servidor)
-      await saveTraspasoLocal(payload);
-
-      toastSuccess("Traspaso", "Traspaso guardado exitosamente.");
-      await removeTraspaso();
-      await removePersona();
-      navigation.navigate("home");
-    } catch (error) {
-      console.log(error);
-      toastError("Traspaso", "Ocurrió un error al guardar el traspaso.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function handleTraspaso() {
     if (!persona) {
       Alert.alert("Persona requerida", "Debe seleccionar un chofer/operador.");
       return;
@@ -365,188 +281,213 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       );
       return;
     }
-    if (!selectedPico) {
-      Alert.alert("Pico requerido", "Debe seleccionar un pico expedidor.");
+    // CAMBIO: Alerta actualizada de "Taxímetro" a "Taxilitro"
+    if (!taxilitroInicial || toNumber(taxilitroInicial) <= 0) {
+      Alert.alert(
+        "Taxilitro inicial requerido",
+        "Debe ingresar el valor numérico del taxilitro inicial.",
+      );
       return;
     }
-
-    const picoSurtidor = picos.find(
-      (pico) => pico.id_pico === Number(selectedPico),
-    );
-    setIdPicoSurtidor(Number(picoSurtidor?.id_pico_surtidor));
-
-    if (!picoSurtidor || picoSurtidor.id_pico_surtidor === 0) {
+    // CAMBIO: Alerta actualizada de "Taxímetro" a "Taxilitro"
+    if (!base64TaxilitroInicial) {
       Alert.alert(
-        "ID Pico Surtidor",
-        "El valor para el pico surtidor no fue encontrado.",
+        "Foto requerida",
+        "Debe capturar la foto del taxilitro inicial.",
       );
       return;
     }
     if (medicionInicial.length === 0) {
       Alert.alert(
         "Medición Inicial requerida",
-        "Debe registrar la medición inicial del tanque receptor.",
+        "Debe registrar la medición inicial.",
       );
       return;
     }
+    if (!cargaCombustible || toNumber(cargaCombustible) <= 0) {
+      Alert.alert(
+        "Litros requeridos",
+        "Debe ingresar una cantidad válida de litros cargados.",
+      );
+      return;
+    }
+    // CAMBIO: Alerta actualizada de "Taxímetro" a "Taxilitro"
+    if (!taxilitroFinal || toNumber(taxilitroFinal) <= 0) {
+      Alert.alert(
+        "Taxilitro final requerido",
+        "Debe ingresar el valor numérico del taxilitro final.",
+      );
+      return;
+    }
+    // CAMBIO: Alerta actualizada de "Taxímetro" a "Taxilitro"
+    if (!base64TaxilitroFinal) {
+      Alert.alert(
+        "Foto requerida",
+        "Debe capturar la foto del taxilitro final.",
+      );
+      return;
+    }
+    if (medicionFinal.length === 0) {
+      Alert.alert(
+        "Medición final es requerida",
+        "Debe registrar la medición final del tanque receptor.",
+      );
+      return;
+    }
+    if (!firma) {
+      Alert.alert("Firma requerida", "Debe registrar la firma del receptor.");
+      return;
+    }
+    const tipoTurno = await getTipoByBodega(Number(selectedBodegaOrigem));
+    if ((tipoTurno === "2") && !motivoConfirmado) {
+        setTurnoCerrado(true); // Muestra el modal del motivo
+        setIsLoading(false);
+        return;
+      }
 
-    // Guardar estado antes de iniciar la espera
-    if (!continuarCargaRef.current) saveState();
+    try {
+      const data: TraspasoDTO = await getStorageTraspaso();
 
-    // Marca el momento de inicio del despacho
-    timestampReferenciaRef.current = Date.now();
+      data.firma_receptor = firma ? [firma] : [];
+      data.regla_altura_final = medicionFinal[0].regla.toString();
+      data.litros_tanque_final = medicionFinal[0].litros;
+      data.temp_final = medicionFinal[0].temperatura;
+      data.foto_medicion_final = medicionFinal[0].foto_tanque
+        ? [medicionFinal[0].foto_tanque]
+        : [];
+      data.obs_traspaso = [data.obs_traspaso, obsAdicional]
+        .filter((s) => s?.trim())
+        .join(" >> ");
+      data.litros_pico = toNumber(cargaCombustible);
+      data.taxilitro_inicial = toNumber(taxilitroInicial);
+      data.taxilitro_final = toNumber(taxilitroFinal);
+      data.foto_taxilitro = base64TaxilitroInicial
+        ? [base64TaxilitroInicial]
+        : [];
+      data.foto_taxilitro_fin = base64TaxilitroFinal
+        ? [base64TaxilitroFinal]
+        : [];
 
-    setSalida(1);
-    setAndRefShouldContinue(true);
+      const payload = { ...data };
+      delete (payload as any).last_id_salida;
+      delete (payload as any).obs_adicional;
+
+      setIsLoading(true);
+
+      await saveTraspasoLocal(payload);
+      await anularUltimoFinTurnoPorBodega(payload.bod_origen, obsAdicional);
+
+      toastSuccess("Traspaso", "Traspaso guardado exitosamente.");
+      await removeTraspaso();
+      await removePersona();
+      navigation.navigate("home");
+    } catch (error) {
+      console.log(error);
+      toastError("Traspaso", "Ocurrió un error al guardar el traspaso.");
+    } finally {
+      setIsLoading(false);
+    }
   }
-
-  const promptStartIfNeeded = (stored: TraspasoDTO) => {
-    const litros = Number(stored?.json?.litros_pico) || 0;
-    // Si no hay litros y hay datos básicos, ofrece iniciar
-    if (litros === 0) {
-      Alert.alert(
-        "Traspaso pendiente",
-        "Aún no se despachó combustible. ¿Desea iniciar la carga ahora?",
-        [
-          {
-            text: "Sí",
-            onPress: () => {
-              continuarCargaRef.current = false; // es una 1ª tanda
-              setSalida(1);
-              setIsLoading(true);
-              setAndRefShouldContinue(true);
-              handleTraspaso(); // reautoriza y entra al loop
-            },
-          },
-          {
-            text: "No",
-            onPress: () => {
-              // Permite seguir editando cabecera / volver cuando quieras
-              setSalida(0);
-              setIsLoading(false);
-              setAndRefShouldContinue(false);
-            },
-            style: "cancel",
-          },
-        ],
-      );
-    }
-  };
-
-  const promptResumeIfNeeded = (stored: TraspasoDTO) => {
-    const litros = Number(stored?.json?.litros_pico) || 0;
-    const lastId = Number(stored?.json?.last_id_salida) || 0;
-    if (litros > 0 && lastId > 0) {
-      Alert.alert(
-        "Traspaso pendiente",
-        `Tiene ${litros.toFixed(2)} L registrados. ¿Desea continuar con otra tanda?`,
-        [
-          {
-            text: "Sí",
-            onPress: () => {
-              continuarCargaRef.current = true;
-              // Preparar e iniciar nueva tanda
-              setSalida(1);
-              setIsLoading(true);
-              setAndRefShouldContinue(true);
-              handleTraspaso();
-            },
-          },
-          {
-            text: "No",
-            onPress: () => {
-              // Mantener pendiente sin polling
-              continuarCargaRef.current = false;
-              setSalida(2);
-              setIsLoading(false);
-              setAndRefShouldContinue(false);
-            },
-            style: "cancel",
-          },
-        ],
-      );
-    }
-  };
 
   useEffect(() => {
     if (sucursal) {
       fetchBodegas();
 
       (async () => {
-        //await removeTraspaso();
-        //await removePersona();
         const storedTraspaso = await getStorageTraspaso();
+        let foto_obs_traspaso = storedTraspaso?.foto_obs_traspaso
+          ? storedTraspaso.foto_obs_traspaso[0]
+          : "";
+        let foto_medicion_inicial = storedTraspaso?.foto_medicion_inicial
+          ? storedTraspaso.foto_medicion_inicial[0]
+          : "";
 
-        if (storedTraspaso && storedTraspaso.json) {
-          const { json } = storedTraspaso;
+        // ◄ RECUPERACIÓN NUEVA
+        let fotoTaxilitroInit = storedTraspaso?.foto_taxilitro
+          ? storedTraspaso.foto_taxilitro[0]
+          : "";
+        let fotoTaxilitroEnd = storedTraspaso?.foto_taxilitro_fin
+          ? storedTraspaso.foto_taxilitro_fin[0]
+          : "";
+
+        if (storedTraspaso) {
           const personaStorage = await getStoragePersona();
 
-          setSelectedBodegaOrigem(json.bod_origen.toString());
-          setSelectedBodegaDestino(json.bod_destino.toString());
-          setSelectedPico(json.id_pico.toString());
-          setTotalizadorPicoInicial(json.taxilitro_inicial);
+          setSelectedBodegaOrigem(storedTraspaso.bod_origen.toString());
+          setSelectedBodegaDestino(storedTraspaso.bod_destino.toString());
+          setSelectedPico(storedTraspaso.id_pico.toString());
           setCargaCombustible(
-            (storedTraspaso.json.litros_pico ?? 0).toFixed(2),
+            storedTraspaso.litros_pico
+              ? storedTraspaso.litros_pico.toString()
+              : "",
           );
-          setTotalizadorPicoFinal(json.taxilitro_final);
-          setBase64Obs(json.foto_obs_traspaso[0] || "");
-          setObs(json.obs_traspaso ?? "");
-          setObsAdicional(json.obs_adicional ?? "");
-          setMotivoConfirmado(!!json.obs_adicional?.trim());
-          if (json.id_tanque_destino /*&& json.litros_tanque_inicial > 0*/) {
-            console.log("restaurandomedicion inicial");
+          setBase64Obs(foto_obs_traspaso);
+          setObs(storedTraspaso.obs_traspaso ?? "");
+          setObsAdicional(storedTraspaso.obs_adicional ?? "");
+          setMotivoConfirmado(!!storedTraspaso.obs_adicional?.trim());
+
+          // ◄ SETEO EN ESTADO LOCAL
+          setTaxilitroInicial(
+            storedTraspaso.taxilitro_inicial
+              ? storedTraspaso.taxilitro_inicial.toString()
+              : "",
+          );
+          setBase64TaxilitroInicial(fotoTaxilitroInit);
+          setTaxilitroFinal(
+            storedTraspaso.taxilitro_final
+              ? storedTraspaso.taxilitro_final.toString()
+              : "",
+          );
+          setBase64TaxilitroFinal(fotoTaxilitroEnd);
+
+          if (storedTraspaso.id_tanque_destino) {
             setMedicionInicial([
               {
-                id_tanque: json.id_tanque_destino.toString(),
-                regla: Number(json.regla_altura_inicial),
-                litros: json.litros_tanque_inicial,
-                temperatura: json.temp_inicial,
-                foto_tanque: json.foto_medicion_inicial[0] || "",
+                id_tanque: storedTraspaso.id_tanque_destino.toString(),
+                regla: Number(storedTraspaso.regla_altura_inicial),
+                litros: storedTraspaso.litros_tanque_inicial,
+                temperatura: storedTraspaso.temp_inicial,
+                foto_tanque: foto_medicion_inicial,
               },
             ]);
+          } else {
+            setMedicionInicial([]); // ◄ Forzar a que siga siendo un array y nunca undefined
           }
-          // Después de setMedicionInicial(...)
-          if (json.regla_altura_final && json.litros_tanque_final > 0) {
+          if (
+            storedTraspaso.regla_altura_final &&
+            storedTraspaso.litros_tanque_final > 0
+          ) {
             setMedicionFinal([
               {
-                id_tanque: json.id_tanque_destino.toString(),
-                regla: Number(json.regla_altura_final),
-                litros: json.litros_tanque_final,
-                temperatura: json.temp_final,
-                foto_tanque: json.foto_medicion_final?.[0] || "",
+                id_tanque: storedTraspaso.id_tanque_destino.toString(),
+                regla: Number(storedTraspaso.regla_altura_final),
+                litros: storedTraspaso.litros_tanque_final,
+                temperatura: storedTraspaso.temp_final,
+                foto_tanque: storedTraspaso.foto_medicion_final?.[0] || "",
               },
             ]);
           }
 
           setPersona(personaStorage);
-
-          // NO inicies polling aquí
           setIsLoading(false);
-          setAndRefShouldContinue(false);
 
           setEstadoInicial({
             persona: personaStorage,
-            selectedBodegaOrigem: json.bod_origen.toString(),
-            selectedBodegaDestino: json.bod_destino.toString(),
-            selectedPico: json.id_pico.toString(),
-            obs: json.obs_traspaso ?? "", // ← antes era ""
-            obsAdicional: json.obs_adicional ?? "", // ← antes era ""
+            selectedBodegaOrigem: storedTraspaso.bod_origen.toString(),
+            selectedBodegaDestino: storedTraspaso.bod_destino.toString(),
+            selectedPico: storedTraspaso.id_pico.toString(),
+            obs: storedTraspaso.obs_traspaso ?? "",
+            obsAdicional: storedTraspaso.obs_adicional ?? "",
+            cargaCombustible: storedTraspaso.litros_pico
+              ? storedTraspaso.litros_pico.toString()
+              : "",
+            taxilitroInicial: storedTraspaso.taxilitro_inicial
+              ? storedTraspaso.taxilitro_inicial.toString()
+              : "",
+            taxilitroFinal: storedTraspaso.taxilitro_final
+              ? storedTraspaso.taxilitro_final.toString()
+              : "",
           });
-
-          // 2do cinturón ante re-procesos:
-          idAutorizadoRef.current = json.last_id_salida || 0;
-
-          const litros = Number(json.litros_pico) || 0;
-
-          if (litros > 0) {
-            // Traspaso parcial con litros: mostrar "Finalizado" (pendiente) y ofrecer reanudar
-            setSalida(2);
-            promptResumeIfNeeded(storedTraspaso); // <-- ya lo tienes
-          } else {
-            // Traspaso aún no cargó nada: volver a estado inicial y ofrecer comenzar
-            setSalida(0);
-            promptStartIfNeeded(storedTraspaso); // <-- ver función abajo
-          }
         } else {
           setEstadoInicial({
             persona: null,
@@ -555,6 +496,9 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
             selectedPico: "",
             obs: "",
             obsAdicional: "",
+            cargaCombustible: "",
+            taxilitroInicial: "",
+            taxilitroFinal: "",
           });
           setSelectedBodegaOrigem("");
         }
@@ -566,7 +510,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     if (route.params?.onPersona) {
       setPersona(route.params.onPersona);
     }
-
     if (route.params?.onFirma) {
       setFirma(route.params.onFirma);
     }
@@ -583,7 +526,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     route.params?.onFirma,
   ]);
 
-  // Agregá este nuevo useEffect para guardar cuando medicionInicial cambia:
   useEffect(() => {
     if (medicionInicial.length > 0) {
       saveState();
@@ -591,15 +533,31 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   }, [medicionInicial]);
 
   useEffect(() => {
+    if (cargaCombustible !== undefined) {
+      saveState();
+    }
+  }, [
+    cargaCombustible,
+    selectedBodegaOrigem,
+    selectedBodegaDestino,
+    selectedPico,
+    obs,
+    obsAdicional,
+    taxilitroInicial,
+    base64TaxilitroInicial,
+    taxilitroFinal,
+    base64TaxilitroFinal,
+  ]);
+
+  useEffect(() => {
     if (medicionFinal.length > 0) {
-      // ← sacar estadoRestaurado
       (async () => {
         const stored = await getStorageTraspaso();
-        if (stored?.json) {
-          stored.json.regla_altura_final = medicionFinal[0].regla.toString();
-          stored.json.litros_tanque_final = medicionFinal[0].litros;
-          stored.json.temp_final = medicionFinal[0].temperatura;
-          stored.json.foto_medicion_final = medicionFinal[0].foto_tanque
+        if (stored) {
+          stored.regla_altura_final = medicionFinal[0].regla.toString();
+          stored.litros_tanque_final = medicionFinal[0].litros;
+          stored.temp_final = medicionFinal[0].temperatura;
+          stored.foto_medicion_final = medicionFinal[0].foto_tanque
             ? [medicionFinal[0].foto_tanque]
             : [];
           await saveTraspaso(stored);
@@ -614,97 +572,14 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     }
   }, [selectedBodegaOrigem]);
 
-  const fetchBox = useCallback(async () => {
-    try {
-      const despacho = await getNuevoDespachoByPico(
-        idPico_surtidor,
-        timestampReferenciaRef.current,
-      );
-
-      if (!despacho) {
-        // No hay despacho nuevo todavía → seguir esperando
-        return;
-      }
-
-      // Llegó un despacho nuevo → la carga finalizó
-      const litros = despacho.litros;
-      const taxIni = despacho.taxilitroInicial;
-      const taxFin = despacho.taxilitroFinal;
-
-      // Actualizar acumulados (soporte para múltiples tandas)
-      const nuevosCargados =
-        litros + (continuarCargaRef.current ? toNumber(cargaCombustible) : 0);
-      const nuevoTaxIni = continuarCargaRef.current
-        ? totalizadorPicoInicial
-        : taxIni;
-
-      setTotalizadorPicoInicial(nuevoTaxIni);
-      setTotalizadorPicoFinal(taxFin);
-      setCargaCombustible(
-        nuevosCargados.toLocaleString("es-PY", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }),
-      );
-
-      // Guardar en storage incluyendo los totalizadores actualizados
-      const existing = await getStorageTraspaso();
-      if (existing?.json) {
-        existing.json.taxilitro_inicial = nuevoTaxIni;
-        existing.json.taxilitro_final = taxFin;
-        existing.json.litros_pico = nuevosCargados;
-        existing.json.last_id_salida = despacho.id;
-        await saveTraspaso(existing);
-      }
-
-      setAndRefShouldContinue(false);
-      setSalida(2);
-      setIsLoading(false);
-      setLitrosCarga(true);
-      continuarCargaRef.current = false;
-    } catch (error) {
-      console.error("Error al consultar despacho en BD:", error);
-    }
-  }, [idPico_surtidor, cargaCombustible, totalizadorPicoInicial]);
-
-  // DESPUÉS:
-  const fetchLoop = useCallback(async () => {
-    if (estadoRestaurado && shouldContinueRef.current) {
-      await fetchBox();
-    }
-
-    // ← Leyendo la ref DESPUÉS de que fetchBox terminó (puede haber cambiado)
-    if (shouldContinueRef.current) {
-      intervalRef.current = setTimeout(() => {
-        fetchLoop();
-      }, 3000);
-    }
-  }, [estadoRestaurado, fetchBox]);
-
-  useEffect(() => {
-    if (estadoRestaurado && shouldContinue) {
-      fetchLoop();
-    }
-
-    return () => {
-      if (intervalRef.current) {
-        clearTimeout(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, [estadoRestaurado, shouldContinue, fetchLoop]);
-
   return turnoCerrado && !motivoConfirmado ? (
     <View className="flex-1">
-      <ScreenHeader
-        title="Traspaso Excepcional"
-        disableBackButton={salida === 2}
-      />
+      <ScreenHeader title="Traspaso Excepcional" />
 
       <View style={styles.overlay}>
         <View style={styles.modalContent}>
           <Text className="font-bold text-red-500 text-center text-2xl underline mb-4">
-            Importente!!!
+            Importante!!!
           </Text>
           <Text className="font-medium text-justify text-xl mb-4">
             Está intentando registrar un traspaso y el turno se encuentra
@@ -731,48 +606,47 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                 );
                 return;
               }
-              // Guardar el motivo explícitamente antes de cerrar el modal
               let stored = await getStorageTraspaso();
-              if (stored?.json) {
-                // Ya existe un traspaso guardado — solo actualizar los campos de motivo
-                stored.json.obs_traspaso = obs;
-                stored.json.obs_adicional = obsAdicional;
+              if (stored) {
+                stored.obs_traspaso = obs;
+                stored.obs_adicional = obsAdicional;
                 await saveTraspaso(stored);
               } else {
-                // Aún no hay nada en storage (medicionInicial vacía, saveState no corrió)
-                // Guardamos un estado mínimo para no perder el motivo
                 const now = new Date();
                 const fecha = now.toISOString().slice(0, 10);
                 const hora = now.toTimeString().slice(0, 8);
 
-                // En el else del handler del modal:
                 const minimalData: TraspasoDTO = {
-                  json: {
-                    bod_origen: Number(selectedBodegaOrigem),
-                    bod_destino: Number(selectedBodegaDestino),
-                    id_tanque_destino: 0,
-                    regla_altura_inicial: "",
-                    litros_tanque_inicial: 0,
-                    temp_inicial: 0,
-                    regla_altura_final: "",
-                    litros_tanque_final: 0,
-                    temp_final: 0,
-                    foto_medicion_final: [],
-                    id_pico: Number(selectedPico),
-                    taxilitro_inicial: 0,
-                    taxilitro_final: 0,
-                    litros_pico: 0,
-                    last_id_salida: 0,
-                    obs_traspaso: obs,
-                    obs_adicional: obsAdicional,
-                    foto_obs_traspaso: base64Obs ? [base64Obs] : [],
-                    foto_medicion_inicial: [],
-                    fecha,
-                    hora,
-                    firma_receptor: [],
-                    id_playero: Number(user.cedula),
-                    id_encargado_receptor: Number(persona?.cedula) || 0,
-                  },
+                  bod_origen: Number(selectedBodegaOrigem),
+                  bod_destino: Number(selectedBodegaDestino),
+                  id_tanque_destino: 0,
+                  regla_altura_inicial: "",
+                  litros_tanque_inicial: 0,
+                  temp_inicial: 0,
+                  regla_altura_final: "",
+                  litros_tanque_final: 0,
+                  temp_final: 0,
+                  foto_medicion_final: [],
+                  id_pico: Number(selectedPico),
+                  taxilitro_inicial: toNumber(taxilitroInicial),
+                  taxilitro_final: toNumber(taxilitroFinal),
+                  foto_taxilitro: base64TaxilitroInicial
+                    ? [base64TaxilitroInicial]
+                    : [],
+                  foto_taxilitro_fin: base64TaxilitroFinal
+                    ? [base64TaxilitroFinal]
+                    : [],
+                  litros_pico: toNumber(cargaCombustible),
+                  last_id_salida: 0,
+                  obs_traspaso: obs,
+                  obs_adicional: obsAdicional,
+                  foto_obs_traspaso: base64Obs ? [base64Obs] : [],
+                  foto_medicion_inicial: [],
+                  fecha,
+                  hora,
+                  firma_receptor: [],
+                  id_playero: Number(user.cedula),
+                  id_encargado_receptor: Number(persona?.cedula) || 0,
                 };
                 await saveTraspaso(minimalData);
                 await savePersona(persona);
@@ -789,7 +663,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     </View>
   ) : (
     <View className="flex-1">
-      <ScreenHeader title="Traspaso" disableBackButton={salida === 1} />
+      <ScreenHeader title="Traspaso" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
@@ -800,13 +674,9 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
           showsVerticalScrollIndicator={false}
         >
           <View className="flex-1 items-center p-4 gap-4">
-            <InputCard
-              title="Chofer/Operador"
-              required={true}
-              locked={salida !== 0}
-            >
+            <InputCard title="Chofer/Operador" required={true}>
               <TextSearch
-                enabled={salida === 0}
+                enabled={true}
                 textValue={persona?.nombre_apellido}
                 placeholder="Buscar persona"
                 onPress={() =>
@@ -817,15 +687,12 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                 }
               />
             </InputCard>
-            {bodegaOrigem.length > 1 && (
-              <InputCard
-                title="Bodega de Origen"
-                required={true}
-                locked={salida !== 0}
-              >
+
+            {bodegaOrigem && bodegaOrigem.length > 1 && (
+              <InputCard title="Bodega de Origen" required={true}>
                 <View className="flex-row items-center p-2 gap-2">
                   <Select
-                    enabled={salida === 0}
+                    enabled={true}
                     data={bodegaOrigem}
                     isLoading={isLoading}
                     selectedValue={selectedBodegaOrigem}
@@ -836,15 +703,12 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                 </View>
               </InputCard>
             )}
-            <InputCard
-              title="Bodega receptora"
-              required={true}
-              locked={salida !== 0}
-            >
+
+            <InputCard title="Bodega receptora" required={true}>
               <View className="flex-row items-center p-2 gap-2">
                 <Select
-                  enabled={salida === 0}
-                  data={bodegaDestino}
+                  enabled={true}
+                  data={bodygaDestino}
                   isLoading={isLoading}
                   selectedValue={selectedBodegaDestino}
                   setSelectedValue={setSelectedBodegaDestino}
@@ -853,48 +717,66 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                 />
               </View>
             </InputCard>
-            <InputCard
-              title="Pico expendedor:"
-              required={true}
-              locked={salida !== 0}
-            >
-              {salida === 0 && (
-                <Select
-                  enabled={salida === 0}
-                  data={picos}
-                  isLoading={isLoading}
-                  selectedValue={selectedPico}
-                  setSelectedValue={setSelectedPico}
-                  labelField="descripcion_pico"
-                  valueField="id_pico"
-                />
-              )}
-              {salida !== 0 && (
-                <Text className="text-lg text-black font-bold">
-                  Pico seleccionado: {selectedPico}
-                </Text>
-              )}
+
+            <InputCard title="Pico expendedor:" required={true}>
+              <Select
+                enabled={true}
+                data={picos}
+                isLoading={isLoading}
+                selectedValue={selectedPico}
+                setSelectedValue={setSelectedPico}
+                labelField="descripcion_pico"
+                valueField="id_pico"
+              />
             </InputCard>
+
+            {/* ◄ CAMBIO: "Taxímetro Inicial" cambiado por "Taxilitro Inicial" */}
+            <InputCard title="Taxilitro Inicial" required>
+              <View className="flex-row items-center p-2 gap-2">
+                <Input
+                  value={taxilitroInicial}
+                  placeholder="Ej: 45201,20"
+                  keyboardType="numeric"
+                  onChangeText={setTaxilitroInicial}
+                />
+              </View>
+              <View className="flex-row items-center p-2 gap-2">
+                <Photo
+                  form="button"
+                  iconSize="lg"
+                  iconColor={
+                    base64TaxilitroInicial && base64TaxilitroInicial.length > 0
+                      ? "#05a722"
+                      : "#000"
+                  }
+                  setImage={(base64) => setBase64TaxilitroInicial(base64)}
+                  disabled={isLoading}
+                />
+              </View>
+            </InputCard>
+
             <InputCard title="Medición Inicial del Tanque Receptor" required>
               <Button
-                disabled={selectedBodegaDestino === "" || salida === 2}
+                disabled={selectedBodegaDestino === ""}
                 title="Medir"
                 icon={
-                  medicionInicial?.length > 0 ? CheckCheck : RulerDimensionLine
+                  medicionInicial && medicionInicial?.length > 0
+                    ? CheckCheck
+                    : RulerDimensionLine
                 }
-                iconColor={medicionInicial?.length > 0 ? "#0af706" : "#000"}
+                iconColor={
+                  medicionInicial && medicionInicial?.length > 0
+                    ? "#0af706"
+                    : "#000"
+                }
                 iconSize="md"
                 onPress={() => {
-                  if (medicionInicial?.length > 0) {
-                    // Gere um alerta com as opções de continuar ou não
+                  if (medicionInicial && medicionInicial?.length > 0) {
                     Alert.alert(
                       "Medición existente",
                       "Ya existe una medición para esta bodega. ¿Desea continuar?",
                       [
-                        {
-                          text: "Cancelar",
-                          style: "cancel",
-                        },
+                        { text: "Cancelar", style: "cancel" },
                         {
                           text: "Continuar",
                           onPress: () => {
@@ -916,178 +798,138 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
               />
             </InputCard>
 
-            <InputCard title="" locked={salida !== 0}>
-              <View className="flex-row p-2 gap-2">
-                <View className="flex-1 justify-center items-center gap-2">
-                  {salida === 0 && (
-                    <>
-                      <Text className="text-xl text-black font-bold">
-                        Registrar carga
-                      </Text>
-                      <Button
-                        title="Comenzar"
-                        onPress={handleTraspaso}
-                        isLoading={isLoading}
-                        icon={Fuel}
-                        iconSize="md"
-                        iconColor="#000"
-                      />
-                    </>
-                  )}
-
-                  {salida === 1 && (
-                    <>
-                      <Text className="text-xl text-black font-bold">
-                        Cargando...
-                      </Text>
-                      <Loading />
-                    </>
-                  )}
-                  {salida === 2 && (
-                    <>
-                      <Text className="text-xl text-black font-bold">
-                        Finalizado
-                      </Text>
-                    </>
-                  )}
-                </View>
-                <View className="flex-1 items-center gap-2">
-                  <Text className="text-xl text-black font-bold">
-                    Litros Cargados
-                  </Text>
-                  <Text className="text-2xl text-black font-bold">
-                    {cargaCombustible}
-                  </Text>
+            <InputCard title="Litros Cargados" required>
+              <View className="flex-row items-center p-2 gap-2 w-full">
+                <View className="flex-1">
+                  <Input
+                    value={cargaCombustible}
+                    placeholder="Ingrese los litros manualmente (Ej: 150,00)"
+                    keyboardType="numeric"
+                    onChangeText={setCargaCombustible}
+                  />
                 </View>
               </View>
             </InputCard>
-            {salida === 2 && (
-              <>
-                <InputCard title="Medición Final del Tanque Receptor" required>
-                  <Button
-                    disabled={selectedBodegaDestino === ""}
-                    title="Medir"
-                    icon={
-                      medicionFinal?.length > 0
-                        ? CheckCheck
-                        : RulerDimensionLine
-                    }
-                    iconColor={medicionFinal?.length > 0 ? "#0af706" : "#000"}
-                    iconSize="md"
-                    onPress={() => {
-                      if (medicionFinal?.length > 0) {
-                        // Gere um alerta com as opções de continuar ou não
-                        Alert.alert(
-                          "Medición existente",
-                          "Ya existe una medición para esta bodega. ¿Desea continuar?",
-                          [
-                            {
-                              text: "Cancelar",
-                              style: "cancel",
-                            },
-                            {
-                              text: "Continuar",
-                              onPress: () => {
-                                navigation.navigate("medicion", {
-                                  fromScreen: "traspaso",
-                                  idBodega: selectedBodegaDestino,
-                                });
-                              },
-                            },
-                          ],
-                        );
-                      } else {
-                        navigation.navigate("medicion", {
-                          fromScreen: "traspaso",
-                          idBodega: selectedBodegaDestino,
-                        });
-                      }
-                    }}
+
+            <InputCard title="Medición Final del Tanque Receptor" required>
+              <Button
+                disabled={selectedBodegaDestino === ""}
+                title="Medir"
+                icon={
+                  medicionFinal && medicionFinal!.length > 0
+                    ? CheckCheck
+                    : RulerDimensionLine
+                }
+                iconColor={
+                  medicionFinal && medicionFinal?.length > 0
+                    ? "#0af706"
+                    : "#000"
+                }
+                iconSize="md"
+                onPress={() => {
+                  if (medicionFinal && medicionFinal?.length > 0) {
+                    Alert.alert(
+                      "Medición existente",
+                      "Ya existe una medición para esta bodega. ¿Desea continuar?",
+                      [
+                        { text: "Cancelar", style: "cancel" },
+                        {
+                          text: "Continuar",
+                          onPress: () => {
+                            navigation.navigate("medicion", {
+                              fromScreen: "traspaso",
+                              idBodega: selectedBodegaDestino,
+                            });
+                          },
+                        },
+                      ],
+                    );
+                  } else {
+                    navigation.navigate("medicion", {
+                      fromScreen: "traspaso",
+                      idBodega: selectedBodegaDestino,
+                    });
+                  }
+                }}
+              />
+            </InputCard>
+
+            {/* ◄ CAMBIO: "Taxímetro Final" cambiado por "Taxilitro Final" */}
+            <InputCard title="Taxilitro Final" required>
+              <View className="flex-row items-center p-2 gap-2">
+                <Input
+                  value={taxilitroFinal}
+                  placeholder="Ej: 45351,20"
+                  keyboardType="numeric"
+                  onChangeText={setTaxilitroFinal}
+                />
+              </View>
+              <View className="flex-row items-center p-2 gap-2">
+                <Photo
+                  form="button"
+                  iconSize="lg"
+                  iconColor={
+                    base64TaxilitroFinal && base64TaxilitroFinal.length > 0
+                      ? "#05a722"
+                      : "#000"
+                  }
+                  setImage={(base64) => setBase64TaxilitroFinal(base64)}
+                  disabled={isLoading}
+                />
+              </View>
+            </InputCard>
+
+            <InputCard title="Observaciones">
+              <View className="flex-row items-center p-2 gap-2">
+                <View className="flex-1">
+                  <Input
+                    multiline
+                    numberOfLines={4}
+                    placeholder="observaciones"
+                    value={obs}
+                    onChangeText={setObs}
                   />
-                </InputCard>
-                <InputCard title="Observaciones">
-                  <View className="flex-row items-center p-2 gap-2">
-                    <Input
-                      multiline
-                      numberOfLines={4}
-                      placeholder="observaciones"
-                      value={obs}
-                      onChangeText={setObs}
-                    />
-                    <View className="flex-col gap-6">
-                      <Photo
-                        form="icon"
-                        iconSize="lg"
-                        iconColor={base64Obs.length > 0 ? "#05a722" : "#000"}
-                        setImage={(base64) => setBase64Obs(base64)}
-                        disabled={isLoading}
-                      />
-                    </View>
-                  </View>
-                </InputCard>
-                <View className="flex-row gap-4">
-                  <Button
-                    title="Firmar"
-                    onPress={() =>
-                      navigation.navigate("firma", {
-                        fromScreen: "traspaso",
-                        persona: persona,
-                      })
-                    }
-                    isLoading={isLoading}
-                    icon={Pencil}
-                    iconSize="md"
-                    iconColor="#000"
-                  />
-                  {firma && (
-                    <Button
-                      title="Grabar"
-                      onPress={() => handleSaveAll()}
-                      isLoading={isLoading}
-                      icon={SaveAll}
-                      iconSize="md"
-                      iconColor="#000"
-                    />
-                  )}
                 </View>
-              </>
-            )}
+              </View>
+              <View className="flex-row items-center p-2 gap-2">
+                <Photo
+                    form="button"
+                    iconSize="lg"
+                    iconColor={
+                      base64Obs && base64Obs.length > 0 ? "#05a722" : "#000"
+                    }
+                    setImage={(base64) => setBase64Obs(base64)}
+                    disabled={isLoading}
+                  />
+              </View>
+            </InputCard>
+
+            <View className="flex-row gap-4">
+              <Button
+                title="Firmar"
+                onPress={() =>
+                  navigation.navigate("firma", {
+                    fromScreen: "traspaso",
+                    persona: persona,
+                  })
+                }
+                isLoading={isLoading}
+                icon={Pencil}
+                iconSize="md"
+                iconColor="#000"
+              />
+              {firma && (
+                <Button
+                  title="Grabar"
+                  onPress={() => handleSaveAll()}
+                  isLoading={isLoading}
+                  icon={SaveAll}
+                  iconSize="md"
+                  iconColor="#000"
+                />
+              )}
+            </View>
           </View>
-          {/* <View className='flex-row items-center p-4'>
-						<View>
-							<Button
-								title='Remover Estado'
-								onPress={async () => {
-									await removeTraspaso();
-									await removePersona();
-								}}
-								isLoading={isLoading}
-								icon={SaveAll}
-								iconSize='md'
-								iconColor='#000'
-							/>
-						</View>
-						<View>
-							<Text className='text-black font-bold'>
-								Pico Selecionado:{selectedPico}
-							</Text>
-							<Text className='text-black font-bold'>
-								IdPicoSelecionado:{idPico_surtidor}
-							</Text>
-							<Text className='text-black font-bold'>
-								Estado Inicial:
-								{estadoRestaurado ? "Restaurado" : "No restaurado"}
-							</Text>
-							<Text className='text-black font-bold'>
-								ShouldContinue:
-								{shouldContinue ? "True" : "False"}
-							</Text>
-							<Text className='text-black font-bold'>
-								Salida:
-								{salida}
-							</Text>
-						</View>
-					</View> */}
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -1104,7 +946,6 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
-    //justifyContent: "center",
     alignItems: "center",
   },
   modalContent: {
@@ -1113,7 +954,7 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "#fff",
     borderRadius: 10,
-    elevation: 5, // Android shadow
+    elevation: 5,
   },
   title: {
     fontSize: 18,

@@ -1,4 +1,4 @@
-export type MedicionDTO = {
+	export type MedicionDTO = {
 	// tanque: string;
 	id_tanque: string;
 	regla: number;

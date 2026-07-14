@@ -13,6 +13,7 @@ export async function getSesionUsuarioActivoLocal() {
     const resultado = await db
       .select({
         cedula: usuariosApp.cedula,
+        idUser: usuariosApp.idUser,
         id_sucursal: sucursales.idSucursal,
         descripcion_sucursal: sucursales.descripcionSucursal,
       })

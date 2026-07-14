@@ -25,7 +25,6 @@ import { TextSearch } from "@/components/TextSearch";
 import { PersonaDTO } from "@/dto/PersonaDTO";
 import { Fuel, Pencil, SaveAll } from "lucide-react-native";
 import { Button } from "@/components/Button";
-import { SequenciaCalibracionDTO } from "@/dto/SequenciaCalibracionDTO";
 import {
   removeCalibracion,
   getStorageCalibracion,
@@ -37,9 +36,25 @@ import {
 // ── BD ────────────────────────────────────────────────────────────────────────
 import { getPicosByBodega, getPicos } from "@DBmodules/picoDB";
 import { getBodegasByIdSucursal } from "@DBmodules/bodegaDB";
-import { getTurnoStatusLocal } from "@DBmodules/turnoBD";
-import { db } from "@/backend/db/client";
-import { calibraciones } from "@/backend/db/schema";
+import { anularUltimoFinTurnoPorBodega, getTipoByBodega, getTurnoStatusLocal } from "@DBmodules/turnoBD";
+import { CalibracionDTO } from "@/dto/CalibracionDTO";
+import { saveCalibracionLocal } from "@/backend/db/modules/calibracionDB";
+
+// Interfaz extendida localmente para dar soporte a las nuevas fotos de taxilitros
+interface MedicionesCalibracionExtendida {
+  taxilitroInicial: number;
+  taxilitroFinal: number;
+  fotoInicialTaxilitro: string;
+  fotoFinalTaxilitro: string;
+  totalMediciones: number;
+  sequencias: {
+    valor_medicion: string;
+    foto_medicion: string;
+    taxilitro: number;
+    litros_cargados: number;
+    foto_taxilitro_carga: string;
+  }[];
+}
 
 export function Calibracion({
   navigation,
@@ -49,6 +64,9 @@ export function Calibracion({
     { label: "Verificación", value: "1" },
     { label: "Calibración", value: "2" },
   ]);
+  const [valoresTemporales, setValoresTemporales] = useState<FormData | null>(
+      null,
+    );
   const [tipoOperacionSeleccionado, setTipoOperacionSeleccionado] =
     useState("");
   const [turnoCerrado, setTurnoCerrado] = useState(false);
@@ -69,9 +87,12 @@ export function Calibracion({
   const [salida, setSalida] = useState(0);
   const [motivoConfirmado, setMotivoConfirmado] = useState(false);
 
-  const [mediciones, setMediciones] = useState<SequenciaCalibracionDTO>({
+  // Estado local adaptado a la interfaz extendida con fotos
+  const [mediciones, setMediciones] = useState<MedicionesCalibracionExtendida>({
     taxilitroInicial: 0,
     taxilitroFinal: 0,
+    fotoInicialTaxilitro: "",
+    fotoFinalTaxilitro: "",
     totalMediciones: 0,
     sequencias: [],
   });
@@ -111,9 +132,11 @@ export function Calibracion({
         photoPrecintoAtual,
         photoPrecintoColocado,
         firma,
-        tipoOperacionSeleccionado,
+        tipoOperationSeleccionado: tipoOperacionSeleccionado, // ◄ Corregido a tipoOperationSeleccionado
         taxilitroInicial: mediciones.taxilitroInicial,
         taxilitroFinal: mediciones.taxilitroFinal,
+        fotoInicialTaxilitro: mediciones.fotoInicialTaxilitro, // ◄ Añadido
+        fotoFinalTaxilitro: mediciones.fotoFinalTaxilitro,     // ◄ Añadido
         totalMediciones: mediciones.totalMediciones,
         sequencias: mediciones.sequencias,
         turnoCerrado,
@@ -194,7 +217,7 @@ export function Calibracion({
         const estadoGuardado = await getStorageCalibracion();
         if (estadoGuardado) {
           setTipoOperacionSeleccionado(
-            estadoGuardado.tipoOperacionSeleccionado,
+            estadoGuardado.tipoOperationSeleccionado ?? "", // ◄ Corregido a tipoOperationSeleccionado
           );
           setSelectedPico(estadoGuardado.selectedPico);
           setObs(estadoGuardado.obs);
@@ -216,6 +239,8 @@ export function Calibracion({
             setMediciones({
               taxilitroInicial: estadoGuardado.taxilitroInicial,
               taxilitroFinal: estadoGuardado.taxilitroFinal,
+              fotoInicialTaxilitro: estadoGuardado.fotoInicialTaxilitro ?? "", // ◄ Añadido
+              fotoFinalTaxilitro: estadoGuardado.fotoFinalTaxilitro ?? "",     // ◄ Añadido
               totalMediciones: estadoGuardado.totalMediciones,
               sequencias: estadoGuardado.sequencias,
             });
@@ -232,7 +257,17 @@ export function Calibracion({
 
   // ─── Parámetros de navegación (retorno desde subpantallas) ────────────────
   useEffect(() => {
-    if (route.params?.onSequencia) setMediciones(route.params.onSequencia);
+    if (route.params?.onSequencia) {
+      const seqData = route.params.onSequencia as any;
+      setMediciones({
+        taxilitroInicial: seqData.taxilitroInicial,
+        taxilitroFinal: seqData.taxilitroFinal,
+        fotoInicialTaxilitro: seqData.fotoInicialTaxilitro || "", // ◄ Corregido
+        fotoFinalTaxilitro: seqData.fotoFinalTaxilitro || "",     // ◄ Corregido
+        totalMediciones: seqData.totalMediciones,
+        sequencias: seqData.sequencias || [],
+      });
+    }
     if (route.params?.onPersona) setPersona(route.params.onPersona);
     if (route.params?.onFirma) setFirma(route.params.onFirma);
   }, [
@@ -349,14 +384,13 @@ export function Calibracion({
       );
       return;
     }
-    navigation.navigate("sequencias", { pico_surtidor: Number(selectedPico) });
+    navigation.navigate("sequencias", { pico_surtidor: Number(selectedPico), descripcion_pico: picoSurtidor?.descripcion_pico});
   }
 
-  // ─── Fetch de picos desde BD (reemplaza api.get /api/picos) ──────────────
+  // ─── Fetch de picos desde BD ──────────────────────────────────────────────
   async function fetchPicos() {
     setIsLoading(true);
     try {
-      // Estado del turno desde BD
       const turnoStatus = await getTurnoStatusLocal(sucursal.id_sucursal);
       if (
         turnoStatus.status === "cerrado" ||
@@ -365,10 +399,8 @@ export function Calibracion({
         setTurnoCerrado(true);
       }
 
-      // Bodegas de la sucursal → picos de cada bodega
       const bodegas = await getBodegasByIdSucursal(sucursal.id_sucursal);
       if (bodegas.length > 0) {
-        // Cargar picos de todas las bodegas de la sucursal
         const todasLasBodegas = bodegas.map((b) => Number(b.id_bodega));
         let todosPicos: PicoDTO[] = [];
         for (const idBod of todasLasBodegas) {
@@ -377,7 +409,6 @@ export function Calibracion({
         }
         setPicos(todosPicos);
       } else {
-        // Fallback: todos los picos
         const todosPicos = await getPicos();
         setPicos(todosPicos);
       }
@@ -389,7 +420,7 @@ export function Calibracion({
     }
   }
 
-  // ─── Guardar todo en BD local (reemplaza api.post /api/calibraciones) ─────
+  // ─── Guardar todo en BD local ─────────────────────────────────────────────
   async function saveAllData() {
     if (!persona) {
       Alert.alert(
@@ -417,8 +448,18 @@ export function Calibracion({
           id_pico = pico.id_pico;
         }
       });
+      
+      const tipoTurno = await getTipoByBodega(Number(id_bodega));
+      
+      if ((tipoTurno === "2") && !motivoConfirmado) {
+        //setValoresTemporales(data); // Respaldamos el objeto data completo
+        setTurnoCerrado(true); // Muestra el modal del motivo
+        setIsLoading(false);
+        return;
+      }      
 
-      const payload = {
+      // Mapeo adaptado con el tipado dinámico para incluir las nuevas propiedades al payload
+      const payload: any = {
         fecha_hora: fecha,
         hora,
         bodega: id_bodega,
@@ -428,6 +469,11 @@ export function Calibracion({
         pico: id_pico,
         taxilitro_inicial: mediciones.taxilitroInicial,
         taxilitro_final: mediciones.taxilitroFinal,
+        
+        // Inyección de fotos de taxilitros globales corregidas
+        foto_inicial_taxilitro: mediciones.fotoInicialTaxilitro,
+        foto_final_taxilitro: mediciones.fotoFinalTaxilitro,
+
         nro_precinto_retirado:
           tipoOperacionSeleccionado === "2" ? numeroPrecintoAtual : "",
         nro_precinto_colocado:
@@ -444,24 +490,17 @@ export function Calibracion({
           foto_med_balde: medicion.foto_medicion,
           taxilitro_carga: medicion.taxilitro.toString(),
           litros_cargados: medicion.litros_cargados ?? 0,
+          foto_taxilitro_carga: medicion.foto_taxilitro_carga, // ◄ Foto interna de cada secuencia
         })),
       };
 
-      // Guardar en BD local (tabla calibraciones, pendiente de sync)
-      await db.insert(calibraciones).values({
-        json: JSON.stringify(payload),
-        tipo:
-          tipoOperacionSeleccionado === "1" ? "VERIFICACION" : "CALIBRACION",
-        sync: 0,
-        fecha: Date.now(),
-        hora: Date.now(),
-      });
-
+      await saveCalibracionLocal(payload);
+      await anularUltimoFinTurnoPorBodega(id_bodega, obsAdicional);
       await removeCalibracion();
 
       toastSuccess(
         "Calibración guardada",
-        "Los datos se han guardado correctamente.",
+        "Los datos se han guardado correctamente."
       );
       navigation.navigate("home");
     } catch (error) {
@@ -488,7 +527,7 @@ export function Calibracion({
           <View style={styles.overlay}>
             <View style={styles.modalContent}>
               <Text className="font-bold text-red-500 text-center text-2xl underline mb-4">
-                Importante!!!
+                Importente!!!
               </Text>
               <Text className="font-medium text-justify text-xl mb-4">
                 Está intentando registrar una calibración y el turno se
@@ -545,20 +584,23 @@ export function Calibracion({
           showsVerticalScrollIndicator={false}
         >
           <View className="flex-1 items-center p-4 gap-4">
-            <InputCard title="Tipo de operación" required locked={salida !== 0}>
+            <InputCard
+              title="Tipo de operación"
+              required={true}
+              locked={salida !== 0}
+            >
               <Select
                 data={tipoOperacion}
                 isLoading={isLoading}
                 selectedValue={tipoOperacionSeleccionado}
                 setSelectedValue={setTipoOperacionSeleccionado}
-                labelField="label"
+                labelField={"label"}
                 valueField="value"
               />
             </InputCard>
-
             <InputCard
-              title="Seleccione el pico:"
-              required
+              title="Selecione el pico:"
+              required={true}
               locked={salida !== 0}
             >
               {salida === 0 && (
@@ -592,8 +634,10 @@ export function Calibracion({
                     value={numeroPrecintoAtual}
                     onChangeText={setNumeroPrecintoAtual}
                   />
+                </View>
+                <View className="flex-row items-center p-2 gap-2">
                   <Photo
-                    form="icon"
+                    form="button"
                     disabled={isLoading}
                     iconSize="lg"
                     iconColor={isLoading ? "#756868eb" : "#000"}
@@ -616,8 +660,10 @@ export function Calibracion({
                     value={numeroPrecintoColocado}
                     onChangeText={setNumeroPrecintoColocado}
                   />
+                </View>
+                <View className="flex-row items-center p-2 gap-2">
                   <Photo
-                    form="icon"
+                    form="button"
                     disabled={salida !== 0}
                     iconSize="lg"
                     iconColor={salida !== 0 ? "#756868eb" : "#000"}
@@ -627,81 +673,84 @@ export function Calibracion({
               </InputCard>
             )}
 
-            {/* Botón para ir a secuencias */}
-            {mediciones.totalMediciones === 0 && (
-              <Button
-                title="Realizar verificación"
-                onPress={handleVerificacion}
-                isLoading={isLoading}
-                icon={Fuel}
-                iconSize="md"
-                iconColor="#000"
-              />
-            )}
-
-            {mediciones.totalMediciones > 0 && (
-              <InputCard title="Mediciones registradas">
-                <Text className="text-black text-base p-2">
-                  Taxilitro Inicial: {mediciones.taxilitroInicial}
-                </Text>
-                <Text className="text-black text-base p-2">
-                  Taxilitro Final: {mediciones.taxilitroFinal}
-                </Text>
-                <Text className="text-black text-base p-2">
-                  Total de mediciones: {mediciones.totalMediciones}
-                </Text>
+            <InputCard
+              title="Verificación del pico"
+              required={true}
+              locked={salida !== 0}
+            >
+              {mediciones.totalMediciones === 0 && (
                 <Button
-                  title="Reiniciar mediciones"
-                  onPress={handleVerificacion}
+                  title="Verificar"
+                  onPress={() => {
+                    handleVerificacion();
+                  }}
                   isLoading={isLoading}
-                  icon={Pencil}
+                  icon={Fuel}
                   iconSize="md"
                   iconColor="#000"
+                />
+              )}
+              {mediciones.totalMediciones > 0 && (
+                <>
+                  <Text className="text-lg text-black font-bold">
+                    Mediciones Realizadas: {mediciones.totalMediciones}
+                  </Text>
+                </>
+              )}
+            </InputCard>
+
+            {mediciones.totalMediciones > 0 && (
+              <InputCard title="Observaciones" locked={salida !== 0}>
+                <View className="flex-row items-center p-2 gap-2">
+                  <Input
+                    multiline
+                    numberOfLines={4}
+                    placeholder="observaciones"
+                    value={obs}
+                    onChangeText={setObs}
+                  />
+                  <View className="flex-col gap-6">
+                    <Photo
+                      form="icon"
+                      disabled={salida !== 0}
+                      iconSize="lg"
+                      iconColor={salida !== 0 ? "#756868eb" : "#000"}
+                      setImage={handlePhotoObs}
+                    />
+                  </View>
+                </View>
+              </InputCard>
+            )}
+            {mediciones.totalMediciones > 0 && (
+              <InputCard
+                title="Encargado de la calibración"
+                required={true}
+                locked={salida !== 0}
+              >
+                <TextSearch
+                  enabled={salida === 0}
+                  textValue={persona?.nombre_apellido}
+                  placeholder="Buscar persona"
+                  onPress={() =>
+                    navigation.navigate("buscarpersona", {
+                      enabledSelect: true,
+                      fromScreen: "calibracion",
+                    })
+                  }
                 />
               </InputCard>
             )}
 
-            {mediciones.totalMediciones > 0 && (
+            {mediciones.totalMediciones > 0 && persona && (
               <>
-                <InputCard title="Chofer/Encargado" required>
-                  <TextSearch
-                    textValue={persona?.nombre_apellido}
-                    placeholder="Buscar persona"
-                    onPress={() =>
-                      navigation.navigate("buscarpersona", {
-                        enabledSelect: true,
-                        fromScreen: "calibracion",
-                      })
-                    }
-                  />
-                </InputCard>
-
-                <InputCard title="Observaciones">
-                  <View className="flex-row items-center p-2 gap-2">
-                    <Input
-                      multiline
-                      numberOfLines={4}
-                      placeholder="Observaciones"
-                      value={obs}
-                      onChangeText={setObs}
-                    />
-                    <Photo
-                      form="icon"
-                      iconSize="lg"
-                      iconColor={photoObs ? "#05a722" : "#000"}
-                      setImage={handlePhotoObs}
-                      disabled={isLoading}
-                    />
-                  </View>
-                </InputCard>
-
                 <View className="flex-row gap-4">
                   <Button
+                    disabled={mediciones.totalMediciones === 0}
                     title="Firmar"
                     onPress={() =>
                       navigation.navigate("firma", {
                         fromScreen: "calibracion",
-                        persona,
+                        persona: persona,
                       })
                     }
                     isLoading={isLoading}
@@ -712,7 +761,7 @@ export function Calibracion({
                   {firma && (
                     <Button
                       title="Grabar"
-                      onPress={saveAllData}
+                      onPress={() => saveAllData()}
                       isLoading={isLoading}
                       icon={SaveAll}
                       iconSize="md"
@@ -730,6 +779,12 @@ export function Calibracion({
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
+  },
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -742,6 +797,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 10,
     elevation: 5,
+  },
+  title: {
+    fontSize: 18,
+    marginBottom: 20,
+    textAlign: "center",
   },
   button: {
     marginTop: 20,

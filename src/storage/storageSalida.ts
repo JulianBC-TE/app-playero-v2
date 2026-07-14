@@ -17,9 +17,13 @@ export type SalidaStorageDTO = {
 	base64Vehiculo: string;
 	base64Horometro: string;
 	base64Kilometraje: string;
+	base64TaxInicio: string; // 🆕 Guardará la foto del taxilitro inicial
+	base64TaxFin: string;    // 🆕 Guardará la foto del taxilitro final
 	base64Obs: string;
 	horometro: string;
 	kilometraje: string;
+	taxilitro_inicial: string; // 🆕 Guardará el valor escrito manual de inicio
+	taxilitro_final: string;   // 🆕 Guardará el valor escrito manual de fin
 	observaciones: string;
 	obsAdicional: string;
 	turnoCerrado: boolean;
@@ -46,7 +50,6 @@ export async function getStorageSalida(): Promise<SalidaStorageDTO | null> {
 		const storage = await AsyncStorage.getItem(SALIDA_STORAGE);
 		if (!storage) return null;
 		const parsed: SalidaStorageDTO = JSON.parse(storage);
-		// Solo restaurar si hay algo significativo guardado
 		const tieneEstado =
 			parsed.persona !== null ||
 			parsed.vehiculo !== null ||

@@ -131,7 +131,7 @@ export function BuscarVehiculo({
         <InputCard title="Busqueda:" required={false}>
           <View className="flex-row w-full items-center relative">
             <Input
-              className="ml-10"
+              className="ml-10 text-xl"
               value={query}
               onChangeText={handleSearch}
               placeholder="Informe, chapa o ID del vehículo"

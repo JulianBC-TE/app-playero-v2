@@ -17,9 +17,9 @@ import { db } from "@/backend/db/client";
 import { picos, syncs } from "@/backend/db/schema";
 import { eq } from "drizzle-orm";
 import { PicoDTO } from "@/dto/PicosDTO";
-import { SYNC_CONFIG } from "../constants/syncConfig";
 import { bodegas } from "../schema";   // ← Agregar esta línea
 import { getIdsBodegasDelUsuario } from "./bodegaDB";
+import { fetchPicosPorBodegas } from "@/backend/api/picoAPI";
 
 
 // Clave en tabla syncs para registrar la última sincronización de picos.
@@ -116,7 +116,7 @@ export async function getPicosByBodega(idBodega: number): Promise<PicoDTO[]> {
 // Útil para mostrar datos del pico seleccionado en el resumen de operación.
 // ---------------------------------------------------------------------------
 
-export async function getPicoById(idPico: number): Promise<PicoDTO | null> {
+export async function getPicoById(idPico: number): Promise<PicoDTO> {
   const rows = await db
     .select({
       idPico: picos.idPico,
@@ -128,7 +128,12 @@ export async function getPicoById(idPico: number): Promise<PicoDTO | null> {
     .where(eq(picos.idPico, idPico))
     .limit(1);
 
-  if (!rows[0]) return null;
+  if (!rows[0]) return {
+    id_pico: -1,
+    descripcion_pico: "error",
+    id_bodega: -1,
+    id_pico_surtidor: -1,
+  };
 
   return {
     id_pico: rows[0].idPico,
@@ -163,37 +168,38 @@ export async function getLastSyncDate(): Promise<number | null> {
 // ---------------------------------------------------------------------------
 
 /**
- * Descarga únicamente los picos de las bodegas autorizadas para el operario.
- * Lee los IDs desde `usuarios_bodegas` (sin internet) y los envía
- * como query param a la API para que filtre en el servidor.
+ * Descarga y sincroniza únicamente los picos de las bodegas
+ * autorizadas para el operario.
+ * Lee los IDs desde `usuarios_bodegas` (sin internet), obtiene los picos
+ * del servidor y los guarda localmente.
  *
  * @param cedula - Cédula del operario autenticado.
  * @returns Cantidad de picos sincronizados.
- * @throws Si la llamada al servidor falla.
+ * @throws Si la llamada al servidor falla o hay error en persistencia.
  */
-export async function syncPicosDelOperario(cedula: string): Promise<number> {
-  console.log(`🔄 Sincronizando picos del operario ${cedula}...`);
+// Asegúrate de importar la instancia de tu bd y la tabla bodegas
+// import { db } from "./tu-archivo-db";
+// import { bodegas } from "./tu-archivo-schema";
 
-  const idsBodegas = await getIdsBodegasDelUsuario(cedula);
-
-  if (idsBodegas.length === 0) {
-    console.log("⚠️ Sin bodegas autorizadas — se omite sync de picos");
-    return 0;
+export async function syncPicosDelOperario(cedula: number): Promise<number> {
+  try {
+    const todasLasBodegas = await db.select({ idBodega: bodegas.idBodega }).from(bodegas);
+    const idsBodegas = todasLasBodegas.map((b) => b.idBodega);
+   
+    if (idsBodegas.length === 0) {
+      console.log("⚠️ PICOS -> Omitido (no hay bodegas)");
+      return 0;
+    }
+   
+    const picos = await fetchPicosPorBodegas(idsBodegas);
+    if (picos.length > 0) {
+      await savePicos(picos);
+    }
+   
+    console.log(`✅ PICOS -> ok (+${picos.length})`);
+    return picos.length;
+  } catch (error) {
+    console.error("❌ PICOS -> Error:", error.message || error);
+    throw error;
   }
-
-  // Enviar los IDs como query param: /api/picos?bodegas=1,2,3
-  const { data: picosServidor } = await SYNC_CONFIG.http.get(
-    SYNC_CONFIG.endpoints.picos,
-    { params: { bodegas: idsBodegas.join(",") } }
-  );
-
-  if (!Array.isArray(picosServidor) || picosServidor.length === 0) {
-    console.log("📭 No se recibieron picos");
-    return 0;
-  }
-
-  await savePicos(picosServidor);
-
-  console.log(`✅ ${picosServidor.length} picos sincronizados`);
-  return picosServidor.length;
 }

@@ -86,7 +86,7 @@ export function BuscarCliente({
           <View className="flex-row items-center gap-2 p-4">
             <View className="flex-row w-full items-center relative">
               <Input
-                className="ml-10"
+                className="ml-10 text-2xl"
                 value={search}
                 onChangeText={setSearch}
                 placeholder="Informe el nombre/RUC del cliente"
@@ -95,7 +95,7 @@ export function BuscarCliente({
               <View className="absolute left-3 mt-2">
                 <Search
                   className="absolute left-3 mt-2"
-                  size={18}
+                  size={20}
                   color="#666"
                 />
               </View>

@@ -36,6 +36,97 @@
       "when": 1779461880969,
       "tag": "0004_tearful_scalphunter",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1781621736598,
+      "tag": "0005_breezy_master_chief",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1781784362814,
+      "tag": "0006_brown_leopardon",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1781792345972,
+      "tag": "0007_worried_mockingbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1781800010987,
+      "tag": "0008_keen_the_initiative",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1781803424672,
+      "tag": "0009_worthless_payback",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1781803562493,
+      "tag": "0010_gorgeous_goblin_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1781803624691,
+      "tag": "0011_fluffy_miracleman",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1781804630026,
+      "tag": "0012_workable_old_lace",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1782223316736,
+      "tag": "0013_hard_surge",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1782302270898,
+      "tag": "0014_solid_cloak",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1782306720042,
+      "tag": "0015_rapid_betty_brant",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1782307189886,
+      "tag": "0016_burly_sunspot",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1782989466705,
+      "tag": "0017_smiling_rattler",
+      "breakpoints": true
     }
   ]
 }

@@ -48,6 +48,7 @@ export function Setup() {
       }
 
       await setServerIP(ip);
+      console.log("Conexión exitosa", "Servidor encontrado correctamente");
       toastSuccess("Conexión exitosa", "Servidor encontrado correctamente");
     } catch (error) {
       setErrorText(error);
@@ -97,8 +98,8 @@ export function Setup() {
             {errorText?.message || ""}
           </Text>
         </View>
-        <View><Button title="🌱 Seed BD" onPress={seedLocalDB} /></View>
+        
       </View>
     </View>
   );
-}
+}/**<View><Button title="🌱 Seed BD" onPress={seedLocalDB} /></View> */

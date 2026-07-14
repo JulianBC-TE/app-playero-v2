@@ -4,35 +4,121 @@
 //   Antes: api.get(`api/registros/turno/status/${sucursal.id_sucursal}`)
 //   Ahora: getTurnoStatusLocal(sucursal.id_sucursal) — desde turnoBD
 //   Permisos: getModulosDelUsuario(cedula) — desde moduleDB
+//
+// LÓGICA DE NEGOCIO (igual que la versión original):
+//   - Módulos operativos (Salida, Traspaso, Calibración, Abastecimiento):
+//       habilitados solo si turno está en estado "iniciado", "falta_cerrar" o "cerrado"
+//       Y el usuario tiene permiso de módulo.
+//   - Ítem "Turno": siempre habilitado, muestra la etiqueta de estado del turno.
+//   - Persona / Vehículo: siempre visibles; puedeCrear controlado por permiso.
+//   - Resto: solo controlado por permisos de módulo.
 
 import { HomeHeader } from "@/components/HomeHeader";
 import { FlatList, Text, View } from "react-native";
 import { MenuCard } from "@/components/MenuCard";
 import { StackRoutesList, StackRoutesProps } from "@/route/app.routes";
-//import { useAppContext } from "@/hooks/useAppContext";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Loading } from "@/components/Loading";
 import { baseMenuItems, menuItemType } from "@/dto/MenuItens";
-//import { StatusTurnoDTO } from "@/dto/statusTurnoDTO";
 import { useFocusEffect } from "@react-navigation/native";
 import { getTurnoStatusLocal } from "@DBmodules/turnoBD";
 import { toastError } from "@/utils/toastMessage";
-//import { seedLocalDB } from "@/backend/db/seeds/seedLocalDB";
 import { getSucursalUsuarioActivoLocal } from "@DBmodules/sucursalDB";
-
-// INTEGRACIÓN DE MÓDULOS DEL USUARIO
 import { getModulosDelUsuario } from "@DBmodules/moduleDB";
-import { useAuth } from "@hooks/useAuth";
+import { useAuth } from "@hooks/useAuth"; // Reemplazamos useAppContext por useAuth para tener acceso al user y al signOut
+import type { TurnoStatus } from "@/backend/db/services/turnoStatusService";
+
+// ─── Constantes ──────────────────────────────────────────────────────────────
+
+/** Rutas de los módulos que requieren turno activo para poder operar. */
+const RUTAS_OPERATIVAS = new Set([
+  "salida",
+  "traspaso",
+  "calibracion",
+  "abastecimiento",
+]);
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Devuelve true cuando el estado del turno permite realizar operaciones
+ * (salida, traspaso, calibración, abastecimiento).
+ * Cuando el turno está "cerrado" o en "falta_cerrar", las pantallas operativas
+ * se encargan ellas mismas de mostrar el aviso y pedir justificación.
+ */
+function turnoPermiteOperar(status: TurnoStatus): boolean {
+  return status === "iniciado" || status === "cerrado" || status === "falta_cerrar";
+}
+
+/**
+ * Traduce el estado del turno a la etiqueta visual que muestra MenuCard
+ * en el ítem "Turno".
+ */
+function etiquetaTurno(status: TurnoStatus): menuItemType["turno"] {
+  switch (status) {
+    case "falta_anterior": return "pendiente";
+    case "normal":         return "iniciar";
+    case "iniciado":       return "abierto";
+    case "falta_cerrar":   return "falta_cerrar";
+    case "falta_inicio":   return "pendiente";
+    case "cerrado":        return "cerrado";
+  }
+}
+
+/**
+ * Consulta si el usuario tiene permiso para el módulo indicado por ruta.
+ * Acepta ModulosLocal completo (que incluye `cedula: number` además de los
+ * campos booleanos), por lo que se usa `typeof valor === "boolean"` en lugar
+ * de asumir que todos los campos son booleans.
+ * Si los permisos son null (sin datos en BD), devuelve `fallback`.
+ */
+function tienePermiso(
+  permisos: Record<string, unknown> | null | undefined,
+  ruta: string,
+  fallback: boolean,
+): boolean {
+  if (!permisos) return fallback;
+  const valor = permisos[ruta];
+  return typeof valor === "boolean" ? valor : fallback;
+}
+
+// ─── Componente ──────────────────────────────────────────────────────────────
 
 export function Home({ navigation }: StackRoutesProps<"home">) {
   const [isLoading, setIsLoading] = useState(true);
   const [menuItems, setMenuItems] = useState<menuItemType[]>(baseMenuItems);
-  const { user } = useAuth(); // Extraemos el operario logueado para obtener su cédula
-  const cedula = user?.cedula; // primitivo, comparación estable
+  
+  const { user, signOut } = useAuth(); 
+  const cedula = user?.cedula; 
+  const estaBloqueado = !!user?.bloqueado; // Evaluamos estado de bloqueo
+
   const [sucursal, setSucursal] = useState<{
     id_sucursal: number;
     descripcion_sucursal: string;
   } | null>(null);
+
+  // ── CONTROL DE USUARIO BLOQUEADO (30 Segundos) ─────────────────────────────
+  useEffect(() => {
+    let temporizador: NodeJS.Timeout;
+
+    if (estaBloqueado) {
+      toastError(
+        "Usuario Bloqueado",
+        "Su usuario se encuentra bloqueado. La aplicación se cerrará en 15 segundos."
+      );
+
+      temporizador = setTimeout(async () => {
+        console.log("Tiempo cumplido. Borrando datos y cerrando sesión...");
+        // Pasamos 'true' para indicar que haga el borrado completo de la BD en el AuthContext
+        // (Nota: ignora cualquier warning de type-checking si la firma aún no está actualizada)
+        await signOut(true as any); 
+      }, 15000); // 30 segundos
+    }
+
+    return () => {
+      if (temporizador) clearTimeout(temporizador);
+    };
+  }, [estaBloqueado, signOut]);
 
   function handleOpenMenu(route: keyof StackRoutesList, params?: any) {
     navigation.navigate(route, params);
@@ -40,56 +126,80 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 
   useFocusEffect(
     useCallback(() => {
+      // Evitamos ejecutar la lógica hasta que haya cédula disponible o si está bloqueado
+      if (!cedula || estaBloqueado) return;
+
       async function loadDashboardData() {
         try {
           setIsLoading(true);
 
-          // 1. Obtener la Sucursal Activa del Usuario
-          const sucursalActiva = await getSucursalUsuarioActivoLocal();
-          setSucursal(sucursalActiva);
-
-          // 2. Obtener el estado del turno si hay una sucursal activa
-          if (sucursalActiva) {
-            const statusTurno = await getTurnoStatusLocal(
-              sucursalActiva.id_sucursal,
-            );
-            // Aquí puedes mapear campos adicionales del estado del turno a los ítems si lo requieres en tu UI
+          // 1. Sucursal activa del usuario logueado (Lectura local)
+          const data = await getSucursalUsuarioActivoLocal();
+      
+          if (data) {
+            setSucursal({
+              id_sucursal: data.idSucursal,
+              descripcion_sucursal: data.descripcionSucursal
+            });
+          } else {
+            setSucursal(null);
           }
 
-          // 3. CONTROL DE ACCESO ACCIONADO POR LA BD LOCAL (Offline-First)
-          if (cedula) {
-            const permisosLocales = await getModulosDelUsuario(
-              String(user.cedula),
-            );
+          // 2. Estado del turno (offline-first)
+          let turnoStatus: TurnoStatus = "normal";
+          
+          if (data && data.idSucursal) {
+            const resultado = await getTurnoStatusLocal(cedula);
+            turnoStatus = resultado.status as TurnoStatus;
+            console.log(resultado.Fin_turno_anterior);
+          }
 
-            if (permisosLocales) {
-              // Recorremos los ítems estáticos del menú y alteramos su propiedad 'enabled'
-              const itemsFiltrados = baseMenuItems.map((item) => {
-                // Formateamos el "route" a minúsculas (ej: 'Abastecimiento' -> 'abastecimiento')
-                // para que coincida exactamente con las columnas de tu esquema SQLite
-                const campoModulo =
-                  item.route.toLowerCase() as keyof typeof permisosLocales;
+          // 3. Permisos de módulos del usuario (offline-first)
+          const permisosLocales = await getModulosDelUsuario(cedula);
+          
+          // 4. Calcular estado de cada ítem del menú y filtrar los no activos
+          const itemsVisibles = baseMenuItems
+            .map((item) => {
+              const ruta = item.route.toLowerCase();
 
-                // Verificamos si la columna existe en el registro de la base de datos
-                const tieneAcceso =
-                  permisosLocales[campoModulo] !== undefined
-                    ? permisosLocales[campoModulo]
-                    : item.enabled; // Si no existe (ej: la ruta 'config'), preserva el valor por defecto
-
+              // ── Ítem "Turno" ──────────────────────────────────────────────
+              if (ruta === "turno") {
                 return {
                   ...item,
-                  enabled: !!tieneAcceso, // Forzamos casteo a booleano puro
+                  enabled: true,
+                  turno: etiquetaTurno(turnoStatus),
                 };
-              });
+              }
 
-              setMenuItems(itemsFiltrados);
-            }
-          }
+              // ── Persona / Vehículo ─────────────────────────────────────────
+              if (ruta === "persona" || ruta === "vehiculo") {
+                const puedeCrear = tienePermiso(permisosLocales, ruta, true);
+                return {
+                  ...item,
+                  enabled: true,
+                  params: { ...item.params, puedeCrear },
+                };
+              }
+
+              // ── Módulos operativos ─────────────────────────────────────────
+              if (RUTAS_OPERATIVAS.has(ruta)) {
+                const tieneAcceso = tienePermiso(permisosLocales, ruta, item.enabled ?? true);
+                const turnoActivo = turnoPermiteOperar(turnoStatus);
+                return { ...item, enabled: tieneAcceso && turnoActivo };
+              }
+
+              // ── Resto de módulos ───────────────────────────────────────────
+              const tieneAcceso = tienePermiso(permisosLocales, ruta, item.enabled ?? true);
+              return { ...item, enabled: tieneAcceso };
+            })
+            .filter((item) => item.enabled);
+
+          setMenuItems(itemsVisibles);
         } catch (error) {
-          console.error("Error cargando el dashboard:", error);
+          console.error("[Home] Error cargando dashboard:", error);
           toastError(
             "Error",
-            "No se pudieron procesar los permisos o el estado del turno local.",
+            "No se pudieron cargar los permisos o el estado del turno.",
           );
         } finally {
           setIsLoading(false);
@@ -97,9 +207,28 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
       }
 
       loadDashboardData();
-    }, [cedula]),
+    }, [cedula, estaBloqueado]) 
   );
 
+  // ── Render si el usuario está bloqueado ──────────────────────────────────────
+  if (estaBloqueado) {
+    return (
+      <View className="flex-1 bg-red-100 items-center justify-center px-6 gap-4">
+        <Text className="text-red-700 text-2xl font-bold text-center">
+          Acceso Restringido
+        </Text>
+        <Text className="text-black text-base text-center font-medium">
+          El usuario asociado a esta cuenta ha sido bloqueado en el sistema.
+        </Text>
+        <Loading />
+        <Text className="text-gray-500 text-sm text-center mt-4 italic">
+          Cerrando sesión de forma segura y eliminando registros locales...
+        </Text>
+      </View>
+    );
+  }
+
+  // ── Render Normal ────────────────────────────────────────────────────────────
   return (
     <View className="flex-1 justify-between">
       {!isLoading ? (
@@ -137,8 +266,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 
           <View className="mb-6">
             <Text className="text-center text-lg font-bold">
-              {sucursal?.descripcion_sucursal ||
-                "Ninguna Sucursal Seleccionada"}
+              {sucursal?.descripcion_sucursal || "Ninguna Sucursal Seleccionada"}
               {sucursal ? ` (${sucursal.id_sucursal})` : ""}
             </Text>
           </View>

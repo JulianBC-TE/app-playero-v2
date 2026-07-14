@@ -1,16 +1,5 @@
-/**
- * Servicio de sincronización maestro.
- * Coordina la ejecución secuencial de todos los módulos de sync
- * (personas, clientes, vehículos, bodegas, picos, tanques, etc.).
- *
- * @module Playero/Backend/DB/Services/syncService
- * @category Database Services
- */
-import { SYNC_CONFIG } from "../constants/syncConfig";
-
-import {
-  syncClientesFromCentral,
-  syncClientesToCentral,
+import { 
+  syncClientesFromCentral 
 } from "../modules/clienteDB";
 import {
   syncPersonasFromCentral,
@@ -22,7 +11,6 @@ import {
 } from "../modules/vehiculoDB";
 
 import { syncSucursalesFromCentral } from "../modules/sucursalDB";
-import { syncBodegasDelOperario } from "../modules/bodegaDB";
 import { syncPicosDelOperario } from "../modules/picoDB";
 import { syncTanquesDelOperario } from "../modules/tanqueDB";
 import {
@@ -49,127 +37,98 @@ import {
   getTurnosPendientes,
   marcarTurnoSync,
   marcarTurnoErrorSync,
+  sincronizarUltimosTurnosDesdeBackend,
 } from "../modules/turnoBD";
-import {
-  enviarTicket,
-  enviarTraspaso,
-  enviarCalibracion,
-  enviarAbastecimiento,
-  enviarTurno,
-} from "../../api/operacionesAPI";
-
-/**
- * Sincronización Inicial después del Login Online
- */
-export async function syncInitialData(
-  idSucursal: number,
-  cedula: string,
-): Promise<void> {
-  console.log("🚀 Iniciando sincronización inicial completa...");
-
-  try {
-    // 1. Sucursales
-    await syncSucursalesFromCentral();
-
-    await syncBodegasDelOperario(cedula); // solo las bodegas de este operario
-    await syncPicosDelOperario(cedula); // solo los picos de esas bodegas
-    await syncTanquesDelOperario(cedula); // solo los tanques de esas bodegas;
-
-    // 4. Maestros bidireccionales
-    await syncClientesFromCentral(0);
-    await syncPersonasFromCentral(0);
-    await syncVehiculosFromCentral(0);
-
-    console.log("✅ Sincronización inicial COMPLETADA");
-  } catch (error) {
-    console.error("❌ Error durante syncInitialData:", error);
-  }
-}
-
-/** Sincronización completa (manual o background) */
-export async function fullSync(idSucursal: number, cedula: string) {
-  await syncInitialData(idSucursal, cedula);
-  await syncPendingData(cedula);
-}
+import { enviarAbastecimiento, enviarCalibracion, enviarTicket, enviarTraspaso, enviarTurno } from "@/backend/api/operacionesAPI";
+import { useAppContext } from "@/hooks/useAppContext";
+import { checkUserStatusServer } from "@/backend/api/authAPI";
+import { updateLocalUserBlockStatus } from "../modules/authDB";
 
 // ── Helper genérico de envío por lotes ───────────────────────────────────────
 
 async function syncLote<T>(
   items: T[],
-  getPk: (item: T) => number, // ← función en vez de keyof
+  getPk: (item: T) => number,
   enviar: (item: T) => Promise<void>,
   marcarOk: (id: number) => Promise<void>,
   marcarError: (id: number) => Promise<void>,
   nombre: string,
 ) {
+  if (items.length === 0) return;
+
   for (const item of items) {
     const id = getPk(item);
     try {
       await enviar(item);
       await marcarOk(id);
-      console.log(`✅ ${nombre} #${id} sincronizado`);
+      console.log(`➡️ ${nombre.toUpperCase()} -> ok (#${id})`);
     } catch (err) {
       await marcarError(id);
-      console.warn(`⚠️ ${nombre} #${id} error:`, err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`❌ ${nombre.toUpperCase()} -> falló (#${id}):`, msg);
     }
   }
 }
 
-// ── syncPendingData actualizado ───────────────────────────────────────────────
-/** Solo envía pendientes al servidor */
-export async function syncPendingData(cedula: string) {
+// ── SUBIDA: syncPendingData ──────────────────────────────────────────────────
+
+export async function syncPendingData() {
   try {
-    // Maestros
-    await syncClientesToCentral();
+    console.log("📤 SUBIDA -> Iniciando subida de datos pendientes...");
+    
     await syncPersonasToCentral();
     await syncVehiculosToCentral();
 
-    // Operaciones de pista
-    await syncLote(
-      await getTicketsPendientes(),
-      (t) => t.idTicket, // ← así en todos
-      enviarTicket,
-      marcarTicketSync,
-      marcarTicketErrorSync,
-      "Ticket",
-    );
-
-    await syncLote(
-      await getTraspasosPendientes(),
-      (t) => t.idTrapaso,
-      enviarTraspaso,
-      marcarTraspasoSync,
-      marcarTraspasoErrorSync,
-      "Traspaso",
-    );
-
-    await syncLote(
-      await getCalibracionesPendientes(),
-      (t) => t.idCalibracion,
-      enviarCalibracion,
-      marcarCalibracionSync,
-      marcarCalibracionErrorSync,
-      "Calibracion",
-    );
-
-    await syncLote(
-      await getAbastecimientosPendientes(),
-      (t) => t.idAbastecimiento,
-      enviarAbastecimiento,
-      marcarAbastecimientoSync,
-      marcarAbastecimientoErrorSync,
-      "Abastecimiento",
-    );
-
-    await syncLote(
-      await getTurnosPendientes(),
-      (t) => t.idTurno,
-      enviarTurno,
-      marcarTurnoSync,
-      marcarTurnoErrorSync,
-      "Turno",
-    );
+    await syncLote(await getTicketsPendientes(), (t) => t.idTicket, enviarTicket, marcarTicketSync, marcarTicketErrorSync, "Ticket");
+    await syncLote(await getTraspasosPendientes(), (t) => t.idTrapaso, enviarTraspaso, marcarTraspasoSync, marcarTraspasoErrorSync, "Traspaso");
+    await syncLote(await getCalibracionesPendientes(), (t) => t.idCalibracion, enviarCalibracion, marcarCalibracionSync, marcarCalibracionErrorSync, "Calibración");
+    await syncLote(await getAbastecimientosPendientes(), (dto) => Number(dto.id_abastecimiento), enviarAbastecimiento, marcarAbastecimientoSync, marcarAbastecimientoErrorSync, "Abastecimiento");
+    await syncLote(await getTurnosPendientes(), (t) => t.idTurno, enviarTurno, marcarTurnoSync, marcarTurnoErrorSync, "Turno");
+    
+    console.log("📤 SUBIDA -> Finalizada");
   } catch (error) {
-    console.error("Error en syncPendingData:", error);
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("❌ SUBIDA -> Error crítico:", msg);
   }
+}
+
+// ── BAJADA: syncCatalogosFromCentral ──────────────────────────────────────────
+
+export async function syncCatalogosFromCentral(idUser: number): Promise<boolean> {
+  let estaBloqueado = false; // Por defecto asumimos false
+  try {
+    console.log("📥 BAJADA -> Descargando catálogos...");
+    
+    try {
+      console.log(`🔒 SINCRO -> Verificando estado de cuenta para id: ${idUser}`);
+      const remoto = await checkUserStatusServer(idUser);
+      await updateLocalUserBlockStatus(idUser, remoto.bloqueado);
+      
+      estaBloqueado = remoto.bloqueado; // ◄ Guardamos el valor real del servidor
+      console.log(`🔒 SINCRO -> Estado de bloqueo guardado localmente: ${remoto.bloqueado}`);
+    } catch (errorBlock) {
+      console.warn("⚠️ SINCRO -> No se pudo validar el estado de bloqueo con el servidor:", errorBlock);
+    }
+
+    await sincronizarUltimosTurnosDesdeBackend(idUser);
+    await syncSucursalesFromCentral();
+    await syncPersonasFromCentral();
+    await syncClientesFromCentral();
+    await syncVehiculosFromCentral();
+
+    return estaBloqueado; // ◄ Retornamos el estado
+  } catch (error) {
+    throw error;
+  }
+}
+
+// ── SINCRO COMPLETA (ORQUESTADOR) ─────────────────────────────────────────────
+
+export async function syncTodo(idUser: number): Promise<boolean> {
+  console.log("🔄 ORQUESTADOR -> Iniciando ciclo completo");
+  await syncPendingData();
+  const usuarioBloqueado = await syncCatalogosFromCentral(idUser); // ◄ Capturamos el valor
+  console.log("🏁 ORQUESTADOR -> Ciclo completo terminado");
+  
+  return usuarioBloqueado; // ◄ Lo exponemos al orquestador externo
 }

@@ -15,12 +15,12 @@ import Logo from "@assets/logo.png";
 import { Input } from "@components/Input";
 import { Button } from "@components/Button";
 import { InputCard } from "@/components/InputCard";
-
+import { Loading } from "@/components/Loading"; // ◄ IMPORTAMOS EL COMPONENTE DE CARGA
 
 import { seedLocalDB } from "@/backend/db/seeds/seedLocalDB";
 
 type FormData = {
-  cedula: string;
+  cedula: number;
   password: string;
 };
 
@@ -32,20 +32,25 @@ export function SignIn() {
   const {
     control,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<FormData>();
+
+  // 1. Obtenemos los valores actuales del formulario
+  const cedulaForm = watch("cedula");
+  const passwordForm = watch("password");
+
+  // 2. Inicializamos el hook en la raíz del componente
+  const { syncInitialData } = useInitialSync(cedulaForm, Number(passwordForm));
 
   async function handleSignIn({ cedula, password }: FormData) {
     try {
       setIsLoading(true);
 
-      // signIn devuelve si el login fue online u offline
-      const wasOnline = await signIn(cedula, password);
-
-      // Solo sincronizar si hubo conexión al servidor
-      if (wasOnline) {
-        await useInitialSync(cedula, password);
-      }
+      // ◄ Le pasamos syncInitialData al signIn.
+      // Así el contexto esperará a sincronizar todo ANTES de cambiar de pantalla.
+      await signIn(cedula, password, syncInitialData);
+      //syncInitialData();
     } catch (error) {
       const isAppError = error instanceof AppError;
       const title = isAppError
@@ -57,6 +62,20 @@ export function SignIn() {
     }
   }
 
+  // ── Vista de Carga a pantalla completa ──────────────────────────────────────
+  // Al ejecutarse el signIn, la pantalla se queda aquí hasta que todo termina
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-teColorSecundarioMedio items-center justify-center">
+        <Loading />
+        <Text className="mt-4 text-black font-medium text-base text-center px-6">
+          Iniciando sesión y sincronizando datos por primera vez...
+        </Text>
+      </View>
+    );
+  }
+
+  // ── Vista del Formulario de Login ───────────────────────────────────────────
   return (
     <ScrollView
       contentContainerStyle={{ flexGrow: 1 }}
@@ -72,7 +91,11 @@ export function SignIn() {
               resizeMode="contain"
             />
           </View>
-          <InputCard className="h-52 gap-2" title="Ingrese cédula y contraseña" required>
+          <InputCard
+            className="h-52 gap-2"
+            title="Ingrese cédula y contraseña"
+            required
+          >
             <Controller
               control={control}
               name="cedula"
@@ -109,7 +132,6 @@ export function SignIn() {
               onPress={handleSubmit(handleSignIn)}
               isLoading={isLoading}
             />
-            <Button title="🌱 Seed BD" onPress={seedLocalDB} />
           </View>
         </View>
       </View>

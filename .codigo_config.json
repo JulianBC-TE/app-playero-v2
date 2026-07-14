@@ -1,12 +1,11 @@
 {
-  "descripcion": "Describe aquí tu proyecto en una o dos oraciones.",
+  "descripcion": "App offline-first que se conecta a bakend para verificacion y descargar datos necesarios",
   "extensiones": [
     ".py",
     ".js",
     ".ts",
     ".jsx",
-    ".tsx",
-    ".css"
+    ".tsx"
   ],
   "ignorar": [
     "node_modules",
@@ -17,7 +16,9 @@
     "build"
   ],
   "incluir_solo": [
-    "src"
+    "src",
+    "app",
+    "api"
   ],
   "limite_lineas": null,
   "omitir_autogenerados": true,
@@ -25,5 +26,6 @@
   "nombre_salida": "contexto_codigo.txt",
   "nombre_salida_cambios": "cambios_git.txt",
   "nombre_salida_co": "mapa_contexto.txt",
-  "modelo": "default"
+  "modelo": "default",
+  "comprimir": null
 }
