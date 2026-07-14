@@ -95,7 +95,7 @@ export async function syncPendingData() {
 // ── BAJADA: syncCatalogosFromCentral ──────────────────────────────────────────
 
 export async function syncCatalogosFromCentral(idUser: number): Promise<boolean> {
-  let estaBloqueado = false; // Por defecto asumimos false
+  let estaBloqueado = false; // Por defecto asumimos false 
   try {
     console.log("📥 BAJADA -> Descargando catálogos...");
     
