@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import {
   CheckCheck,
+  Edit,
   Fuel,
   RulerDimensionLine,
   SaveAll,
@@ -22,7 +23,6 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { Select } from "@/components/Select";
 import { useAppContext } from "@/hooks/useAppContext";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
-//import { api } from "@/services/api";
 import { Input } from "@/components/Input";
 import { BodegaDTO } from "@/dto/BodegaDTO";
 import { Photo } from "@/components/Photo";
@@ -36,7 +36,7 @@ import {
   saveAbastecimiento,
   AbastecimientoStorageDTO,
 } from "@/storage/storageAbastecimiento";
-import { removeMedicionAbastecimiento } from "@/storage/storageMedicionAbastecimiento"; // ← agregar
+import { removeMedicionAbastecimiento } from "@/storage/storageMedicionAbastecimiento";
 import { getBodegasByIdSucursal } from "@DBmodules/bodegaDB";
 import {
   anularUltimoFinTurnoPorBodega,
@@ -44,7 +44,6 @@ import {
   getTurnoStatusLocal,
 } from "@DBmodules/turnoBD";
 import { saveAbastecimientoLocal } from "@DBmodules/abastecimientoDB";
-import { number } from "yup";
 import { removeCargaCombustible } from "@/storage/storageCargaCombustible";
 
 export function Abastecimiento({
@@ -117,6 +116,7 @@ export function Abastecimiento({
     medicionFinal,
     turnoCerrado,
   ]);
+
   const huboCambios = useCallback(() => {
     if (!estadoInicial || !estadoRestaurado) return false;
 
@@ -164,10 +164,6 @@ export function Abastecimiento({
     const unsubscribe = navigation.addListener("beforeRemove", (e) => {
       if (isLoading || !estadoRestaurado) return;
 
-      /*if (!huboCambios()) {
-        return;
-      }*/
-
       e.preventDefault();
 
       Alert.alert(
@@ -178,7 +174,6 @@ export function Abastecimiento({
             text: "Cancelar",
             style: "cancel",
           },
-          // DESPUÉS
           {
             text: "Salir sin guardar",
             style: "destructive",
@@ -305,7 +300,6 @@ export function Abastecimiento({
   async function fetchBodegas() {
     try {
       setIsLoading(true);
-      // Estado del turno desde BD local
       const turnoStatus = await getTurnoStatusLocal(sucursal.id_sucursal);
       if (
         turnoStatus.status === "cerrado" ||
@@ -313,7 +307,6 @@ export function Abastecimiento({
       ) {
         setTurnoCerrado(true);
       }
-      // Bodegas desde BD local
       const bodegasDB = await getBodegasByIdSucursal(sucursal.id_sucursal);
       setBodegas(bodegasDB);
     } catch (error) {
@@ -340,7 +333,6 @@ export function Abastecimiento({
     }
   }, [ordenCompra, remision, litros, base64Images]);
 
-  // Parámetros que vienen de sub-pantallas (CargaCombustible, MedicionAbastecimiento)
   useEffect(() => {
     if (route.params?.onCargaZeta) {
       setCargaZeta(route.params.onCargaZeta);
@@ -350,11 +342,9 @@ export function Abastecimiento({
     const newMedicionFinal = route.params?.onMedicionFinal;
 
     if (newMedicionInicial && newMedicionFinal) {
-      // Ambas vienen juntas desde MedicionAbastecimiento — guardar en un solo paso
       setMedicionInicial(newMedicionInicial);
       setMedicionFinal(newMedicionFinal);
 
-      // Guardamos explícitamente con los nuevos valores sin esperar el useEffect de guardarEstado
       saveAbastecimiento({
         ordenCompra,
         remision,
@@ -392,7 +382,7 @@ export function Abastecimiento({
       medicionFinal?.reduce((acc, med) => acc + med.litros, 0) || 0;
     const tipoTurno = await getTipoByBodega(Number(selectedBodega));
     if (tipoTurno === "2" && !motivoConfirmado) {
-      setTurnoCerrado(true); // Muestra el modal del motivo
+      setTurnoCerrado(true);
       setIsLoading(false);
       return;
     }
@@ -431,7 +421,7 @@ export function Abastecimiento({
           foto_medicion: med.foto_tanque,
         },
         fin: {
-          regla: String(medicionFinal[index].regla),
+          regla: String(medicionFinal[index]?.regla ?? 0),
           temperatura: medicionFinal[index]?.temperatura,
           litros: medicionFinal[index]?.litros,
           foto_medicion: medicionFinal[index]?.foto_tanque,
@@ -441,10 +431,8 @@ export function Abastecimiento({
 
     try {
       setIsLoading(true);
-      // Guardar en BD local (pendiente de sync con el servidor)
       await saveAbastecimientoLocal(payload);
       await anularUltimoFinTurnoPorBodega(payload.id_bod, obsAdicional);
-      // Limpiar storage temporal
       await removeAbastecimiento();
       await removeCargaCombustible();
       await removeMedicionAbastecimiento();
@@ -646,18 +634,19 @@ export function Abastecimiento({
                     )}
                   </InputCard>
                 )}
-                {medicionInicial?.length === 0 &&
-                  ((tipoOperacionSeleccionado === "1" &&
-                    (cargaZeta?.litros_zeta ?? 0) > 0) ||
-                    tipoOperacionSeleccionado === "0") && (
-                    <InputCard title={"Medición de tanques"} required={true}>
+                {((tipoOperacionSeleccionado === "1" &&
+                  (cargaZeta?.litros_zeta ?? 0) > 0) ||
+                  tipoOperacionSeleccionado === "0") && (
+                  <InputCard
+                    title={"Medición de tanques"}
+                    required={true}
+                    verified={medicionInicial?.length > 0}
+                  >
+                        <View className="flex-row justify-center mt-2"></View>
+                    {medicionInicial?.length === 0 ? (
                       <Button
                         title="Medir"
-                        icon={
-                          (medicionInicial?.length ?? 0) > 0
-                            ? CheckCheck
-                            : RulerDimensionLine
-                        }
+                        icon={RulerDimensionLine}
                         iconColor={"#000"}
                         iconSize="md"
                         onPress={() => {
@@ -669,8 +658,60 @@ export function Abastecimiento({
                           });
                         }}
                       />
-                    </InputCard>
-                  )}
+                    ) : (
+                      <View className="w-full gap-3">
+                        {medicionInicial.map((medIni, index) => {
+                          const medFin = medicionFinal[index];
+                          return (
+                            <View
+                              key={index}
+                              className="p-3 bg-gray-100 rounded-lg border border-gray-300 gap-1"
+                            >
+                              <View className="flex-row justify-between border-b border-gray-200 pb-1">
+                                <Text className="font-bold text-gray-800 text-base text-lg">
+                                  Inicial:
+                                </Text>
+                                <Text className="font-bold text-gray-800 text-base text-lg">
+                                  {medIni.litros} L  -  {" "}
+                                  {medIni.temperatura} °C
+                                </Text>
+                              </View>
+                              {medFin && (
+                                <View className="flex-row justify-between pt-1">
+                                  <Text className="font-bold text-gray-800 text-base text-lg">
+                                    Final:
+                                  </Text>
+                                  <Text className="font-bold text-gray-800 text-base text-lg">
+                                    {medFin.litros} L  - {" "}
+                                    {medFin.temperatura} °C
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          );
+                        })}
+                        <View className="flex-row justify-center mt-2">
+                          <View className="flex-row justify-center mt-2"></View>
+                          <Button
+                            title="Editar"
+                            icon={Edit}
+                            iconColor={"#000"}
+                            iconSize="md"
+                            onPress={() => {
+                              navigation.navigate("medicionAbastecimiento", {
+                                fromScreen: "abastecimiento",
+                                idBodega: selectedBodega,
+                                cargaZeta: cargaZeta?.litros_zeta || 0,
+                                litrosRemision: Number(litros),
+                              });
+                            }}
+                          />
+                        </View>
+                        <View className="flex-row justify-center mt-2"></View>
+                      </View>
+                    )}
+                  </InputCard>
+                )}
                 {medicionInicial?.length !== 0 && (
                   <>
                     <InputCard title="Observaciones">

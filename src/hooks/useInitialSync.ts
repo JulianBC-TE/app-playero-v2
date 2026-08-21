@@ -7,7 +7,8 @@ import { syncPicosDelOperario } from "@/backend/db/modules/picoDB";
 import { syncTanquesDelOperario} from "@/backend/db/modules/tanqueDB";
 import { getSesionUsuarioActivoLocal } from "@/backend/db/modules/usuarioDB";
 import { sincronizarUltimosTurnosDesdeBackend } from "@/backend/db/modules/turnoBD";
-
+import { sincronizarCubicacionesMasivas } from "@/backend/db/services/sincronizarCubicaciones";
+ 
 export function useInitialSync(cedula: number, id: number) {
   const user = getSesionUsuarioActivoLocal();
   async function syncInitialData(): Promise<void> {
@@ -22,7 +23,7 @@ export function useInitialSync(cedula: number, id: number) {
       await syncClientesFromCentral();   
       await syncPersonasFromCentralInit();
       await syncVehiculosFromCentral();
-
+      await sincronizarCubicacionesMasivas();
       console.log("✅ SYNC -> Completada con éxito");
     } catch (error) {
       console.error("❌ SYNC -> Falló la sincronización inicial:", error);

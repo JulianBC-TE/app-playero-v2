@@ -97,6 +97,7 @@ export async function enviarTraspaso(fila: FilaTraspaso): Promise<void> {
 }
 
 export async function enviarCalibracion(fila: FilaCalibracion): Promise<void> {
+  console.log(fila.dto.clave);
   const payload = {
     calibraciones: [{ id_calibracion: fila.dto.clave, json: fila.dto }]
   };
@@ -139,7 +140,8 @@ export async function enviarTurno(fila: FilaTurno): Promise<void> {
     hora:                  fila.hora,
     observacion_anulacion: fila.observacionAnulacion,
   };
-
+  console.log(item.json.fotos_observacion);
+  console.log(item.json.med_tanques[0].foto_tanque);
   const payload: TurnoBatchPayload = { turnos: [item] };
 
   const endpoint = fila.tipo === "1"

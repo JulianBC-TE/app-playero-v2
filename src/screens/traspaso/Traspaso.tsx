@@ -5,6 +5,7 @@ import { TextSearch } from "@/components/TextSearch";
 import { PersonaDTO } from "@/dto/PersonaDTO";
 import { StackRoutesProps } from "@/route/app.routes";
 import { useCallback, useEffect, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   View,
   Text,
@@ -14,6 +15,8 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
+  Image
 } from "react-native";
 import {
   CheckCheck,
@@ -73,7 +76,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   const [obs, setObs] = useState<string>("");
   const [obsAdicional, setObsAdicional] = useState<string>("");
 
-  // ◄ NUEVOS ESTADOS: Taxímetros de inicio y fin (Texto y Fotos)
   const [taxilitroInicial, setTaxilitroInicial] = useState<string>("");
   const [base64TaxilitroInicial, setBase64TaxilitroInicial] =
     useState<string>("");
@@ -92,12 +94,13 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     taxilitroInicial: string;
     taxilitroFinal: string;
   } | null>(null);
+  const insets = useSafeAreaInsets();
 
   const toNumber = (v: unknown) => {
     if (typeof v === "number") return v;
     const s = String(v ?? "").trim();
     if (!s) return 0;
-    return Number(s.replace(/\./g, "").replace(",", "."));
+    return Number(s.replace(",", "."));
   };
 
   async function fetchPicos() {
@@ -121,6 +124,29 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     }
   }
 
+  const confirmarEliminacion = (
+    onConfirm: () => void,
+    titulo: string = "Eliminar imagen",
+    mensaje: string = "¿Estás seguro de que deseas eliminar esta foto?",
+  ) => {
+    Alert.alert(
+      titulo,
+      mensaje,
+      [
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: onConfirm,
+        },
+      ],
+      { cancelable: true },
+    );
+  };
+
   async function fetchBodegas() {
     try {
       setIsLoading(true);
@@ -129,7 +155,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       await setSelectedBodegaOrigem(bodegasOrigen[0].id_bodega);
       const bodegasDestino = await getBodegasTraspaso(sucursal.id_sucursal);
       await setBodegaDestino(bodegasDestino);
-      await setSelectedBodegaDestino(bodegasDestino[0].id_bodega)
+      await setSelectedBodegaDestino(bodegasDestino[0].id_bodega);
     } catch (error) {
       toastError("Error al buscar bodega", "Intente nuevamente más tarde.");
     } finally {
@@ -144,7 +170,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 
     const existing = await getStorageTraspaso();
 
-    const data: TraspasoDTO = {
+    const data: TraspasoDTO = { 
       bod_origen: Number(selectedBodegaOrigem),
       bod_destino: Number(selectedBodegaDestino),
       id_tanque_destino: Number(medicionInicial[0]?.id_tanque ?? 0),
@@ -156,8 +182,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       temp_final: existing?.temp_final ?? 0,
       foto_medicion_final: existing?.foto_medicion_final ?? [],
       id_pico: Number(selectedPico),
-      taxilitro_inicial: toNumber(taxilitroInicial), // ◄ CAMBIO: Mapeo dinámico
-      taxilitro_final: toNumber(taxilitroFinal), // ◄ CAMBIO: Mapeo dinámico
+      taxilitro_inicial: toNumber(taxilitroInicial),
+      taxilitro_final: toNumber(taxilitroFinal),
       litros_pico: toNumber(cargaCombustible),
       last_id_salida: 0,
       obs_traspaso: obs,
@@ -168,10 +194,10 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
         : [],
       foto_taxilitro: base64TaxilitroInicial
         ? [base64TaxilitroInicial]
-        : (existing?.foto_taxilitro ?? []), // ◄ GUARDADO LOCAL
+        : (existing?.foto_taxilitro ?? []),
       foto_taxilitro_fin: base64TaxilitroFinal
         ? [base64TaxilitroFinal]
-        : (existing?.foto_taxilitro_fin ?? []), // ◄ GUARDADO LOCAL
+        : (existing?.foto_taxilitro_fin ?? []),
       fecha: existing?.fecha ?? fecha,
       hora: existing?.hora ?? hora,
       firma_receptor: existing?.firma_receptor ?? [],
@@ -281,7 +307,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       );
       return;
     }
-    // CAMBIO: Alerta actualizada de "Taxímetro" a "Taxilitro"
     if (!taxilitroInicial || toNumber(taxilitroInicial) <= 0) {
       Alert.alert(
         "Taxilitro inicial requerido",
@@ -289,7 +314,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       );
       return;
     }
-    // CAMBIO: Alerta actualizada de "Taxímetro" a "Taxilitro"
     if (!base64TaxilitroInicial) {
       Alert.alert(
         "Foto requerida",
@@ -311,7 +335,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       );
       return;
     }
-    // CAMBIO: Alerta actualizada de "Taxímetro" a "Taxilitro"
     if (!taxilitroFinal || toNumber(taxilitroFinal) <= 0) {
       Alert.alert(
         "Taxilitro final requerido",
@@ -319,7 +342,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       );
       return;
     }
-    // CAMBIO: Alerta actualizada de "Taxímetro" a "Taxilitro"
     if (!base64TaxilitroFinal) {
       Alert.alert(
         "Foto requerida",
@@ -339,11 +361,11 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       return;
     }
     const tipoTurno = await getTipoByBodega(Number(selectedBodegaOrigem));
-    if ((tipoTurno === "2") && !motivoConfirmado) {
-        setTurnoCerrado(true); // Muestra el modal del motivo
-        setIsLoading(false);
-        return;
-      }
+    if (tipoTurno === "2" && !motivoConfirmado) {
+      setTurnoCerrado(true);
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const data: TraspasoDTO = await getStorageTraspaso();
@@ -402,7 +424,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
           ? storedTraspaso.foto_medicion_inicial[0]
           : "";
 
-        // ◄ RECUPERACIÓN NUEVA
         let fotoTaxilitroInit = storedTraspaso?.foto_taxilitro
           ? storedTraspaso.foto_taxilitro[0]
           : "";
@@ -426,7 +447,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
           setObsAdicional(storedTraspaso.obs_adicional ?? "");
           setMotivoConfirmado(!!storedTraspaso.obs_adicional?.trim());
 
-          // ◄ SETEO EN ESTADO LOCAL
           setTaxilitroInicial(
             storedTraspaso.taxilitro_inicial
               ? storedTraspaso.taxilitro_inicial.toString()
@@ -451,7 +471,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
               },
             ]);
           } else {
-            setMedicionInicial([]); // ◄ Forzar a que siga siendo un array y nunca undefined
+            setMedicionInicial([]);
           }
           if (
             storedTraspaso.regla_altura_final &&
@@ -669,7 +689,10 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: insets.bottom + 40,
+          }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -730,16 +753,34 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
               />
             </InputCard>
 
-            {/* ◄ CAMBIO: "Taxímetro Inicial" cambiado por "Taxilitro Inicial" */}
             <InputCard title="Taxilitro Inicial" required>
               <View className="flex-row items-center p-2 gap-2">
                 <Input
                   value={taxilitroInicial}
                   placeholder="Ej: 45201,20"
-                  keyboardType="numeric"
+                  keyboardType="decimal-pad"
                   onChangeText={setTaxilitroInicial}
                 />
               </View>
+            </InputCard>
+            <InputCard title="Foto Taxilitro Inicial" required>
+                <View className="flex-row items-center p-2 gap-2">
+                  {base64TaxilitroInicial && base64TaxilitroInicial.length > 0 ? (
+                    <Pressable
+                      onPress={() =>
+                        confirmarEliminacion(() => setBase64TaxilitroInicial(""))
+                      }
+                    >
+                      <Image
+                        source={{
+                          uri: `data:image/jpeg;base64,${base64TaxilitroInicial}`,
+                        }}
+                        className="w-56 h-36 rounded-lg border border-gray-300"
+                        resizeMode="cover"
+                      />
+                    </Pressable>
+                  ) : null}
+                </View>
               <View className="flex-row items-center p-2 gap-2">
                 <Photo
                   form="button"
@@ -755,6 +796,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
               </View>
             </InputCard>
 
+            {/* Medición Inicial: Muestra botón y desglose de Altura/Litros */}
             <InputCard title="Medición Inicial del Tanque Receptor" required>
               <Button
                 disabled={selectedBodegaDestino === ""}
@@ -796,6 +838,21 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                   }
                 }}
               />
+
+              {medicionInicial && medicionInicial.length > 0 && (
+                <View className="w-full items-center p-2 mt-2 bg-gray-100 rounded-md border border-gray-200">
+                  <Text className="text-md font-bold text-gray-800">
+                    Altura: {medicionInicial[0].regla} cm  —  {medicionInicial[0].litros.toLocaleString()} L
+                  </Text>
+                  {Boolean(medicionInicial[0].temperatura) && (
+                    <Text className="text-xs text-gray-500 mt-1">
+                      Temperatura: {medicionInicial[0].temperatura} °C
+                    </Text>
+                  )}
+                </View>
+              )}
+              <View><Text className="text-xs text-gray-500">
+              </Text></View>
             </InputCard>
 
             <InputCard title="Litros Cargados" required>
@@ -804,13 +861,14 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                   <Input
                     value={cargaCombustible}
                     placeholder="Ingrese los litros manualmente (Ej: 150,00)"
-                    keyboardType="numeric"
+                    keyboardType="decimal-pad"
                     onChangeText={setCargaCombustible}
                   />
                 </View>
               </View>
             </InputCard>
 
+            {/* Medición Final: Muestra botón y desglose de Altura/Litros */}
             <InputCard title="Medición Final del Tanque Receptor" required>
               <Button
                 disabled={selectedBodegaDestino === ""}
@@ -852,15 +910,27 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                   }
                 }}
               />
+
+              {medicionFinal && medicionFinal.length > 0 && (
+                <View className="w-full items-center p-2 mt-2 bg-gray-100 rounded-md border border-gray-200">
+                  <Text className="text-md font-bold text-gray-800">
+                    Altura: {medicionFinal[0].regla} cm  —  {medicionFinal[0].litros.toLocaleString()} L
+                  </Text>
+                  {Boolean(medicionFinal[0].temperatura) && (
+                    <Text className="text-xs text-gray-500 mt-1">
+                      Temperatura: {medicionFinal[0].temperatura} °C
+                    </Text>
+                  )}
+                </View>
+              )}
             </InputCard>
 
-            {/* ◄ CAMBIO: "Taxímetro Final" cambiado por "Taxilitro Final" */}
             <InputCard title="Taxilitro Final" required>
               <View className="flex-row items-center p-2 gap-2">
                 <Input
                   value={taxilitroFinal}
                   placeholder="Ej: 45351,20"
-                  keyboardType="numeric"
+                  keyboardType="decimal-pad"
                   onChangeText={setTaxilitroFinal}
                 />
               </View>
@@ -893,14 +963,14 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
               </View>
               <View className="flex-row items-center p-2 gap-2">
                 <Photo
-                    form="button"
-                    iconSize="lg"
-                    iconColor={
-                      base64Obs && base64Obs.length > 0 ? "#05a722" : "#000"
-                    }
-                    setImage={(base64) => setBase64Obs(base64)}
-                    disabled={isLoading}
-                  />
+                  form="button"
+                  iconSize="lg"
+                  iconColor={
+                    base64Obs && base64Obs.length > 0 ? "#05a722" : "#000"
+                  }
+                  setImage={(base64) => setBase64Obs(base64)}
+                  disabled={isLoading}
+                />
               </View>
             </InputCard>
 

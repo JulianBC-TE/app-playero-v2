@@ -4,11 +4,11 @@ import { Image, View } from "react-native";
 import { Button } from "@/components/Button";
 
 import { toastError, toastSuccess } from "@utils/toastMessage";
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"; 
 import { InputCard } from "@/components/InputCard";
 import { Input } from "@/components/Input";
-//import { api } from "@/services/api";
 import { getTanquesByBodega } from "@DBmodules/tanqueDB";
+import { cubicacionService } from "@DBmodules/cubicacionDB";
 import { TanqueDTO } from "@/dto/TanqueDTO";
 import { MedicionDTO } from "@/dto/MedicionDTO";
 import { Select } from "@/components/Select";
@@ -26,22 +26,24 @@ type FormData = {
   temperatura: string;
 };
 
+interface AlturaSelectOption {
+  id: string;
+  label: string;
+  altura: number;
+  litros: number;
+}
+
 const habilitarTanque = yup.object({
   altura_regla: yup
     .string()
-    .required("Altura de la regla es requerido")
-    .matches(
-      /^[0-9]*\,?[0-9]+$/,
-      "El formato de de esta información no és válida",
-    ),
+    .required("Altura de la regla es requerida"),
   temperatura: yup
     .string()
-    .required("Temperatura del tanque es requerido")
-    .matches(/^[0-9]*\,?[0-9]+$/, "El formato de la temperatura no és válida"),
+    .required("Temperatura del tanque es requerida")
+    .matches(/^[0-9]*\,?[0-9]+$/, "El formato de la temperatura no es válido"),
   litros: yup
     .string()
-    .required("Cantidad de litros en el tanque requerido")
-    .matches(/^[0-9]*\,?[0-9]+$/, "Formato de Litros no és inválido"),
+    .required("Cantidad de litros requerida"),
 });
 
 export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
@@ -50,34 +52,67 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
   const [isLoading, setIsLoading] = useState(false);
   const [tanques, setTanques] = useState<TanqueDTO[]>([]);
   const [selectedTanques, setSelectedTanques] = useState("");
+  const [alturasCubicacion, setAlturasCubicacion] = useState<AlturaSelectOption[]>([]);
+  const [loadingAlturas, setLoadingAlturas] = useState(false);
   const [medicion, setMedicion] = useState<MedicionDTO[]>([]);
-  const [fromScreen, setFromScreen] = useState(
-    route.params?.fromScreen || "turno",
-  );
+  const [fromScreen] = useState(route.params?.fromScreen || "turno");
 
   const {
     control,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm({
     resolver: yupResolver(habilitarTanque),
     defaultValues: {
-      altura_regla: "", // passar o parametro aqui quando for editar
+      altura_regla: "",
       temperatura: "",
       litros: "",
     },
   });
 
+  // Cargar alturas de cubicación cuando cambia el tanque seleccionado
+  useEffect(() => {
+    async function loadCubicacionTanque() {
+      if (!selectedTanques) {
+        setAlturasCubicacion([]);
+        setValue("altura_regla", "");
+        setValue("litros", "");
+        return;
+      }
+
+      try {
+        setLoadingAlturas(true);
+        const puntos = await cubicacionService.obtenerCubicacionPorTanque(Number(selectedTanques));
+        //console.log("Puntos de cubicación obtenidos:", selectedTanques, puntos);
+        const opciones = puntos.map((p) => ({
+          id: String(p.altura),
+          label: `${p.altura}  —  ${p.litros.toLocaleString()} L`,
+          altura: p.altura,
+          litros: p.litros,
+        }));
+
+        setAlturasCubicacion(opciones);
+      } catch (error) {
+        toastError("Error de Cubicación", "No se pudieron obtener las alturas del tanque.");
+      } finally {
+        setLoadingAlturas(false);
+      }
+    }
+
+    loadCubicacionTanque();
+  }, [selectedTanques]);
+
   const definirMedicion = ({ altura_regla, litros, temperatura }: FormData) => {
     if (base64Image === "") {
       toastError(
-        "Registro fotografico requerido",
+        "Registro fotográfico requerido",
         "Por favor, capture una foto del tanque.",
       );
       return;
     }
-    // Busca o nome do tanque selecionado
+
     const tanqueSelecionado = tanques.find(
       (t) => t.id_tanque === +selectedTanques,
     );
@@ -88,32 +123,29 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
     }
 
     const newMedicion: MedicionDTO = {
-      //tanque: tanqueSelecionado.descripcion_tanque || "",
       id_tanque: selectedTanques,
       regla: parseFloat(altura_regla),
-      temperatura: parseFloat(temperatura),
+      temperatura: parseFloat(temperatura.replace(",", ".")),
       litros: parseFloat(litros),
       foto_tanque: base64Image,
     };
-    // Atualiza a lista de mediciones
+
     const updatedMediciones = [...medicion, newMedicion];
     setMedicion(updatedMediciones);
 
-    // Remove o tanque processado da lista
     const tanquesAtualizados = tanques.filter(
       (t) => t.id_tanque !== +selectedTanques,
     );
     setTanques(tanquesAtualizados);
-    setSelectedTanques(""); // Limpa o tanque selecionado
+    setSelectedTanques("");
 
-    reset(); // Limpa os campos do formulário
-    setBase64Image(""); // Limpa a imagem capturada
+    reset();
+    setBase64Image("");
     toastSuccess(
       "Tanque registrado",
       "El tanque ha sido registrado con éxito.",
     );
 
-    // Se era o último tanque, conclui
     if (tanquesAtualizados.length === 0) {
       toastSuccess(
         "Tanques Medidos",
@@ -122,11 +154,6 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
       navigation.popTo(fromScreen as any, { onMedicion: updatedMediciones });
     }
   };
-
-  function handleRemoveMedicion(idTanque: string) {
-    setMedicion((prev) => prev.filter((item) => item.id_tanque !== idTanque));
-    toastSuccess("Medición removida", "La medición ha sido removida.");
-  }
 
   async function fetchTanques() {
     try {
@@ -155,6 +182,7 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
     <View className="flex-1">
       <ScreenHeader title="Medición" />
       <View className="flex-1 p-4 gap-4 items-center">
+        {/* Selector de Tanque */}
         <InputCard title="Tanque" required>
           <Select
             data={tanques}
@@ -166,44 +194,53 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
           />
         </InputCard>
 
-        {/* Crie uma renderização condicional baseado na seleção de um tanque */}
+        {/* Selector de Altura de Regla / Cubicación */}
+        {Boolean(selectedTanques) && (
+          <InputCard title="Altura Regla" required>
+            <Controller
+              control={control}
+              name="altura_regla"
+              render={({ field: { onChange, value } }) => (
+                <Select
+                  data={alturasCubicacion}
+                  isLoading={loadingAlturas}
+                  selectedValue={value}
+                  setSelectedValue={(val) => {
+                    onChange(val);
+                    const puntoElegido = alturasCubicacion.find((item) => item.id === val);
+                    if (puntoElegido) {
+                      setValue("litros", String(puntoElegido.litros));
+                    }
+                  }}
+                  labelField="label"
+                  valueField="id"
+                />
+              )}
+            />
+          </InputCard>
+        )}
 
-        <InputCard title="Altura Regla" required>
-          <Controller
-            control={control}
-            name="altura_regla"
-            render={({ field: { onChange, value } }) => (
-              <Input
-                keyboardType="number-pad"
-                align="center"
-                textAlignVertical="top"
-                className="ml-2 text-center"
-                value={value}
-                onChangeText={onChange}
-                placeholder="Informe la altura de la regla"
-                errorMessage={errors.altura_regla?.message}
-              />
-            )}
-          />
-        </InputCard>
+        {/* Campo Litros (Cargado automáticamente al elegir la altura) */}
         <InputCard title="Litros" required>
           <Controller
             control={control}
             name="litros"
-            render={({ field: { onChange, value } }) => (
+            render={({ field: { value } }) => (
               <Input
                 keyboardType="number-pad"
                 align="center"
                 textAlignVertical="top"
                 className="ml-2"
                 value={value}
-                onChangeText={onChange}
-                placeholder="Litros en el tanque"
+                editable={false}
+                placeholder="Litros en el tanque (Autocalculado)"
                 errorMessage={errors.litros?.message}
               />
             )}
           />
         </InputCard>
+
+        {/* Temperatura */}
         <InputCard title="Temperatura" required>
           <Controller
             control={control}
@@ -222,6 +259,8 @@ export function Medicion({ navigation, route }: StackRoutesProps<"medicion">) {
             )}
           />
         </InputCard>
+
+        {/* Foto */}
         <InputCard title="Fotos" className="min-h-48" required>
           <View className="w-full items-center p-4 gap-2">
             <Image

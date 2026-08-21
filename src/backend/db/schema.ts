@@ -434,6 +434,30 @@ export const modulosUsuarios = sqliteTable("modulos_usuarios", {
     .default(false),
 });
 
+/**
+ * Tabla de cubicación de tanques (relación altura en regla vs litros).
+ * Permite calcular el volumen contenido localmente en la app sin conexión.
+ */
+export const cubicacionTanque = sqliteTable(
+  "cubicacion_tanque",
+  {
+    idTanque: integer("id_tanque")
+      .notNull()
+      .references(() => tanques.idTanque, { onDelete: "cascade" }),
+    altura: real("altura").notNull(),
+    litros: real("litros").notNull(),
+    sync: integer("sync").notNull().default(0),
+  },
+  (table) => ({
+    pk: primaryKey({
+      columns: [table.idTanque, table.altura],
+    }),
+  })
+);
+
+export type CubicacionTanque = typeof cubicacionTanque.$inferSelect;
+export type CubicacionTanqueInsert = typeof cubicacionTanque.$inferInsert;
+
 // ==================== RELACIONES ====================
 /** Relación 1-a-1 personas → usuariosApp. */
 export const personasRelations = relations(personas, ({ one }) => ({
@@ -537,5 +561,22 @@ export const medicionesTanqueRelations = relations(medicionesTanque, ({ one }) =
   abastecimiento: one(abastecimientos, {
     fields: [medicionesTanque.abastecimientoId],
     references: [abastecimientos.idAbastecimiento],
+  }),
+}));
+
+/** Relación N-a-1 tanques → bodegas y 1-a-N tanques → cubicaciones */
+export const tanquesRelations = relations(tanques, ({ one, many }) => ({
+  bodega: one(bodegas, {
+    fields: [tanques.idBodega],
+    references: [bodegas.idBodega],
+  }),
+  cubicaciones: many(cubicacionTanque),
+}));
+
+/** Relación N-a-1 cubicacionTanque → tanques */
+export const cubicacionTanqueRelations = relations(cubicacionTanque, ({ one }) => ({
+  tanque: one(tanques, {
+    fields: [cubicacionTanque.idTanque],
+    references: [tanques.idTanque],
   }),
 }));
