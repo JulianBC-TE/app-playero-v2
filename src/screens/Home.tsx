@@ -21,7 +21,7 @@ import { useCallback, useState, useEffect } from "react";
 import { Loading } from "@/components/Loading";
 import { baseMenuItems, menuItemType } from "@/dto/MenuItens";
 import { useFocusEffect } from "@react-navigation/native";
-import { getTurnoStatusLocal } from "@DBmodules/turnoBD";
+import { getBodegasConCierreAnulado, getTurnoStatusLocal } from "@DBmodules/turnoBD";
 import { toastError } from "@/utils/toastMessage";
 import { getSucursalUsuarioActivoLocal } from "@DBmodules/sucursalDB";
 import { getModulosDelUsuario } from "@DBmodules/moduleDB";
@@ -58,7 +58,7 @@ function etiquetaTurno(status: TurnoStatus): menuItemType["turno"] {
   switch (status) {
     case "falta_anterior": return "pendiente";
     case "normal":         return "iniciar";
-    case "iniciado":       return "abierto";
+    case "iniciado":      return "abierto";
     case "falta_cerrar":   return "falta_cerrar";
     case "falta_inicio":   return "pendiente";
     case "cerrado":        return "cerrado";
@@ -151,12 +151,16 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
           if (data && data.idSucursal) {
             const resultado = await getTurnoStatusLocal(cedula);
             turnoStatus = resultado.status as TurnoStatus;
-            console.log(resultado.Fin_turno_anterior);
+            //console.log(resultado.Fin_turno_anterior);
           }
 
           // 3. Permisos de módulos del usuario (offline-first)
           const permisosLocales = await getModulosDelUsuario(cedula);
-          
+          const anulado = await getBodegasConCierreAnulado(cedula);
+          //console.log(anulado);
+          if(turnoStatus == "iniciado" && anulado.hayPendientes){
+            turnoStatus = "falta_cerrar"
+          }
           // 4. Calcular estado de cada ítem del menú y filtrar los no activos
           const itemsVisibles = baseMenuItems
             .map((item) => {
@@ -164,6 +168,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 
               // ── Ítem "Turno" ──────────────────────────────────────────────
               if (ruta === "turno") {
+                console.log(turnoStatus, user);
                 return {
                   ...item,
                   enabled: true,
@@ -264,7 +269,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
             </View>
           </View>
 
-          <View className="mb-6">
+          <View className="mb-20">
             <Text className="text-center text-lg font-bold">
               {sucursal?.descripcion_sucursal || "Ninguna Sucursal Seleccionada"}
               {sucursal ? ` (${sucursal.id_sucursal})` : ""}

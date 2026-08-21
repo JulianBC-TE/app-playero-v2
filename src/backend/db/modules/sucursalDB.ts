@@ -182,7 +182,7 @@ export async function syncSucursalesFromCentral(): Promise<number> {
       await saveSucursales(items);
     }
 
-    console.log(`✅ SUCURSALES -> ok (+${items.length})`);
+    if(items.length > 0)console.log(`✅ SUCURSALES -> ok (+${items.length})`);
     return items.length;
   } catch (error) {
     console.error("❌ SUCURSALES -> Error:", error.message || error);

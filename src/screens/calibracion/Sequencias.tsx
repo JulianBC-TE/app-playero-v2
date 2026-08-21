@@ -10,6 +10,7 @@ import { SequenciaCalibracionDTO } from "@/dto/SequenciaCalibracionDTO";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Photo } from "@/components/Photo";
 import { Input } from "@/components/Input";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getStorageCalibracion,
   saveCalibracion,
@@ -21,7 +22,13 @@ const OPCIONES_MEDICION = Array.from({ length: 21 }, (_, i) => {
   return { label: `${valor} ml`, value: valor.toString() };
 });
 
-// Interfaz extendida localmente para manejar el flujo de fotos de taxilitros
+const toNumber = (v: unknown) => {
+  if (typeof v === "number") return v;
+  const s = String(v ?? "").trim();
+  if (!s) return NaN;
+  return Number(s.replace(",", "."));
+};
+
 interface SequenciaCalibracionExtendidaDTO extends Omit<
   SequenciaCalibracionDTO,
   "sequencias"
@@ -41,9 +48,10 @@ export function Sequencias({
   navigation,
   route,
 }: StackRoutesProps<"sequencias">) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
   const [pico, setPico] = useState<number>(0);
   const [descripcionPico, setDescripcionPico] = useState<string>("");
+  const [cargado, setCargado] = useState(false);
 
   // Campos de Texto
   const [taxilitroInicial, setTaxilitroInicial] = useState("");
@@ -51,10 +59,12 @@ export function Sequencias({
   const [litrosCargados, setLitrosCargados] = useState("");
   const [valorMedicion, setValorMedicion] = useState("");
 
-  // Fotos de la Secuencia
-  const [photoSequencia, setPhotoSequencia] = useState(""); // Foto de la Medición (Balde)
-  const [photoTaxInicial, setPhotoTaxInicial] = useState(""); // Foto del Taxilitro Inicial (Solo 1ra vez)
-  const [photoTaxFinal, setPhotoTaxFinal] = useState(""); // Foto del Taxilitro Final (Detalle/Carga)
+  const insets = useSafeAreaInsets();
+
+  // Fotos
+  const [photoSequencia, setPhotoSequencia] = useState("");
+  const [photoTaxInicial, setPhotoTaxInicial] = useState("");
+  const [photoTaxFinal, setPhotoTaxFinal] = useState("");
 
   const [mediciones, setMediciones] =
     useState<SequenciaCalibracionExtendidaDTO>({
@@ -95,8 +105,10 @@ export function Sequencias({
   );
 
   useEffect(() => {
-    persistirMediciones(mediciones);
-  }, [mediciones, persistirMediciones]);
+    if (cargado) {
+      persistirMediciones(mediciones);
+    }
+  }, [mediciones, cargado, persistirMediciones]);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener("beforeRemove", (e) => {
@@ -110,7 +122,6 @@ export function Sequencias({
           {
             text: "Finalizar y salir",
             onPress: () => {
-              navigation.dispatch(e.data.action);
               navigation.navigate("calibracion", {
                 onSequencia: medicionesRef.current,
               });
@@ -127,14 +138,27 @@ export function Sequencias({
       setPico(route.params.pico_surtidor);
     }
     if (route.params?.descripcion_pico) {
-      setDescripcionPico(route.params.descripcion_pico); // ← Guardar descripción
+      setDescripcionPico(route.params.descripcion_pico);
     }
-  }, [route.params?.pico_surtidor, route.params?.descripcion_pico]);
+    
+    const existData = (route.params as any)?.medicionesExistentes as SequenciaCalibracionExtendidaDTO | undefined;
+    if (existData && existData.totalMediciones > 0) {
+      setMediciones(existData);
+      if (existData.taxilitroFinal) {
+        setTaxilitroInicial(existData.taxilitroFinal.toString());
+      }
+    }
+    setCargado(true);
+  }, [route.params]);
 
   function handleRegistrarSecuencia() {
     const esLaPrimera = mediciones.totalMediciones === 0;
 
-    if (!taxilitroInicial || isNaN(Number(taxilitroInicial))) {
+    const txIni = toNumber(taxilitroInicial);
+    const txFin = toNumber(taxilitroFinal);
+    const litros = toNumber(litrosCargados);
+
+    if (!taxilitroInicial.trim() || isNaN(txIni)) {
       toastError("Validación", "Ingrese un taxilitro inicial válido.");
       return;
     }
@@ -142,7 +166,7 @@ export function Sequencias({
       toastError("Validación", "Debe capturar la foto del taxilitro inicial.");
       return;
     }
-    if (!taxilitroFinal || isNaN(Number(taxilitroFinal))) {
+    if (!taxilitroFinal.trim() || isNaN(txFin)) {
       toastError("Validación", "Ingrese un taxilitro final válido.");
       return;
     }
@@ -150,7 +174,7 @@ export function Sequencias({
       toastError("Validación", "Debe capturar la foto del taxilitro final.");
       return;
     }
-    if (!litrosCargados || isNaN(Number(litrosCargados))) {
+    if (!litrosCargados.trim() || isNaN(litros)) {
       toastError("Validación", "Ingrese los litros cargados.");
       return;
     }
@@ -166,10 +190,6 @@ export function Sequencias({
       return;
     }
 
-    const txIni = Number(taxilitroInicial);
-    const txFin = Number(taxilitroFinal);
-    const litros = Number(litrosCargados);
-
     setMediciones((prev) => {
       return {
         taxilitroInicial: esLaPrimera ? txIni : prev.taxilitroInicial,
@@ -177,7 +197,7 @@ export function Sequencias({
         fotoInicialTaxilitro: esLaPrimera
           ? photoTaxInicial
           : prev.fotoInicialTaxilitro,
-        fotoFinalTaxilitro: photoTaxFinal, // Siempre mantiene la del último taxilitro capturado
+        fotoFinalTaxilitro: photoTaxFinal,
         totalMediciones: prev.totalMediciones + 1,
         sequencias: [
           ...prev.sequencias,
@@ -192,8 +212,7 @@ export function Sequencias({
       };
     });
 
-    // Resetear formulario para la siguiente secuencia (arrastrando el inicial automáticamente)
-    setTaxilitroInicial(taxilitroFinal); // El final de esta se vuelve el inicial de la próxima
+    setTaxilitroInicial(taxilitroFinal);
     setTaxilitroFinal("");
     setLitrosCargados("");
     setValorMedicion("");
@@ -215,7 +234,7 @@ export function Sequencias({
     <View className="flex-1" style={{ backgroundColor: "#F9FAFB" }}>
       <ScreenHeader title="Secuencia de Verificación" />
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 40 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -263,12 +282,11 @@ export function Sequencias({
             <View style={{ backgroundColor: "#FFFFFF" }}>
               <InputCard title="Formulario de secuencia" required>
                 <View className="p-4 gap-4 w-full">
-                  {/* SECCIÓN TAXILITROS */}
                   <Text className="text-gray-900 font-bold text-center tracking-wider text-xl">
                     LECTURAS DEL TAXILITRO
                   </Text>
 
-                  {/* Taxilitro Inicial (Con foto obligatoria si es la primera) */}
+                  {/* Taxilitro Inicial */}
                   <View
                     className="gap-2 p-3 rounded-lg"
                     style={{ backgroundColor: "#F3F4F6" }}
@@ -279,8 +297,8 @@ export function Sequencias({
                     <View className="flex-row items-center gap-2">
                       <View className="flex-1">
                         <Input
-                          keyboardType="numeric"
-                          placeholder="0.00"
+                          keyboardType="decimal-pad"
+                          placeholder="0,00"
                           value={taxilitroInicial}
                           onChangeText={setTaxilitroInicial}
                           editable={esPrimeraCarga && !isLoading}
@@ -289,21 +307,22 @@ export function Sequencias({
                     </View>
                     <View className="items-center gap-2">
                       {esPrimeraCarga ? (
-                      <Photo
-                        form="button"
-                        iconSize="lg"
-                        iconColor={photoTaxInicial ? "#059669" : "#9CA3AF"}
-                        setImage={setPhotoTaxInicial}
-                        disabled={isLoading}
-                      />
-                    ) : (
-                      <Text className="text-green-600 text-xs font-bold px-2">
-                        ✓ Foto OK
-                      </Text>
-                    )}
+                        <Photo
+                          form="button"
+                          iconSize="lg"
+                          iconColor={photoTaxInicial ? "#059669" : "#9CA3AF"}
+                          setImage={setPhotoTaxInicial}
+                          disabled={isLoading}
+                        />
+                      ) : (
+                        <Text className="text-green-600 text-xs font-bold px-2">
+                          ✓ Foto OK
+                        </Text>
+                      )}
                     </View>
                   </View>
-                  {/* Taxilitro Final (Con foto en cada iteración) */}
+
+                  {/* Taxilitro Final */}
                   <View
                     className="gap-2 p-3 rounded-lg"
                     style={{ backgroundColor: "#F3F4F6" }}
@@ -314,8 +333,8 @@ export function Sequencias({
                     <View className="flex-row items-center gap-2">
                       <View className="flex-1">
                         <Input
-                          keyboardType="numeric"
-                          placeholder="0.00"
+                          keyboardType="decimal-pad"
+                          placeholder="0,00"
                           value={taxilitroFinal}
                           onChangeText={setTaxilitroFinal}
                           editable={!isLoading}
@@ -347,8 +366,8 @@ export function Sequencias({
                         Litros cargados
                       </Text>
                       <Input
-                        keyboardType="numeric"
-                        placeholder="20"
+                        keyboardType="decimal-pad"
+                        placeholder="20,00"
                         value={litrosCargados}
                         onChangeText={setLitrosCargados}
                         editable={!isLoading}
@@ -368,7 +387,6 @@ export function Sequencias({
                       />
                     </View>
 
-                    {/* Foto de la Medición */}
                     <View className="flex-row items-center justify-between mt-2 p-3 rounded-md bg-blue-50 border border-blue-200">
                       <Text className="text-gray-900 font-medium text-xl flex-1">
                         Foto del balde graduado

@@ -9,17 +9,18 @@ const Tab = createMaterialTopTabNavigator();
 
 export function ResumenSincronizacion({ navigation }: StackRoutesProps<"resumenSincronizacion">) {
   const [fecha, setFecha] = useState(new Date());
+  const [isUnlocked, setIsUnlocked] = useState(false);
 
-  // Convertimos el objeto Date nativo al string standard que entiende SQLite (YYYY-MM-DD)
   const fechaISOString = fecha.toISOString().split("T")[0];
 
   return (
     <View className="flex-1 bg-gray-50">
-      {/* Reemplazo por nuestro encabezado reactivo */}
       <HeaderResumen 
-        title="Resumen de Sincronización" 
+        title="Resumen" 
         fechaSeleccionada={fecha} 
         onFechaChange={(nuevaFecha) => setFecha(nuevaFecha)} 
+        isUnlocked={isUnlocked}
+        setIsUnlocked={setIsUnlocked}
       />
       
       <Tab.Navigator
@@ -30,23 +31,53 @@ export function ResumenSincronizacion({ navigation }: StackRoutesProps<"resumenS
         }}
       >
         <Tab.Screen name="resumenSalidas" options={{ tabBarLabel: "Salidas" }}>
-          {() => <ListaResumenSincronizacion tipo="salida" fechaFiltro={fechaISOString} />}
+          {() => (
+            <ListaResumenSincronizacion 
+              tipo="salida" 
+              fechaFiltro={fechaISOString} 
+              isUnlocked={isUnlocked} 
+            />
+          )}
         </Tab.Screen>
 
         <Tab.Screen name="resumenAbastecimientos" options={{ tabBarLabel: "Abastecimientos" }}>
-          {() => <ListaResumenSincronizacion tipo="abastecimiento" fechaFiltro={fechaISOString} />}
+          {() => (
+            <ListaResumenSincronizacion 
+              tipo="abastecimiento" 
+              fechaFiltro={fechaISOString} 
+              isUnlocked={isUnlocked} 
+            />
+          )}
         </Tab.Screen>
 
         <Tab.Screen name="resumenTraspasos" options={{ tabBarLabel: "Traspasos" }}>
-          {() => <ListaResumenSincronizacion tipo="traspaso" fechaFiltro={fechaISOString} />}
+          {() => (
+            <ListaResumenSincronizacion 
+              tipo="traspaso" 
+              fechaFiltro={fechaISOString} 
+              isUnlocked={isUnlocked} 
+            />
+          )}
         </Tab.Screen>
 
         <Tab.Screen name="resumenCalibraciones" options={{ tabBarLabel: "Calibraciones" }}>
-          {() => <ListaResumenSincronizacion tipo="calibracion" fechaFiltro={fechaISOString} />}
+          {() => (
+            <ListaResumenSincronizacion 
+              tipo="calibracion" 
+              fechaFiltro={fechaISOString} 
+              isUnlocked={isUnlocked} 
+            />
+          )}
         </Tab.Screen>
 
         <Tab.Screen name="resumenTurnos" options={{ tabBarLabel: "Turnos" }}>
-          {() => <ListaResumenSincronizacion tipo="turno" fechaFiltro={fechaISOString} />}
+          {() => (
+            <ListaResumenSincronizacion 
+              tipo="turno" 
+              fechaFiltro={fechaISOString} 
+              isUnlocked={isUnlocked} 
+            />
+          )}
         </Tab.Screen>
       </Tab.Navigator>
     </View>

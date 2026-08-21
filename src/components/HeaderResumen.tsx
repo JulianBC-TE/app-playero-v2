@@ -1,19 +1,30 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, Modal, TextInput, Alert } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { ArrowLeftSquare, ChevronLeft, ChevronRight, Calendar } from "lucide-react-native";
+import { ArrowLeftSquare, ChevronLeft, ChevronRight, Calendar, Lock, Unlock, X } from "lucide-react-native";
 import { DatePickerModal } from "react-native-paper-dates";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+
+const CLAVE_HARDCODEADA = "EliminaciónLocalNoEnElServidor"; // ◄ Modifica aquí tu clave
 
 type HeaderResumenProps = {
   title: string;
   fechaSeleccionada: Date;
   onFechaChange: (nuevaFecha: Date) => void;
+  isUnlocked: boolean;
+  setIsUnlocked: (unlocked: boolean) => void;
 };
 
-export function HeaderResumen({ title, fechaSeleccionada, onFechaChange }: HeaderResumenProps) {
+export function HeaderResumen({ 
+  title, 
+  fechaSeleccionada, 
+  onFechaChange,
+  isUnlocked,
+  setIsUnlocked
+}: HeaderResumenProps) {
   const navigation = useNavigation();
   const [open, setOpen] = useState(false);
+  const [modalClaveVisible, setModalClaveVisible] = useState(false);
+  const [claveInput, setClaveInput] = useState("");
 
   function cambiarDia(cantidad: number) {
     const nueva = new Date(fechaSeleccionada);
@@ -44,6 +55,26 @@ export function HeaderResumen({ title, fechaSeleccionada, onFechaChange }: Heade
     });
   }
 
+  function handleValidarClave() {
+    if (claveInput === CLAVE_HARDCODEADA) {
+      setIsUnlocked(true);
+      setModalClaveVisible(false);
+      setClaveInput("");
+      Alert.alert("Éxito", "Modo administrador activado.");
+    } else {
+      Alert.alert("Error", "Clave incorrecta.");
+    }
+  }
+
+  function handleLockPress() {
+    if (isUnlocked) {
+      setIsUnlocked(false);
+      Alert.alert("Bloqueado", "Modo administrador desactivado.");
+    } else {
+      setModalClaveVisible(true);
+    }
+  }
+
   return (
     <View className="bg-teColorPrincipal pt-14 pb-3">
       <View className="flex-row items-center px-8 gap-4 mb-3">
@@ -53,6 +84,15 @@ export function HeaderResumen({ title, fechaSeleccionada, onFechaChange }: Heade
         <Text className="flex-1 text-2xl font-bold text-white" numberOfLines={1}>
           {title}
         </Text>
+
+        {/* Icono de Candado */}
+        <TouchableOpacity onPress={handleLockPress} className="p-1">
+          {isUnlocked ? (
+            <Unlock color="#22c55e" size={26} />
+          ) : (
+            <Lock color="#fff" size={26} />
+          )}
+        </TouchableOpacity>
       </View>
 
       <View className="mx-6 bg-white/10 rounded-xl flex-row justify-between items-center py-2 px-3">
@@ -75,7 +115,6 @@ export function HeaderResumen({ title, fechaSeleccionada, onFechaChange }: Heade
         </TouchableOpacity>
       </View>
 
-      {/* Este modal corre 100% en JS/TS, no usa código nativo que rompa Expo Go */}
       <DatePickerModal
         locale="es"
         mode="single"
@@ -83,8 +122,38 @@ export function HeaderResumen({ title, fechaSeleccionada, onFechaChange }: Heade
         onDismiss={onDismissSingle}
         date={fechaSeleccionada}
         onConfirm={onConfirmSingle}
-        validRange={{ endDate: new Date() }} // Máximo hoy
+        validRange={{ endDate: new Date() }}
       />
+
+      {/* Modal para ingresar clave de desbloqueo */}
+      <Modal visible={modalClaveVisible} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 justify-center items-center px-6">
+          <View className="bg-white w-full rounded-2xl p-5 shadow-lg">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text className="text-lg font-bold text-gray-800">Ingresar Clave Admin</Text>
+              <TouchableOpacity onPress={() => setModalClaveVisible(false)}>
+                <X color="#6b7280" size={22} />
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              secureTextEntry
+              keyboardType="numeric"
+              placeholder="Clave requerida"
+              value={claveInput}
+              onChangeText={setClaveInput}
+              className="border border-gray-300 rounded-xl px-4 py-3 text-base text-gray-800 mb-4"
+            />
+
+            <TouchableOpacity 
+              onPress={handleValidarClave}
+              className="bg-blue-600 rounded-xl py-3 items-center"
+            >
+              <Text className="text-white font-bold text-base">Desbloquear</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

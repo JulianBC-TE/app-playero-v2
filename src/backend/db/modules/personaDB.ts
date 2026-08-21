@@ -288,7 +288,7 @@ export async function syncPersonasFromCentral(): Promise<number> {
     }
     await syncsController.saveOrUpdate(SYNC_KEY, Date.now());
     
-    console.log(`✅ PERSONAS -> ok (+${items.length})`);
+    if(items.length > 0)console.log(`✅ PERSONAS -> ok (+${items.length})`);
     return items.length;
   } catch (error) {
     console.error("❌ PERSONAS -> Error:", error.message || error);
@@ -304,7 +304,7 @@ export async function syncPersonasFromCentralInit(): Promise<number> {
     }
     await syncsController.saveOrUpdate(SYNC_KEY, Date.now());
     
-    console.log(`✅ PERSONAS -> ok (+${items.length})`);
+    if(items.length > 0)console.log(`✅ PERSONAS -> ok (+${items.length})`);
     return items.length;
   } catch (error) {
     console.error("❌ PERSONAS -> Error:", error.message || error);
@@ -321,7 +321,7 @@ export async function syncPersonasFromCentralInit(): Promise<number> {
 export async function syncPersonasToCentral(): Promise<number> {
   const pendientes = await getPersonasPendientesSync();
   if (pendientes.length === 0) {
-    console.log("⚪ PERSONAS -> Nada pendiente para subir");
+    //console.log("⚪ PERSONAS -> Nada pendiente para subir");
     return 0;
   }
 

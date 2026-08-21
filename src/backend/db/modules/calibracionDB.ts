@@ -64,13 +64,14 @@ export async function getCalibracionesPendientes(): Promise<FilaCalibracion[]> {
     .orderBy(desc(calibraciones.idCalibracion));
     
   if (rows.length === 0) {
-    console.log("⚪ CALIBRACIÓN -> Nada pendiente para subir");
+    //console.log("⚪ CALIBRACIÓN -> Nada pendiente para subir");
     return [];
   }
   
   return rows.map((r) => {
-    const fecha = new Date(r.fechaHora).toISOString().split('T')[0]; 
-    const clave = `${r.idCalibracion}-${r.bodega}-${r.ciEncargado}-${fecha}-${r.idCalibracion}`;
+    const fecha = new Date(r.fechaHora).toISOString().split('T')[0];
+    console.log("hora calibracion", r.hora);
+    const clave = `${r.idCalibracion}-${r.bodega}-${r.ciEncargado}-${fecha}-${r.hora}-${r.idCalibracion}`;
 
     return {
       idCalibracion: r.idCalibracion, 

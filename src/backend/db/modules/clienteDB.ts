@@ -239,7 +239,7 @@ export async function syncClientesFromCentral(): Promise<number> {
     }
     await syncsController.saveOrUpdate(SYNC_KEY, Date.now());
     
-    console.log(`✅ CLIENTES -> ok (+${items.length})`);
+    if(items.length > 0)console.log(`✅ CLIENTES -> ok (+${items.length})`);
     return items.length;
   } catch (error) {
     console.error("❌ CLIENTES -> Error:", error.message || error);

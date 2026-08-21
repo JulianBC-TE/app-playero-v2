@@ -59,6 +59,8 @@ export async function crearTurnoLocal({
 }) {
   // CORRECCIÓN: Convertir a string de forma segura ("1" o "2")
   const tipoNumber = String(tipo);
+  console.log(dto.med_tanques[0]);
+  console.log(dto.med_tanques[0].foto_tanque);
 
   return db.insert(turnos).values({
     idBodega,
@@ -135,7 +137,7 @@ export async function getTurnosPendientes() {
       .where(eq(turnos.sync, -1))
       .orderBy(turnos.idTurno);
     if (resultB.length === 0) {
-      console.log("⚪ TURNO -> Nada pendiente para subir");
+      //console.log("⚪ TURNO -> Nada pendiente para subir");
       return [];
     } else {
       result = resultB;
@@ -245,11 +247,10 @@ function parsearHoraAEntero(horaStr: string | null): number | null {
  */
 // Variable de control fuera de la función para bloquear llamadas paralelas
 let estaSincronizando = false;
-
+/*
 export async function sincronizarUltimosTurnosDesdeBackend(
   userId: number,
 ): Promise<void> {
-  // Si ya hay una instancia corriendo, rebotamos las peticiones paralelas
   if (estaSincronizando) {
     console.log(
       "[Sincronización] Bloqueada llamada duplicada por concurrencia.",
@@ -258,7 +259,7 @@ export async function sincronizarUltimosTurnosDesdeBackend(
   }
 
   try {
-    estaSincronizando = true; // Cerramos el candado
+    estaSincronizando = true;
     const turnosBackend = await obtenerEstadoTurnosPorBodega(userId);
 
     for (const item of turnosBackend) {
@@ -284,51 +285,23 @@ export async function sincronizarUltimosTurnosDesdeBackend(
           and(
             eq(turnos.idBodega, item.idbodega),
             eq(turnos.tipo, tipoBack),
-            eq(turnos.fecha, fechaNum), // ◄ DESCOMENTAR ESTO ES CRUCIAL
+            eq(turnos.fecha, fechaNum),
           ),
         )
         .limit(1);
 
       if (existeTurnoLocal.length > 0) {
-        //console.log("existe truno local --> analisis comparativo");
         const turnoLocalActual = existeTurnoLocal[0];
         const fechaLocal = turnoLocalActual.fecha ?? 0;
         const horaLocal = turnoLocalActual.hora ?? 0;
 
         const backendFecha = fechaNum ?? 0;
         const backendHora = horaNum ?? 0;
-        /*console.log(
-          "Back -> bod:",
-          item.idbodega,
-          "tipo",
-          item.turnoCompleto.tipo,
-          "fecha",
-          backendFecha,
-          "hora ",
-          horaNum,
-        );
-        console.log(
-          "App -> bod:",
-          existeTurnoLocal[0].idBodega,
-          "tipo",
-          existeTurnoLocal[0].tipo,
-          "fecha",
-          fechaLocal,
-          "hora ",
-          horaLocal,
-        );
-        console.log(
-          "diferencia de fecha: ",
-          backendFecha - fechaLocal,
-          "diferencia de hora: ",
-          backendHora - horaLocal,
-        );*/
         if (
           backendFecha < fechaLocal ||
           (backendFecha <= fechaLocal && backendHora <= horaLocal)
         ) {
           if (existeTurnoLocal[0].estado <= 1 && backendFecha === fechaLocal) {
-            //console.log(turnoLocalActual.idTurno,backendFecha === fechaLocal, backendFecha == fechaLocal)
             await db
               .update(turnos)
               .set({
@@ -365,8 +338,220 @@ export async function sincronizarUltimosTurnosDesdeBackend(
     console.error("❌ Error en sincronizarUltimosTurnosDesdeBackend:", error);
     throw error;
   } finally {
-    estaSincronizando = false; // Abrimos el candado al terminar con éxito o fallo
+    estaSincronizando = false;
   }
+}
+*/
+
+/**
+ * Función auxiliar para fusionar el DTO del backend con las fotos locales
+ * si el servidor envía los strings o arreglos de imágenes vacíos.
+ */
+function fusionarDtoConFotosLocales(dtoBackend: TurnoDTO, jsonLocal: string): TurnoDTO {
+  try {
+    const dtoLocal = JSON.parse(jsonLocal) as TurnoDTO;
+
+    // 1. Preservar fotos de tanques
+    const medTanquesFusionados = (dtoBackend.med_tanques || []).map((tanqueBack, index) => {
+      // Intenta coincidir por id_tanque o por posición en el array
+      const tanqueLocal = dtoLocal.med_tanques?.find(t => t.id_tanque === tanqueBack.id_tanque) 
+        || dtoLocal.med_tanques?.[index];
+
+      return {
+        ...tanqueBack,
+        foto_tanque: (tanqueBack.foto_tanque && tanqueBack.foto_tanque.trim() !== "")
+          ? tanqueBack.foto_tanque
+          : (tanqueLocal?.foto_tanque || ""),
+      };
+    });
+
+    // 2. Preservar fotos de picos / taxilitros
+    const medPicosFusionados = (dtoBackend.med_picos || []).map((picoBack, index) => {
+      const picoLocal = dtoLocal.med_picos?.find(p => p.id_pico === picoBack.id_pico)
+        || dtoLocal.med_picos?.[index];
+
+      return {
+        ...picoBack,
+        foto_taxilitro: (picoBack.foto_taxilitro && picoBack.foto_taxilitro.length > 0)
+          ? picoBack.foto_taxilitro
+          : (picoLocal?.foto_taxilitro || []),
+      };
+    });
+
+    // 3. Preservar fotos de observación general
+    const fotosObsFusionadas = (dtoBackend.fotos_observacion && dtoBackend.fotos_observacion.length > 0)
+      ? dtoBackend.fotos_observacion
+      : (dtoLocal.fotos_observacion || []);
+
+    return {
+      ...dtoBackend,
+      med_tanques: medTanquesFusionados,
+      med_picos: medPicosFusionados,
+      fotos_observacion: fotosObsFusionadas,
+    };
+  } catch (error) {
+    console.warn("[Sincronización] No se pudo deserializar el JSON local para conservar fotos:", error);
+    return dtoBackend;
+  }
+}
+
+/**
+ * Trae los últimos turnos del backend y los homologa a la estructura local.
+ * No actualiza si los datos del backend son más antiguos en fecha u hora que los locales.
+ */
+export async function sincronizarUltimosTurnosDesdeBackend(
+  userId: number,
+): Promise<void> {
+  // Si ya hay una instancia corriendo, rebotamos las peticiones paralelas[cite: 1]
+  if (estaSincronizando) {
+    console.log(
+      "[Sincronización] Bloqueada llamada duplicada por concurrencia.",
+    );
+    return;
+  }
+
+  try {
+    estaSincronizando = true; // Cerramos el candado[cite: 1]
+    const turnosBackend = await obtenerEstadoTurnosPorBodega(userId);
+
+    for (const item of turnosBackend) {
+      const dto: TurnoDTO = item.turnoCompleto;
+
+      const fechaNum = dto.fecha
+        ? parseInt(dto.fecha.replace(/-/g, ""), 10)
+        : null;
+      if (fechaNum === null) {
+        console.warn(
+          `[Sincronización] Saltando bodega ${item.idbodega} porque el turno no viene con una fecha válida.`,
+        );
+        continue;
+      }
+      const horaNum = parsearHoraAEntero(dto.hora);
+      const tipoBack = item.tipo === "2" ? "2" : "1";
+
+      const existeTurnoLocal = await db
+        .select()
+        .from(turnos)
+        .where(
+          and(
+            eq(turnos.idBodega, item.idbodega),
+            eq(turnos.tipo, tipoBack),
+            eq(turnos.fecha, fechaNum),
+          ),
+        )
+        .limit(1);
+
+      if (existeTurnoLocal.length > 0) {
+        const turnoLocalActual = existeTurnoLocal[0];
+        const fechaLocal = turnoLocalActual.fecha ?? 0;
+        const horaLocal = turnoLocalActual.hora ?? 0;
+
+        const backendFecha = fechaNum ?? 0;
+        const backendHora = horaNum ?? 0;
+
+        // Fusionamos los datos del backend conservando las fotos que ya existían localmente
+        const dtoConFotosPreservadas = fusionarDtoConFotosLocales(dto, turnoLocalActual.json);
+
+        if (
+          backendFecha < fechaLocal ||
+          (backendFecha <= fechaLocal && backendHora <= horaLocal)
+        ) {
+          if (existeTurnoLocal[0].estado <= 1 && backendFecha === fechaLocal) {
+            await db
+              .update(turnos)
+              .set({
+                json: JSON.stringify(dtoConFotosPreservadas),
+                sync: 1,
+              })
+              .where(eq(turnos.idTurno, turnoLocalActual.idTurno));
+          }
+          continue;
+        }
+        console.log(`TURNO -> bodega ${item.idbodega}...`);
+
+        await db
+          .update(turnos)
+          .set({
+            json: JSON.stringify(dtoConFotosPreservadas),
+            sync: 1,
+            fecha: fechaNum,
+            hora: horaNum,
+          })
+          .where(eq(turnos.idTurno, turnoLocalActual.idTurno));
+      } else {
+        await db.insert(turnos).values({
+          idBodega: item.idbodega,
+          json: JSON.stringify(dto),
+          tipo: tipoBack,
+          sync: 1,
+          fecha: fechaNum,
+          hora: horaNum,
+        });
+      }
+    }
+  } catch (error) {
+    console.error("❌ Error en sincronizarUltimosTurnosDesdeBackend:", error);
+    throw error;
+  } finally {
+    estaSincronizando = false; // Abrimos el candado al terminar con éxito o fallo[cite: 1]
+  }
+}
+
+/**
+ * Revisa las bodegas del usuario y detecta aquellas cuyo ÚLTIMO turno registrado
+ * es de tipo cierre ("2" / "FIN-TURNO") pero con estado 2 (anulado).
+ * Esto indica que ese cierre fue anulado y la bodega sigue "abierta" en la práctica:
+ * falta volver a cerrarla.
+ *
+ * A diferencia de `getTurnoStatusLocal`, esta función:
+ *  - Chequea explícitamente el tipo del turno (no asume por convención).
+ *  - Devuelve puntualmente cuáles bodegas están en esa situación, sin mezclarlas
+ *    con bodegas que simplemente nunca se cerraron.
+ *
+ * @param cedula - Cédula del operario logueado
+ * @returns `{ hayPendientes, bodegas }` donde `bodegas` es la lista de idBodega
+ * cuyo último turno es un cierre anulado (falta cerrar).
+ */
+export async function getBodegasConCierreAnulado(
+  cedula: number,
+): Promise<{ hayPendientes: boolean; bodegas: number[] }> {
+  const bodegasDelUsuario = await getBodegasDelUsuario(cedula);
+  if (!bodegasDelUsuario || bodegasDelUsuario.length === 0) {
+    return { hayPendientes: false, bodegas: [] };
+  }
+
+  const idsBodegas = bodegasDelUsuario.map((b: BodegaDTO) =>
+    Number(b.id_bodega),
+  );
+
+  const bodegasConCierreAnulado: number[] = [];
+
+  for (const idBodega of idsBodegas) {
+    const ultimoTurno = await db
+      .select({
+        tipo: turnos.tipo,
+        estado: turnos.estado,
+      })
+      .from(turnos)
+      .where(eq(turnos.idBodega, idBodega))
+      .orderBy(desc(turnos.idTurno))
+      .limit(1);
+
+    if (ultimoTurno.length === 0) continue;
+
+    const turno = ultimoTurno[0];
+    const esCierre = turno.tipo === "2" || turno.tipo === "FIN-TURNO";
+    const esAnulado = turno.estado === 2;
+
+    if (esCierre && esAnulado) {
+      bodegasConCierreAnulado.push(idBodega);
+    }
+  }
+
+  return {
+    hayPendientes: bodegasConCierreAnulado.length > 0,
+    bodegas: bodegasConCierreAnulado,
+  };
 }
 
 /**
@@ -663,6 +848,7 @@ export async function imprimirTurnosPorBodegaYFecha(
             : t.tipo;
       const syncIcono = t.sync === 1 ? "✅ Sincronizado" : "⏳ Pendiente";
       const estadoTexto = t.estado === 1 ? "Activo" : "❌ Anulado";
+      
 
       // Imprimimos cada registro en una línea limpia y fácil de leer
       console.log(

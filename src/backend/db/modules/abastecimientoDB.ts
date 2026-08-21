@@ -108,7 +108,7 @@ export async function getAbastecimientosPendientes(): Promise<
     .where(eq(abastecimientos.sync, 0))
     .orderBy(desc(abastecimientos.idAbastecimiento));
   if (rows.length === 0) {
-    console.log("⚪ ABASTECIMIENTO -> Nada pendiente para subir");
+    //console.log("⚪ ABASTECIMIENTO -> Nada pendiente para subir");
     return [];
   }
 

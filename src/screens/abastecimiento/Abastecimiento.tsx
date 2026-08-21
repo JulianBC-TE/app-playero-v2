@@ -57,7 +57,7 @@ export function Abastecimiento({
   ]);
   const [tipoOperacionSeleccionado, setTipoOperacionSeleccionado] =
     useState("");
-  const [turnoCerrado, setTurnoCerrado] = useState(false);
+  const [turnoCerrado, setTurnoCerrado] = useState(false); 
   const { sucursal, user } = useAppContext();
   const [isLoading, setIsLoading] = useState(false);
   const [obs, setObs] = useState<string>("");

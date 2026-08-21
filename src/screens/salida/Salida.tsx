@@ -10,6 +10,7 @@ import { VehiculoDTO } from "@/dto/VehiculoDTO";
 import { BodegaDTO } from "@/dto/BodegaDTO";
 import { StackRoutesProps } from "@/route/app.routes";
 import { useCallback, useEffect, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   View,
   Text,
@@ -19,6 +20,8 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
+  Image,
 } from "react-native";
 import { Controller, useForm } from "react-hook-form";
 import { Pencil, SaveAll } from "lucide-react-native";
@@ -52,8 +55,8 @@ import { TicketDTO } from "@/dto/TicketDTO";
 type FormData = {
   horometro?: string | null;
   kilometraje?: string | null;
-  taxilitro_inicial: string; // 🆕 Añadido
-  taxilitro_final: string; // 🆕 Añadido
+  taxilitro_inicial: string;
+  taxilitro_final: string;
   litros: string;
   observaciones?: string;
 };
@@ -63,20 +66,20 @@ const registrarSalidaSchema = yup.object({
     .string()
     .nullable()
     .notRequired()
-    .matches(/^[0-9,]*$/, "Solo números y coma permitidos"),
+    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123,45)"),
   kilometraje: yup
     .string()
     .nullable()
     .notRequired()
-    .matches(/^[0-9]*$/, "Solo números permitidos"),
-  taxilitro_inicial: yup // 🆕 Validación añadida
+    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123,45)"),
+  taxilitro_inicial: yup
     .string()
     .required("El taxilitro inicial es requerido")
-    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123.45)"),
-  taxilitro_final: yup // 🆕 Validación añadida
+    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123,45)"),
+  taxilitro_final: yup
     .string()
     .required("El taxilitro final es requerido")
-    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123.45)"),
+    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123,45)"),
   litros: yup
     .string()
     .required("Los litros cargados son requeridos")
@@ -103,6 +106,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   const [valoresTemporales, setValoresTemporales] = useState<FormData | null>(
     null,
   );
+
   // ─── Datos ──────────────────────────────────────────────────────────────────
   const [bodegas, setBodegas] = useState<BodegaDTO[]>([]);
   const [picos, setPicos] = useState<PicoDTO[]>([]);
@@ -112,6 +116,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   const [location, setLocation] = useState<Location.LocationObject | null>(
     null,
   );
+  const insets = useSafeAreaInsets();
 
   // ─── Selecciones ────────────────────────────────────────────────────────────
   const [selectedBodega, setSelectedBodega] = useState<string>("");
@@ -122,8 +127,8 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   const [base64Vehiculo, setBase64Vehiculo] = useState<string>("");
   const [base64Horometro, setBase64Horometro] = useState<string>("");
   const [base64Kilometraje, setBase64Kilometraje] = useState<string>("");
-  const [base64TaxInicio, setBase64TaxInicio] = useState<string>(""); // 🆕 Foto taxilitro inicial
-  const [base64TaxFin, setBase64TaxFin] = useState<string>(""); // 🆕 Foto taxilitro final
+  const [base64TaxInicio, setBase64TaxInicio] = useState<string>("");
+  const [base64TaxFin, setBase64TaxFin] = useState<string>("");
   const [base64Obs, setBase64Obs] = useState<string>("");
 
   const {
@@ -138,8 +143,8 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
     defaultValues: {
       horometro: "",
       kilometraje: "",
-      taxilitro_inicial: "", // 🆕 Inicializado
-      taxilitro_final: "", // 🆕 Inicializado
+      taxilitro_inicial: "",
+      taxilitro_final: "",
       litros: "",
       observaciones: "",
     },
@@ -173,7 +178,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   }, []);
 
   // ─── Picos según bodega seleccionada ─────────────────────────────────────
-
   useEffect(() => {
     if (!selectedBodega) {
       setPicos([]);
@@ -196,7 +200,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   }, [selectedBodega]);
 
   // ─── Params de navegación (persona, vehículo, firma) ─────────────────────
-
   useEffect(() => {
     if (route.params?.onPersona) setPersona(route.params.onPersona);
     if (route.params?.onVehiculo) setVehiculo(route.params.onVehiculo);
@@ -207,10 +210,31 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
     route.params?.onFirma,
   ]);
 
-  // ─── Guardar ticket ───────────────────────────────────────────────────────
+  const confirmarEliminacion = (
+    onConfirm: () => void,
+    titulo: string = "Eliminar imagen",
+    mensaje: string = "¿Estás seguro de que deseas eliminar esta foto?",
+  ) => {
+    Alert.alert(
+      titulo,
+      mensaje,
+      [
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: onConfirm,
+        },
+      ],
+      { cancelable: true },
+    );
+  };
 
+  // ─── Guardar ticket ───────────────────────────────────────────────────────
   async function handleSaveAll(data: FormData) {
-    // 1. Extraemos primero todas las propiedades de 'data' para que existan en las validaciones
     const {
       horometro,
       kilometraje,
@@ -220,7 +244,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       observaciones,
     } = data;
 
-    // 2. Ahora sí, tus validaciones de UI existentes funcionarán sin errores de TypeScript
     if (!persona) {
       Alert.alert("Persona requerida", "Debe seleccionar un operador.");
       return;
@@ -256,7 +279,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       return;
     }
 
-    // Línea 215 (¡Solucionada! Ahora 'kilometraje' y 'horometro' sí existen aquí)
     if (!kilometraje && !horometro) {
       Alert.alert(
         "Campos requeridos",
@@ -283,29 +305,18 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
     try {
       setIsLoading(true);
 
-      // Verificación del estado del turno al momento de guardar
       const tipoTurno = await getTipoByBodega(Number(selectedBodega));
       const turnoData = await getTurnoStatusLocal(user.cedula);
-      console.log(turnoData.status);
       const estaCerrado =
         turnoData.status === "cerrado" || turnoData.status === "falta_cerrar";
 
       if ((estaCerrado || tipoTurno === "2") && !motivoConfirmado) {
-        setValoresTemporales(data); // Respaldamos el objeto data completo
-        setTurnoCerrado(true); // Muestra el modal del motivo
+        setValoresTemporales(data);
+        setTurnoCerrado(true);
         setIsLoading(false);
         return;
       }
 
-      // 3. PROCESO DE GUARDADO NORMAL / EXCEPCIONAL
-      const {
-        horometro,
-        kilometraje,
-        taxilitro_inicial,
-        taxilitro_final,
-        litros,
-        observaciones,
-      } = data;
       const now = new Date();
 
       const ticket: TicketDTO = {
@@ -316,7 +327,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
         ci_playero: Number(user.cedula),
         id_operador: Number(persona.cedula),
         litros: Number((litros ?? "0").replace(",", ".")),
-        kilometraje: Number(kilometraje) || 0,
+        kilometraje: Number((kilometraje ?? "0").replace(",", ".")) || 0,
         horometro: Number((horometro ?? "").replace(",", ".")) || 0,
         taxilitro_inicial: Number((taxilitro_inicial ?? "0").replace(",", ".")),
         taxilitro_final: Number((taxilitro_final ?? "0").replace(",", ".")),
@@ -335,7 +346,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
           ? `https://www.google.com/maps?q=${location.coords.latitude},${location.coords.longitude}`
           : "",
         obs: observaciones ?? "",
-        // Si fue excepcional, concatena el obsAdicional (motivo) ingresado en el modal
         observaciones_ticket: motivoConfirmado
           ? `${observaciones ?? ""} >> MOTIVO EXCEPCIONAL: ${obsAdicional}`
           : (observaciones ?? ""),
@@ -346,7 +356,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       await anularUltimoFinTurnoPorBodega(ticket.id_bod, obsAdicional);
       await removeSalida();
 
-      // Reset de los estados
       setPersona(null);
       setVehiculo(null);
       setFirma(null);
@@ -374,7 +383,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   }
 
   // ─── Persistencia (Borrador) ──────────────────────────────────────────────
-
   const guardarEstado = useCallback(async () => {
     if (!estadoRestaurado) return;
     try {
@@ -392,13 +400,13 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
         base64Vehiculo,
         base64Horometro,
         base64Kilometraje,
-        base64TaxInicio, // 🆕 Guardado en borrador
-        base64TaxFin, // 🆕 Guardado en borrador
+        base64TaxInicio,
+        base64TaxFin,
         base64Obs,
         horometro: watchedValues.horometro ?? "",
         kilometraje: watchedValues.kilometraje ?? "",
-        taxilitro_inicial: watchedValues.taxilitro_inicial ?? "", // 🆕 Guardado en borrador
-        taxilitro_final: watchedValues.taxilitro_final ?? "", // 🆕 Guardado en borrador
+        taxilitro_inicial: watchedValues.taxilitro_inicial ?? "",
+        taxilitro_final: watchedValues.taxilitro_final ?? "",
         observaciones: watchedValues.observaciones ?? "",
         obsAdicional,
         turnoCerrado,
@@ -430,7 +438,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   }, [guardarEstado]);
 
   // ─── Restaurar estado ─────────────────────────────────────────────────────
-
   useEffect(() => {
     async function restaurarEstado() {
       let guardado: SalidaStorageDTO | null = null;
@@ -445,13 +452,13 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
           setBase64Vehiculo(guardado.base64Vehiculo);
           setBase64Horometro(guardado.base64Horometro);
           setBase64Kilometraje(guardado.base64Kilometraje);
-          setBase64TaxInicio(guardado.base64TaxInicio ?? ""); // 🆕 Restauración foto
-          setBase64TaxFin(guardado.base64TaxFin ?? ""); // 🆕 Restauración foto
+          setBase64TaxInicio(guardado.base64TaxInicio ?? "");
+          setBase64TaxFin(guardado.base64TaxFin ?? "");
           setBase64Obs(guardado.base64Obs);
           setValue("horometro", guardado.horometro);
           setValue("kilometraje", guardado.kilometraje);
-          setValue("taxilitro_inicial", guardado.taxilitro_inicial ?? ""); // 🆕 Restauración texto
-          setValue("taxilitro_final", guardado.taxilitro_final ?? ""); // 🆕 Restauración texto
+          setValue("taxilitro_inicial", guardado.taxilitro_inicial ?? "");
+          setValue("taxilitro_final", guardado.taxilitro_final ?? "");
           setValue("litros", guardado.cargaCombustible);
           setValue("observaciones", guardado.observaciones);
           setObsAdicional(guardado.obsAdicional);
@@ -496,7 +503,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   }, []);
 
   // ─── Guardar/Salir ────────────────────────────────────────────────────────
-
   useEffect(() => {
     const unsubscribe = navigation.addListener("beforeRemove", (e) => {
       if (isLoading || !estadoRestaurado) return;
@@ -533,7 +539,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   }, [navigation, guardarEstado, isLoading, estadoRestaurado]);
 
   // ─── Render: turno cerrado ────────────────────────────────────────────────
-
   if (turnoCerrado && !motivoConfirmado) {
     return (
       <View className="flex-1">
@@ -543,7 +548,10 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
           style={{ flex: 1 }}
         >
           <ScrollView
-            contentContainerStyle={{ flexGrow: 1 }}
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingBottom: insets.bottom + 40,
+            }}
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.overlay}>
@@ -568,8 +576,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                     onChangeText={setObsAdicional}
                   />
                 </InputCard>
-                // Busca el botón dentro del bloque "if (turnoCerrado &&
-                !motivoConfirmado)" y modifícalo:
                 <TouchableOpacity
                   style={styles.button}
                   onPress={() => {
@@ -581,13 +587,10 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                       return;
                     }
 
-                    // Cambiamos los estados reflejando que ya se rellenó el motivo
                     setMotivoConfirmado(true);
                     setTurnoCerrado(false);
 
-                    // Si tenemos los datos del formulario respaldados, ejecutamos el guardado directamente
                     if (valoresTemporales) {
-                      // Usamos un setTimeout muy pequeño para asegurar que React procese el cambio de 'motivoConfirmado' antes de lanzar la función
                       setTimeout(() => {
                         handleSaveAll(valoresTemporales);
                       }, 100);
@@ -607,7 +610,6 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   }
 
   // ─── Render: flujo normal ─────────────────────────────────────────────────
-
   return (
     <View className="flex-1">
       <ScreenHeader title="Salida Combustible" />
@@ -616,7 +618,10 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: insets.bottom + 40,
+          }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -649,12 +654,125 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                   }
                 />
               </View>
+            </InputCard>
+            <InputCard title="Foto del Equipo/Vehículo" required>
+              <View className="flex-row items-center p-2 gap-2">
+                {base64Vehiculo ? (
+                  <Pressable
+                    onPress={() =>
+                      confirmarEliminacion(() => setBase64Vehiculo(""))
+                    }
+                  >
+                    <Image
+                      source={{
+                        uri: `data:image/jpeg;base64,${base64Vehiculo}`,
+                      }}
+                      className="w-56 h-36 rounded-lg border border-gray-300"
+                      resizeMode="cover"
+                    />
+                  </Pressable>
+                ) : null}
+              </View>
               <View className="flex-row items-center p-2 gap-2">
                 <Photo
                   form="button"
                   iconSize="lg"
                   iconColor={base64Vehiculo ? "#05a722" : "#000"}
                   setImage={setBase64Vehiculo}
+                />
+              </View>
+            </InputCard>
+
+            {/* Horómetro */}
+            <InputCard title="Horómetro">
+              <View className="flex-row items-center p-2 gap-2">
+                <Controller
+                  control={control}
+                  name="horometro"
+                  render={({ field: { onChange, value } }) => (
+                    <Input
+                      keyboardType="decimal-pad"
+                      align="center"
+                      placeholder="Informe el horómetro"
+                      value={value ?? ""}
+                      onChangeText={(text) => onChange(text.replace(".", ","))}
+                      errorMessage={errors.horometro?.message}
+                    />
+                  )}
+                />
+              </View>
+            </InputCard>
+            <InputCard title="Foto Horómetro">
+              <View className="flex-row items-center p-2 gap-2">
+                {base64Horometro ? (
+                  <Pressable
+                    onPress={() =>
+                      confirmarEliminacion(() => setBase64Horometro(""))
+                    }
+                  >
+                    <Image
+                      source={{
+                        uri: `data:image/jpeg;base64,${base64Horometro}`,
+                      }}
+                      className="w-56 h-36 rounded-lg border border-gray-300"
+                      resizeMode="cover"
+                    />
+                  </Pressable>
+                ) : null}
+              </View>
+              <View className="flex-row items-center p-2 gap-2">
+                <Photo
+                  form="button"
+                  iconSize="lg"
+                  iconColor={base64Horometro ? "#05a722" : "#000"}
+                  setImage={setBase64Horometro}
+                />
+              </View>
+            </InputCard>
+
+            {/* Kilometraje */}
+            <InputCard title="Kilometraje">
+              <View className="flex-row items-center p-2 gap-2">
+                <Controller
+                  control={control}
+                  name="kilometraje"
+                  render={({ field: { onChange, value } }) => (
+                    <Input
+                      keyboardType="decimal-pad"
+                      align="center"
+                      placeholder="Informe el kilometraje"
+                      value={value ?? ""}
+                      onChangeText={(text) => onChange(text.replace(".", ","))}
+                      errorMessage={errors.kilometraje?.message}
+                    />
+                  )}
+                />
+              </View>
+            </InputCard>
+            <InputCard title="Foto kilometraje">
+              <View className="flex-row items-center p-2 gap-2">
+                {base64Kilometraje ? (
+                  <Pressable
+                    onPress={() =>
+                      confirmarEliminacion(() => setBase64Kilometraje(""))
+                    }
+                  >
+                    <Image
+                      source={{
+                        uri: `data:image/jpeg;base64,${base64Kilometraje}`,
+                      }}
+                      className="w-56 h-36 rounded-lg border border-gray-300"
+                      resizeMode="cover"
+                    />
+                  </Pressable>
+                ) : null}
+              </View>
+              <View className="flex-row items-center p-2 gap-2">
+                <Photo
+                  form="button"
+                  iconSize="lg"
+                  iconColor={base64Kilometraje ? "#05a722" : "#000"}
+                  setImage={setBase64Kilometraje}
                 />
               </View>
             </InputCard>
@@ -683,63 +801,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
               />
             </InputCard>
 
-            {/* Horómetro */}
-            <InputCard title="Horómetro">
-              <View className="flex-row items-center p-2 gap-2">
-                <Controller
-                  control={control}
-                  name="horometro"
-                  render={({ field: { onChange, value } }) => (
-                    <Input
-                      keyboardType="number-pad"
-                      align="center"
-                      placeholder="Informe el horómetro"
-                      value={value ?? ""}
-                      onChangeText={onChange}
-                      errorMessage={errors.horometro?.message}
-                    />
-                  )}
-                />
-              </View>
-              <View className="flex-row items-center p-2 gap-2">
-                <Photo
-                  form="button"
-                  iconSize="lg"
-                  iconColor={base64Horometro ? "#05a722" : "#000"}
-                  setImage={setBase64Horometro}
-                />
-              </View>
-            </InputCard>
-
-            {/* Kilometraje */}
-            <InputCard title="Kilometraje">
-              <View className="flex-row items-center p-2 gap-2">
-                <Controller
-                  control={control}
-                  name="kilometraje"
-                  render={({ field: { onChange, value } }) => (
-                    <Input
-                      keyboardType="number-pad"
-                      align="center"
-                      placeholder="Informe el kilometraje"
-                      value={value ?? ""}
-                      onChangeText={onChange}
-                      errorMessage={errors.kilometraje?.message}
-                    />
-                  )}
-                />
-              </View>
-              <View className="flex-row items-center p-2 gap-2">
-                <Photo
-                  form="button"
-                  iconSize="lg"
-                  iconColor={base64Kilometraje ? "#05a722" : "#000"}
-                  setImage={setBase64Kilometraje}
-                />
-              </View>
-            </InputCard>
-
-            {/* 🆕 Taxilitro Inicial */}
+            {/* Taxilitro Inicial */}
             <InputCard title="Taxilitro Inicial" required>
               <View className="flex-row items-center p-2 gap-2">
                 <Controller
@@ -751,11 +813,30 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                       align="center"
                       placeholder="Ingrese taxilitro inicial"
                       value={value ?? ""}
-                      onChangeText={onChange}
+                      onChangeText={(text) => onChange(text.replace(".", ","))}
                       errorMessage={errors.taxilitro_inicial?.message}
                     />
                   )}
                 />
+              </View>
+            </InputCard>
+            <InputCard title="Foto Taxilitro Inicial">
+              <View className="flex-row items-center p-2 gap-2">
+                {base64TaxInicio ? (
+                  <Pressable
+                    onPress={() =>
+                      confirmarEliminacion(() => setBase64TaxInicio(""))
+                    }
+                  >
+                    <Image
+                      source={{
+                        uri: `data:image/jpeg;base64,${base64TaxInicio}`,
+                      }}
+                      className="w-56 h-36 rounded-lg border border-gray-300"
+                      resizeMode="cover"
+                    />
+                  </Pressable>
+                ) : null}
               </View>
               <View className="flex-row items-center p-2 gap-2">
                 <Photo
@@ -778,14 +859,14 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                     align="center"
                     placeholder="Ej: 123,45"
                     value={value ?? ""}
-                    onChangeText={onChange}
+                    onChangeText={(text) => onChange(text.replace(".", ","))}
                     errorMessage={errors.litros?.message}
                   />
                 )}
               />
             </InputCard>
 
-            {/* 🆕 Taxilitro Final */}
+            {/* Taxilitro Final */}
             <InputCard title="Taxilitro Final" required>
               <View className="flex-row items-center p-2 gap-2">
                 <Controller
@@ -797,11 +878,30 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                       align="center"
                       placeholder="Ingrese taxilitro final"
                       value={value ?? ""}
-                      onChangeText={onChange}
+                      onChangeText={(text) => onChange(text.replace(".", ","))}
                       errorMessage={errors.taxilitro_final?.message}
                     />
                   )}
                 />
+              </View>
+            </InputCard>
+            <InputCard title="Foto Taxilitro Final">
+              <View className="flex-row items-center p-2 gap-2">
+                {base64TaxFin ? (
+                  <Pressable
+                    onPress={() =>
+                      confirmarEliminacion(() => setBase64TaxFin(""))
+                    }
+                  >
+                    <Image
+                      source={{
+                        uri: `data:image/jpeg;base64,${base64TaxFin}`,
+                      }}
+                      className="w-56 h-36 rounded-lg border border-gray-300"
+                      resizeMode="cover"
+                    />
+                  </Pressable>
+                ) : null}
               </View>
               <View className="flex-row items-center p-2 gap-2">
                 <Photo
@@ -898,4 +998,3 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
-

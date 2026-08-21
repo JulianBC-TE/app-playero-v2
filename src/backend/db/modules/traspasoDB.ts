@@ -150,7 +150,7 @@ export async function getTraspasosPendientes(): Promise<Array<Traspaso & { dto: 
     .where(eq(trapasos.sync, 0))
     .orderBy(desc(trapasos.fechaCreacion));
   if (rows.length === 0) {
-    console.log("⚪ TRASPASO -> Nada pendiente para subir");
+    //console.log("⚪ TRASPASO -> Nada pendiente para subir");
     return [];
   }
   return rows.map((row) => {

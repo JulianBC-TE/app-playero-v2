@@ -88,7 +88,7 @@ export async function getTicketsPendientes(): Promise<{
 }[]> {
   const result = await db.select().from(tickets).where(eq(tickets.sync, 0));
   if (result.length === 0) {
-    console.log("⚪ TICKET -> Nada pendiente para subir");
+    //console.log("⚪ TICKET -> Nada pendiente para subir");
     return [];
   }
   return result.map((row) => {

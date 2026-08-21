@@ -18,7 +18,7 @@ export function useSyncEngine(intervaloMs: number = 15000) {
       try {
         isSyncingRef.current = true;
         
-        console.log("⏱️ Timer disparado automáticamente.");
+        //console.log("⏱️ Timer disparado automáticamente.");
         
         // 2. Capturamos el booleano que nos devuelve syncTodo (si está bloqueado o no en el servidor)
         const estaBloqueado = await syncTodo(user.idUser!); 

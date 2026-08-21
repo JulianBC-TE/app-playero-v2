@@ -331,8 +331,7 @@ export async function syncVehiculosFromCentral(): Promise<number> {
       await saveVehiculos(items);
     }
     await syncsController.saveOrUpdate(SYNC_KEY, Date.now());
-    
-    console.log(`✅ VEHÍCULOS -> ok (+${items.length})`);
+    if(items.length > 0)console.log(`✅ VEHÍCULOS -> ok (+${items.length})`);
     return items.length;
   } catch (error) {
     console.error("❌ VEHÍCULOS -> Error:", error.message || error);
@@ -349,7 +348,7 @@ export async function syncVehiculosFromCentral(): Promise<number> {
 export async function syncVehiculosToCentral(): Promise<number> {
   const pendientes = await getVehiculosPendientesSync();
   if (pendientes.length === 0) {
-    console.log("⚪ VEHÍCULOS -> Nada pendiente para subir");
+    //console.log("⚪ VEHÍCULOS -> Nada pendiente para subir");
     return 0;
   }
 

@@ -74,7 +74,7 @@ async function syncLote<T>(
 
 export async function syncPendingData() {
   try {
-    console.log("📤 SUBIDA -> Iniciando subida de datos pendientes...");
+    //console.log("📤 SUBIDA -> Iniciando subida de datos pendientes...");
     
     await syncPersonasToCentral();
     await syncVehiculosToCentral();
@@ -97,17 +97,17 @@ export async function syncPendingData() {
 export async function syncCatalogosFromCentral(idUser: number): Promise<boolean> {
   let estaBloqueado = false; // Por defecto asumimos false 
   try {
-    console.log("📥 BAJADA -> Descargando catálogos...");
+    //console.log("📥 BAJADA -> Descargando catálogos...");
     
     try {
-      console.log(`🔒 SINCRO -> Verificando estado de cuenta para id: ${idUser}`);
+      //console.log(`🔒 SINCRO -> Verificando estado de cuenta para id: ${idUser}`);
       const remoto = await checkUserStatusServer(idUser);
       await updateLocalUserBlockStatus(idUser, remoto.bloqueado);
       
       estaBloqueado = remoto.bloqueado; // ◄ Guardamos el valor real del servidor
-      console.log(`🔒 SINCRO -> Estado de bloqueo guardado localmente: ${remoto.bloqueado}`);
+      if(remoto.bloqueado)console.log(`📤 BAJADA -> Estado de bloqueo guardado localmente: ${remoto.bloqueado}`);
     } catch (errorBlock) {
-      console.warn("⚠️ SINCRO -> No se pudo validar el estado de bloqueo con el servidor:", errorBlock);
+      console.warn("📤 BAJADA -> ⚠️ No se pudo validar el estado de bloqueo con el servidor:", errorBlock);
     }
 
     await sincronizarUltimosTurnosDesdeBackend(idUser);
@@ -115,7 +115,7 @@ export async function syncCatalogosFromCentral(idUser: number): Promise<boolean>
     await syncPersonasFromCentral();
     await syncClientesFromCentral();
     await syncVehiculosFromCentral();
-
+    console.log("📤 BAJADA -> Finalizada");
     return estaBloqueado; // ◄ Retornamos el estado
   } catch (error) {
     throw error;

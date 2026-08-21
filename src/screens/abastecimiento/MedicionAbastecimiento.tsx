@@ -15,7 +15,6 @@ import { toastError, toastSuccess } from "@utils/toastMessage";
 import { useCallback, useEffect, useState } from "react";
 import { InputCard } from "@/components/InputCard";
 import { Input } from "@/components/Input";
-//import { api } from "@/services/api";
 import { TanqueDTO } from "@/dto/TanqueDTO";
 import { MedicionDTO } from "@/dto/MedicionDTO";
 import { Select } from "@/components/Select";
@@ -38,7 +37,7 @@ type FormData = {
   litrosInicial: string;
   tempInicial: string;
   alturaFinal: string;
-  tempFinal: string;
+  tempFinal: string; 
   litrosFinal: string;
 };
 
@@ -47,32 +46,38 @@ const habilitarTanque = yup.object({
     .string()
     .required("Altura de la regla es requerido")
     .matches(
-      /^[0-9]*\,?[0-9]+$/,
-      "El formato de de esta información no és válida",
+      /^[0-9]+([.,][0-9]+)?$/,
+      "El formato de esta información no es válida",
     ),
   tempInicial: yup
     .string()
     .required("Temperatura del tanque es requerido")
-    .matches(/^[0-9]*\,?[0-9]+$/, "El formato de la temperatura no és válida"),
+    .matches(
+      /^[0-9]+([.,][0-9]+)?$/,
+      "El formato de la temperatura no es válida",
+    ),
   litrosInicial: yup
     .string()
     .required("Cantidad de litros en el tanque requerido")
-    .matches(/^[0-9]*\,?[0-9]+$/, "Formato de Litros no és inválido"),
+    .matches(/^[0-9]+([.,][0-9]+)?$/, "Formato de Litros no es válido"),
   alturaFinal: yup
     .string()
     .required("Altura final de la regla es requerido")
     .matches(
-      /^[0-9]*\,?[0-9]+$/,
-      "El formato de de esta información no és válida",
+      /^[0-9]+([.,][0-9]+)?$/,
+      "El formato de esta información no es válida",
     ),
   tempFinal: yup
     .string()
     .required("Temperatura del tanque es requerido")
-    .matches(/^[0-9]*\,?[0-9]+$/, "El formato de la temperatura no és válida"),
+    .matches(
+      /^[0-9]+([.,][0-9]+)?$/,
+      "El formato de la temperatura no es válida",
+    ),
   litrosFinal: yup
     .string()
     .required("Cantidad de litros en el tanque requerido")
-    .matches(/^[0-9]*\,?[0-9]+$/, "Formato de Litros no és inválido"),
+    .matches(/^[0-9]+([.,][0-9]+)?$/, "Formato de Litros no es válido"),
 });
 
 export function MedicionAbastecimiento({
@@ -92,6 +97,8 @@ export function MedicionAbastecimiento({
   const [litrosTanque, setLitrosTanque] = useState<number>(0);
   const litrosRemision = route.params?.litrosRemision || 0;
   const [estadoRestaurado, setEstadoRestaurado] = useState(false);
+
+  const formatComma = (val: string) => val.replace(/\./g, ",");
 
   const {
     watch,
@@ -119,12 +126,13 @@ export function MedicionAbastecimiento({
   const litrosFinalWatch = watch("litrosFinal");
   const tempFinalWatch = watch("tempFinal");
 
-  const litros_inicial = Number(litrosInicialWatch);
-  const litros_final = Number(litrosFinalWatch);
+  const parseNum = (val?: string) => Number(val ? val.replace(",", ".") : 0);
+
+  const litros_inicial = parseNum(litrosInicialWatch);
+  const litros_final = parseNum(litrosFinalWatch);
 
   const capacidadeRestante = litrosTanque - litros_inicial;
 
-  // ─── Persistencia: guardar estado cuando cambia algo relevante ───
   const guardarEstado = useCallback(async () => {
     if (!estadoRestaurado) return;
 
@@ -170,12 +178,10 @@ export function MedicionAbastecimiento({
     guardarEstado();
   }, [guardarEstado]);
 
-  // ─── Restaurar estado al montar ───
   useEffect(() => {
     async function restaurarEstado() {
       try {
         const guardado = await getStorageMedicionAbastecimiento();
-        // Solo restaurar si el idBodega coincide para no mezclar sesiones de bodegas distintas
         if (guardado && guardado.idBodega === idBodega) {
           setMedicionInicial(guardado.medicionInicial);
           setMedicionFinal(guardado.medicionFinal);
@@ -183,16 +189,14 @@ export function MedicionAbastecimiento({
           setBase64ImageFinal(guardado.base64ImageFinal);
           setSelectedTanques(guardado.selectedTanques);
           reset({
-            alturaInicial: guardado.alturaInicial || "",
-            litrosInicial: guardado.litrosInicial || "",
-            tempInicial: guardado.tempInicial || "",
+            alturaInicial: formatComma(guardado.alturaInicial || ""),
+            litrosInicial: formatComma(guardado.litrosInicial || ""),
+            tempInicial: formatComma(guardado.tempInicial || ""),
 
-            alturaFinal: guardado.alturaFinal || "",
-            litrosFinal: guardado.litrosFinal || "",
-            tempFinal: guardado.tempFinal || "",
+            alturaFinal: formatComma(guardado.alturaFinal || ""),
+            litrosFinal: formatComma(guardado.litrosFinal || ""),
+            tempFinal: formatComma(guardado.tempFinal || ""),
           });
-          // Los tanques ya medidos se filtran DESPUÉS de que fetchTanques cargue
-          // — ver el useEffect que combina tanques + medicionInicial restaurada
         }
       } catch (error) {
         console.log(
@@ -206,7 +210,6 @@ export function MedicionAbastecimiento({
     restaurarEstado();
   }, []);
 
-  // ─── Filtrar tanques ya medidos una vez que tengamos tanto tanques como mediciones ───
   useEffect(() => {
     if (
       !estadoRestaurado ||
@@ -218,8 +221,6 @@ export function MedicionAbastecimiento({
     setTanques((prev) =>
       prev.filter((t) => !idsTanquesMedidos.includes(t.id_tanque)),
     );
-    // Este efecto solo debe correr una vez al restaurar — no en cada cambio de medicionInicial
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estadoRestaurado, tanques.length]);
 
   const definirMedicion = ({
@@ -237,6 +238,7 @@ export function MedicionAbastecimiento({
       );
       return;
     }
+
     const tanqueSelecionado = tanques.find(
       (t) => t.id_tanque === +selectedTanques,
     );
@@ -246,7 +248,15 @@ export function MedicionAbastecimiento({
       return;
     }
 
-    if (Number(litrosFinal) - Number(litrosInicial) > litrosTanque) {
+    const altIni = parseNum(alturaInicial);
+    const tempIni = parseNum(tempInicial);
+    const litIni = parseNum(litrosInicial);
+
+    const altFin = parseNum(alturaFinal);
+    const tempFin = parseNum(tempFinal);
+    const litFin = parseNum(litrosFinal);
+
+    if (litFin - litIni > litrosTanque) {
       Alert.alert(
         "Exceso de litros",
         `El total de litros cargados no puede exceder la capacidad del tanque (${litrosTanque} litros).`,
@@ -256,24 +266,22 @@ export function MedicionAbastecimiento({
 
     const MedicionInicial: MedicionDTO = {
       id_tanque: selectedTanques,
-      regla: Number(alturaInicial),
-      temperatura: Number(tempInicial),
-      litros: Number(litrosInicial),
+      regla: altIni,
+      temperatura: tempIni,
+      litros: litIni,
       foto_tanque: base64ImageInicial,
     };
     const updatedMedicionesIniciales = [...medicionInicial, MedicionInicial];
-
     setMedicionInicial((prev) => [...prev, MedicionInicial]);
 
     const MedicionFinal: MedicionDTO = {
       id_tanque: selectedTanques,
-      regla: Number(alturaFinal),
-      temperatura: Number(tempFinal),
-      litros: Number(litrosFinal),
+      regla: altFin,
+      temperatura: tempFin,
+      litros: litFin,
       foto_tanque: base64ImageFinal,
     };
     const updatedMedicionesFinales = [...medicionFinal, MedicionFinal];
-
     setMedicionFinal((prev) => [...prev, MedicionFinal]);
 
     let totalLitrosCargados = 0;
@@ -282,8 +290,6 @@ export function MedicionAbastecimiento({
         updatedMedicionesFinales[posic].litros -
         updatedMedicionesIniciales[posic].litros;
     }
-    console.log("Total Litros Cargados:", totalLitrosCargados);
-    console.log("Litros Remisión:", litrosRemision);
 
     if (totalLitrosCargados < litrosRemision && tanques.length > 1) {
       const tanquesAtualizados = tanques.filter(
@@ -291,7 +297,7 @@ export function MedicionAbastecimiento({
       );
       setTanques(tanquesAtualizados);
       reset();
-      setBase64ImageInicial("");
+      setBase64ImageInicial(""); 
       setBase64ImageFinal("");
       toastSuccess(
         "Tanque registrado",
@@ -300,7 +306,6 @@ export function MedicionAbastecimiento({
       return;
     }
 
-    // Limpiar storage al confirmar todas las mediciones y volver
     removeMedicionAbastecimiento().catch(() => {});
     navigation.popTo(fromScreen as any, {
       onMedicionInicial: updatedMedicionesIniciales,
@@ -379,12 +384,12 @@ export function MedicionAbastecimiento({
                 name="alturaInicial"
                 render={({ field: { onChange, value } }) => (
                   <Input
-                    keyboardType="number-pad"
+                    keyboardType="decimal-pad"
                     align="center"
                     textAlignVertical="top"
                     className="ml-2 text-center"
                     value={value}
-                    onChangeText={onChange}
+                    onChangeText={(text) => onChange(formatComma(text))}
                     placeholder="Informe la altura de la regla"
                     errorMessage={errors.alturaInicial?.message}
                   />
@@ -397,12 +402,12 @@ export function MedicionAbastecimiento({
                 name="litrosInicial"
                 render={({ field: { onChange, value } }) => (
                   <Input
-                    keyboardType="number-pad"
+                    keyboardType="decimal-pad"
                     align="center"
                     textAlignVertical="top"
                     className="ml-2"
                     value={value}
-                    onChangeText={onChange}
+                    onChangeText={(text) => onChange(formatComma(text))}
                     placeholder="Litros en el tanque"
                     errorMessage={errors.litrosInicial?.message}
                   />
@@ -415,12 +420,12 @@ export function MedicionAbastecimiento({
                 name="tempInicial"
                 render={({ field: { onChange, value } }) => (
                   <Input
-                    keyboardType="number-pad"
+                    keyboardType="decimal-pad"
                     align="center"
                     textAlignVertical="top"
                     className="ml-2"
                     value={value}
-                    onChangeText={onChange}
+                    onChangeText={(text) => onChange(formatComma(text))}
                     placeholder="Informe la temperatura del tanque"
                     errorMessage={errors.tempInicial?.message}
                   />
@@ -458,12 +463,12 @@ export function MedicionAbastecimiento({
                     name="alturaFinal"
                     render={({ field: { onChange, value } }) => (
                       <Input
-                        keyboardType="number-pad"
+                        keyboardType="decimal-pad"
                         align="center"
                         textAlignVertical="top"
                         className="ml-2 text-center"
                         value={value}
-                        onChangeText={onChange}
+                        onChangeText={(text) => onChange(formatComma(text))}
                         placeholder="Informe la altura de la regla"
                         errorMessage={errors.alturaFinal?.message}
                       />
@@ -479,12 +484,12 @@ export function MedicionAbastecimiento({
                     name="litrosFinal"
                     render={({ field: { onChange, value } }) => (
                       <Input
-                        keyboardType="number-pad"
+                        keyboardType="decimal-pad"
                         align="center"
                         textAlignVertical="top"
                         className="ml-2"
                         value={value}
-                        onChangeText={onChange}
+                        onChangeText={(text) => onChange(formatComma(text))}
                         placeholder="Litros en el tanque"
                         errorMessage={errors.litrosFinal?.message}
                       />
@@ -497,12 +502,12 @@ export function MedicionAbastecimiento({
                     name="tempFinal"
                     render={({ field: { onChange, value } }) => (
                       <Input
-                        keyboardType="number-pad"
+                        keyboardType="decimal-pad"
                         align="center"
                         textAlignVertical="top"
                         className="ml-2"
                         value={value}
-                        onChangeText={onChange}
+                        onChangeText={(text) => onChange(formatComma(text))}
                         placeholder="Informe la temperatura del tanque"
                         errorMessage={errors.tempFinal?.message}
                       />

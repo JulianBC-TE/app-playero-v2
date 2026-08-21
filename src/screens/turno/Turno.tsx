@@ -12,6 +12,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StackRoutesProps } from "@/route/app.routes";
 
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { InputCard } from "@/components/InputCard";
 import { Button } from "@/components/Button";
@@ -71,6 +72,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 
   const [blockHeader, setBlockHeader] = useState(false);
   const [taxilitros, setTaxilitros] = useState<Record<number, string>>({});
+  const insets = useSafeAreaInsets();
 
   // ◄ NUEVO: Almacena un array de fotos Base64 indexado por el id_pico
   const [fotosPicos, setFotosPicos] = useState<Record<number, string[]>>({});
@@ -162,8 +164,8 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
   async function procesarTurno() {
     if (!sesionLocal) {
       Alert.alert(
-        "Error de sesión",
-        "No se encontró información del usuario activo localmente.",
+        "Error de sesión", 
+        "No se encontró información del usuario activo localmente.", 
       );
       return;
     }
@@ -175,6 +177,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
       );
       return;
     }
+    console.log(medicion);
 
     const taxilitrosFaltantes = picosList.filter(
       (p) => !taxilitros[p.id_pico] || taxilitros[p.id_pico].trim() === "",
@@ -224,7 +227,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
         hora,
         ci_playero: Number(sesionLocal.cedula),
         litros: totalizadorLitros,
-        observacion: obs + "|" + obsAdicional,
+        observacion: obs,
         fotos_observacion: base64Images,
         med_tanques: medicion,
         med_picos: resultadosTotalizadores.map((result) => ({
@@ -499,7 +502,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
       />
       <ScrollView
         className="flex-1"
-        contentContainerStyle={{ padding: 16, gap: 16, alignItems: "center" }}
+        contentContainerStyle={{ padding: 16, gap: 16, alignItems: "center", paddingBottom: insets.bottom + 40  }}
         showsVerticalScrollIndicator={false}
       >
         {/* Selección de bodega */}
@@ -523,6 +526,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
             iconSize="md"
             onPress={() => {
               if (medicion?.length > 0) {
+                console.log(medicion);
                 Alert.alert(
                   "Medición existente",
                   "Ya hay una medición inicial cargada. ¿Desea continuar?",

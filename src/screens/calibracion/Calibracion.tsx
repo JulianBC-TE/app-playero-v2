@@ -8,9 +8,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Pressable,
+  Image,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { InputCard } from "@/components/InputCard";
 import { Photo } from "@/components/Photo";
@@ -36,11 +39,13 @@ import {
 // ── BD ────────────────────────────────────────────────────────────────────────
 import { getPicosByBodega, getPicos } from "@DBmodules/picoDB";
 import { getBodegasByIdSucursal } from "@DBmodules/bodegaDB";
-import { anularUltimoFinTurnoPorBodega, getTipoByBodega, getTurnoStatusLocal } from "@DBmodules/turnoBD";
-import { CalibracionDTO } from "@/dto/CalibracionDTO";
+import {
+  anularUltimoFinTurnoPorBodega,
+  getTipoByBodega,
+  getTurnoStatusLocal,
+} from "@DBmodules/turnoBD";
 import { saveCalibracionLocal } from "@/backend/db/modules/calibracionDB";
 
-// Interfaz extendida localmente para dar soporte a las nuevas fotos de taxilitros
 interface MedicionesCalibracionExtendida {
   taxilitroInicial: number;
   taxilitroFinal: number;
@@ -49,7 +54,7 @@ interface MedicionesCalibracionExtendida {
   totalMediciones: number;
   sequencias: {
     valor_medicion: string;
-    foto_medicion: string;
+    foto_medicion: string; 
     taxilitro: number;
     litros_cargados: number;
     foto_taxilitro_carga: string;
@@ -64,13 +69,11 @@ export function Calibracion({
     { label: "Verificación", value: "1" },
     { label: "Calibración", value: "2" },
   ]);
-  const [valoresTemporales, setValoresTemporales] = useState<FormData | null>(
-      null,
-    );
   const [tipoOperacionSeleccionado, setTipoOperacionSeleccionado] =
     useState("");
+  const insets = useSafeAreaInsets();
   const [turnoCerrado, setTurnoCerrado] = useState(false);
-  const { sucursal, user } = useAppContext();
+  const { sucursal } = useAppContext();
   const [picos, setPicos] = useState<PicoDTO[]>([]);
   const [selectedPico, setSelectedPico] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -84,10 +87,9 @@ export function Calibracion({
     useState<string>("");
   const [numeroPrecintoColocado, setNumeroPrecintoColocado] = useState("");
   const [numeroPrecintoAtual, setNumeroPrecintoAtual] = useState("");
-  const [salida, setSalida] = useState(0);
+  const [salida] = useState(0);
   const [motivoConfirmado, setMotivoConfirmado] = useState(false);
 
-  // Estado local adaptado a la interfaz extendida con fotos
   const [mediciones, setMediciones] = useState<MedicionesCalibracionExtendida>({
     taxilitroInicial: 0,
     taxilitroFinal: 0,
@@ -99,9 +101,35 @@ export function Calibracion({
 
   const [estadoRestaurado, setEstadoRestaurado] = useState(false);
 
+  const autosaveBloqueadoRef = useRef(false);
+  const ultimoGuardadoPromiseRef = useRef<Promise<void> | null>(null);
+
+  const confirmarEliminacion = (
+    onConfirm: () => void,
+    titulo: string = "Eliminar imagen",
+    mensaje: string = "¿Estás seguro de que deseas eliminar esta foto?",
+  ) => {
+    Alert.alert(
+      titulo,
+      mensaje,
+      [
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: onConfirm,
+        },
+      ],
+      { cancelable: true },
+    );
+  };
+
   // ─── Guardar estado en storage ────────────────────────────────────────────
   const guardarEstado = useCallback(async () => {
-    if (!estadoRestaurado) return;
+    if (!estadoRestaurado || autosaveBloqueadoRef.current) return;
     try {
       const now = new Date();
       const fecha = now.toISOString().slice(0, 10);
@@ -132,17 +160,19 @@ export function Calibracion({
         photoPrecintoAtual,
         photoPrecintoColocado,
         firma,
-        tipoOperationSeleccionado: tipoOperacionSeleccionado, // ◄ Corregido a tipoOperationSeleccionado
+        tipoOperationSeleccionado: tipoOperacionSeleccionado,
         taxilitroInicial: mediciones.taxilitroInicial,
         taxilitroFinal: mediciones.taxilitroFinal,
-        fotoInicialTaxilitro: mediciones.fotoInicialTaxilitro, // ◄ Añadido
-        fotoFinalTaxilitro: mediciones.fotoFinalTaxilitro,     // ◄ Añadido
+        fotoInicialTaxilitro: mediciones.fotoInicialTaxilitro,
+        fotoFinalTaxilitro: mediciones.fotoFinalTaxilitro,
         totalMediciones: mediciones.totalMediciones,
         sequencias: mediciones.sequencias,
         turnoCerrado,
       };
 
-      await saveCalibracion(estado);
+      const promesa = saveCalibracion(estado);
+      ultimoGuardadoPromiseRef.current = promesa;
+      await promesa;
     } catch (error) {
       console.log("[Calibracion] Error al guardar estado:", error);
     }
@@ -190,7 +220,7 @@ export function Calibracion({
                     style: "destructive",
                     onPress: async () => {
                       await removeCalibracion();
-                      navigation.dispatch(e.data.action);
+                      navigation.navigate("home"); // ◄ Redirige directamente a Home
                     },
                   },
                 ],
@@ -201,7 +231,7 @@ export function Calibracion({
             text: "Guardar y salir",
             onPress: async () => {
               await guardarEstado();
-              navigation.dispatch(e.data.action);
+              navigation.navigate("home"); // ◄ Redirige directamente a Home
             },
           },
         ],
@@ -217,7 +247,7 @@ export function Calibracion({
         const estadoGuardado = await getStorageCalibracion();
         if (estadoGuardado) {
           setTipoOperacionSeleccionado(
-            estadoGuardado.tipoOperationSeleccionado ?? "", // ◄ Corregido a tipoOperationSeleccionado
+            estadoGuardado.tipoOperationSeleccionado ?? "",
           );
           setSelectedPico(estadoGuardado.selectedPico);
           setObs(estadoGuardado.obs);
@@ -239,8 +269,8 @@ export function Calibracion({
             setMediciones({
               taxilitroInicial: estadoGuardado.taxilitroInicial,
               taxilitroFinal: estadoGuardado.taxilitroFinal,
-              fotoInicialTaxilitro: estadoGuardado.fotoInicialTaxilitro ?? "", // ◄ Añadido
-              fotoFinalTaxilitro: estadoGuardado.fotoFinalTaxilitro ?? "",     // ◄ Añadido
+              fotoInicialTaxilitro: estadoGuardado.fotoInicialTaxilitro ?? "",
+              fotoFinalTaxilitro: estadoGuardado.fotoFinalTaxilitro ?? "",
               totalMediciones: estadoGuardado.totalMediciones,
               sequencias: estadoGuardado.sequencias,
             });
@@ -255,15 +285,15 @@ export function Calibracion({
     restaurarEstado();
   }, []);
 
-  // ─── Parámetros de navegación (retorno desde subpantallas) ────────────────
+  // ─── Parámetros de navegación ────────────────────────────────────────────
   useEffect(() => {
     if (route.params?.onSequencia) {
       const seqData = route.params.onSequencia as any;
       setMediciones({
         taxilitroInicial: seqData.taxilitroInicial,
         taxilitroFinal: seqData.taxilitroFinal,
-        fotoInicialTaxilitro: seqData.fotoInicialTaxilitro || "", // ◄ Corregido
-        fotoFinalTaxilitro: seqData.fotoFinalTaxilitro || "",     // ◄ Corregido
+        fotoInicialTaxilitro: seqData.fotoInicialTaxilitro || "",
+        fotoFinalTaxilitro: seqData.fotoFinalTaxilitro || "",
         totalMediciones: seqData.totalMediciones,
         sequencias: seqData.sequencias || [],
       });
@@ -281,7 +311,6 @@ export function Calibracion({
     fetchPicos();
   }, []);
 
-  // ─── Handlers de foto ─────────────────────────────────────────────────────
   function handlePhotoObs(image: string) {
     setPhotoObs(image);
   }
@@ -292,46 +321,6 @@ export function Calibracion({
     setPhotoPrecintoAtual(image);
   }
 
-  async function handlePhotoPrecinto(tipo: "colocado" | "retirado" | "obs") {
-    try {
-      setIsLoading(true);
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permiso", "Necesitamos permiso para acceder a la cámara.");
-        return;
-      }
-      const photoSelected = await ImagePicker.launchCameraAsync({
-        mediaTypes: "images",
-        allowsEditing: false,
-        aspect: [4, 4],
-        quality: 0.3,
-        base64: true,
-      });
-      if (!photoSelected.canceled) {
-        const { base64 } = photoSelected.assets[0];
-        if (typeof base64 === "string") {
-          switch (tipo) {
-            case "obs":
-              setPhotoObs(base64);
-              break;
-            case "colocado":
-              setPhotoPrecintoColocado(base64);
-              break;
-            case "retirado":
-              setPhotoPrecintoAtual(base64);
-              break;
-          }
-          toastSuccess("Registro Fotográfico", "Foto capturada exitosamente.");
-        }
-      }
-    } catch (error) {
-      toastError("Error al capturar foto", "Intente nuevamente más tarde.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  // ─── Validación antes de ir a secuencias ──────────────────────────────────
   async function handleVerificacion() {
     if (tipoOperacionSeleccionado === "") {
       Alert.alert(
@@ -355,20 +344,6 @@ export function Calibracion({
         );
         return;
       }
-      if (!numeroPrecintoColocado) {
-        Alert.alert(
-          "Precinto",
-          "Debe ingresar el número de precinto a colocar.",
-        );
-        return;
-      }
-      if (!photoPrecintoColocado) {
-        Alert.alert(
-          "Precinto",
-          "Debe capturar una foto del precinto colocado.",
-        );
-        return;
-      }
     }
     if (!selectedPico) {
       Alert.alert("Pico requerido", "Debe seleccionar un pico expedidor.");
@@ -384,10 +359,13 @@ export function Calibracion({
       );
       return;
     }
-    navigation.navigate("sequencias", { pico_surtidor: Number(selectedPico), descripcion_pico: picoSurtidor?.descripcion_pico});
+    navigation.navigate("sequencias", {
+      pico_surtidor: Number(selectedPico),
+      descripcion_pico: picoSurtidor?.descripcion_pico,
+      medicionesExistentes: mediciones,
+    } as any);
   }
 
-  // ─── Fetch de picos desde BD ──────────────────────────────────────────────
   async function fetchPicos() {
     setIsLoading(true);
     try {
@@ -420,7 +398,6 @@ export function Calibracion({
     }
   }
 
-  // ─── Guardar todo en BD local ─────────────────────────────────────────────
   async function saveAllData() {
     if (!persona) {
       Alert.alert(
@@ -448,17 +425,20 @@ export function Calibracion({
           id_pico = pico.id_pico;
         }
       });
-      
+
       const tipoTurno = await getTipoByBodega(Number(id_bodega));
-      
-      if ((tipoTurno === "2") && !motivoConfirmado) {
-        //setValoresTemporales(data); // Respaldamos el objeto data completo
-        setTurnoCerrado(true); // Muestra el modal del motivo
+
+      if (tipoTurno === "2" && !motivoConfirmado) {
+        setTurnoCerrado(true);
         setIsLoading(false);
         return;
-      }      
+      }
 
-      // Mapeo adaptado con el tipado dinámico para incluir las nuevas propiedades al payload
+      autosaveBloqueadoRef.current = true;
+      if (ultimoGuardadoPromiseRef.current) {
+        await ultimoGuardadoPromiseRef.current;
+      }
+
       const payload: any = {
         fecha_hora: fecha,
         hora,
@@ -469,8 +449,6 @@ export function Calibracion({
         pico: id_pico,
         taxilitro_inicial: mediciones.taxilitroInicial,
         taxilitro_final: mediciones.taxilitroFinal,
-        
-        // Inyección de fotos de taxilitros globales corregidas
         foto_inicial_taxilitro: mediciones.fotoInicialTaxilitro,
         foto_final_taxilitro: mediciones.fotoFinalTaxilitro,
 
@@ -490,7 +468,7 @@ export function Calibracion({
           foto_med_balde: medicion.foto_medicion,
           taxilitro_carga: medicion.taxilitro.toString(),
           litros_cargados: medicion.litros_cargados ?? 0,
-          foto_taxilitro_carga: medicion.foto_taxilitro_carga, // ◄ Foto interna de cada secuencia
+          foto_taxilitro_carga: medicion.foto_taxilitro_carga,
         })),
       };
 
@@ -500,18 +478,18 @@ export function Calibracion({
 
       toastSuccess(
         "Calibración guardada",
-        "Los datos se han guardado correctamente."
+        "Los datos se han guardado correctamente.",
       );
       navigation.navigate("home");
     } catch (error) {
       console.error("Error al guardar calibración:", error);
       toastError("Error al guardar", "Intente nuevamente más tarde.");
+      autosaveBloqueadoRef.current = false;
     } finally {
       setIsLoading(false);
     }
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return turnoCerrado && !motivoConfirmado ? (
     <View className="flex-1">
       <ScreenHeader title="Turno Cerrado" />
@@ -520,7 +498,10 @@ export function Calibracion({
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: insets.bottom + 40,
+          }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -579,7 +560,10 @@ export function Calibracion({
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: insets.bottom + 40,
+          }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -635,17 +619,76 @@ export function Calibracion({
                     onChangeText={setNumeroPrecintoAtual}
                   />
                 </View>
+              </InputCard>
+            )}
+            {tipoOperacionSeleccionado === "2" && (
+              <InputCard title="Foto Precinto a Retirar">
+                <View className="flex-row items-center p-2 gap-2">
+                  {photoPrecintoAtual ? (
+                    <Pressable
+                      onPress={() =>
+                        confirmarEliminacion(() => handlePhotoPrecintoAtual(""))
+                      }
+                    >
+                      <Image
+                        source={{
+                          uri: `data:image/jpeg;base64,${photoPrecintoAtual}`,
+                        }}
+                        className="w-56 h-36 rounded-lg border border-gray-300"
+                        resizeMode="cover"
+                      />
+                    </Pressable>
+                  ) : null}
+                </View>
                 <View className="flex-row items-center p-2 gap-2">
                   <Photo
                     form="button"
                     disabled={isLoading}
                     iconSize="lg"
-                    iconColor={isLoading ? "#756868eb" : "#000"}
+                    iconColor={photoPrecintoAtual ? "#05a722" : "#000"}
                     setImage={handlePhotoPrecintoAtual}
                   />
                 </View>
               </InputCard>
             )}
+
+            <InputCard
+              title="Verificación del pico"
+              required={true}
+              locked={salida !== 0}
+            >
+              {mediciones.totalMediciones === 0 ? (
+                <Button
+                  title="Verificar"
+                  onPress={() => {
+                    handleVerificacion();
+                  }}
+                  isLoading={isLoading}
+                  icon={Fuel}
+                  iconSize="md"
+                  iconColor="#000"
+                />
+              ) : (
+                <View className="gap-3 w-full items-center">
+                  <Text className="text-lg text-black font-bold">
+                    Mediciones Realizadas: {mediciones.totalMediciones}
+                  </Text>
+                  {salida === 0 && (
+                    <Button
+                      title="Continuar"
+                      onPress={() => {
+                        handleVerificacion();
+                      }}
+                      isLoading={isLoading}
+                    />
+                  )}
+                </View>
+              )}
+              <View className="gap-3 w-full items-center">
+                <Text className="text-lg text-black font-bold"></Text>
+              </View>
+            </InputCard>
+
             {tipoOperacionSeleccionado === "2" && (
               <InputCard
                 title="Número de Precinto colocado"
@@ -661,43 +704,39 @@ export function Calibracion({
                     onChangeText={setNumeroPrecintoColocado}
                   />
                 </View>
+              </InputCard>
+            )}
+            
+            {tipoOperacionSeleccionado === "2" && (
+              <InputCard title="Foto Precinto a Retirar">
+                <View className="flex-row items-center p-2 gap-2">
+                  {photoPrecintoColocado ? (
+                    <Pressable
+                      onPress={() =>
+                        confirmarEliminacion(() => handlePhotoPrecintoColocado(""))
+                      }
+                    >
+                      <Image
+                        source={{
+                          uri: `data:image/jpeg;base64,${photoPrecintoColocado}`,
+                        }}
+                        className="w-56 h-36 rounded-lg border border-gray-300"
+                        resizeMode="cover"
+                      />
+                    </Pressable>
+                  ) : null}
+                </View>
                 <View className="flex-row items-center p-2 gap-2">
                   <Photo
                     form="button"
                     disabled={salida !== 0}
                     iconSize="lg"
-                    iconColor={salida !== 0 ? "#756868eb" : "#000"}
+                    iconColor={photoPrecintoColocado ? "#05a722" : "#000"}
                     setImage={handlePhotoPrecintoColocado}
                   />
                 </View>
               </InputCard>
             )}
-
-            <InputCard
-              title="Verificación del pico"
-              required={true}
-              locked={salida !== 0}
-            >
-              {mediciones.totalMediciones === 0 && (
-                <Button
-                  title="Verificar"
-                  onPress={() => {
-                    handleVerificacion();
-                  }}
-                  isLoading={isLoading}
-                  icon={Fuel}
-                  iconSize="md"
-                  iconColor="#000"
-                />
-              )}
-              {mediciones.totalMediciones > 0 && (
-                <>
-                  <Text className="text-lg text-black font-bold">
-                    Mediciones Realizadas: {mediciones.totalMediciones}
-                  </Text>
-                </>
-              )}
-            </InputCard>
 
             {mediciones.totalMediciones > 0 && (
               <InputCard title="Observaciones" locked={salida !== 0}>
@@ -779,12 +818,6 @@ export function Calibracion({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f0f0f0",
-  },
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -797,11 +830,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderRadius: 10,
     elevation: 5,
-  },
-  title: {
-    fontSize: 18,
-    marginBottom: 20,
-    textAlign: "center",
   },
   button: {
     marginTop: 20,

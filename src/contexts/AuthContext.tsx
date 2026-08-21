@@ -64,69 +64,7 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
   const [isLoadingServerIP, setIsLoadingServerIP] = useState(true);
   const [serverIP, setServerIPState] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(false);
-
-  // ── signIn ────────────────────────────────────────────────────────────────
-  // Retorna true si el login fue online (para que el caller decida si sincronizar).
-
-  /*async function signIn(cedula: number, password: string): Promise<boolean> {
-  setIsLoadingUserData(true);
-  try {
-    const online = await httpClient.isOnline();
-
-    if (online) {
-      // ── Login online ──────────────────────────────────────────────────
-      const loginData = await login(cedula, password);
-      
-      const userData: UserDTO = { 
-        cedula: loginData.persona.cedula, 
-        name: loginData.persona.nombreApellido 
-      };
-      
-      await saveAuthToken({ 
-        token: loginData.token, 
-        refresh_token: loginData.usuarioApp.refreshToken ?? "" 
-      });
-      
-      await saveUser(userData);
-      
-      // Guardar datos localmente con las funciones compartidas
-      await saveUserLocally(loginData);
-
-      httpClient.setToken(loginData.token);
-      setUser(userData);
-      setIsOffline(false);
-
-      return true; // ← online
-    } else {
-      // ── Login offline ─────────────────────────────────────────────────
-      const result = await loginOffline(cedula, password);
-
-      if (!result.ok) {
-        const messages: Record<typeof result.reason, string> = {
-          not_last_user:
-            "Para cambiar de usuario necesitás conexión al servidor.",
-          wrong_password: "Contraseña incorrecta.",
-          no_local_user:
-            "No hay datos locales. Conectate al servidor para hacer el primer login.",
-          error: "Error al iniciar sesión offline.",
-        };
-        throw new Error(messages[result.reason]);
-      }
-
-      const userData: UserDTO = {
-        cedula: Number(result.user.cedula),
-        name: result.user.name,
-      };
-      await saveUser(userData);
-      setUser(userData);
-      setIsOffline(true);
-
-      return false; // ← offline
-    }
-  } finally {
-    setIsLoadingUserData(false);
-  }
-}*/
+  
   async function signIn(cedula: number, password: string, onSyncInitialData?: () => Promise<void>): Promise<boolean> {
     setIsLoadingUserData(true);
     try {
