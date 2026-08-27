@@ -1,6 +1,7 @@
 import { 
   syncClientesFromCentral 
 } from "../modules/clienteDB";
+import { sincronizarCubicacionesMasivas } from "./sincronizarCubicaciones";
 import {
   syncPersonasFromCentral,
   syncPersonasToCentral,
@@ -115,6 +116,7 @@ export async function syncCatalogosFromCentral(idUser: number): Promise<boolean>
     await syncPersonasFromCentral();
     await syncClientesFromCentral();
     await syncVehiculosFromCentral();
+    await sincronizarCubicacionesMasivas();
     console.log("📤 BAJADA -> Finalizada");
     return estaBloqueado; // ◄ Retornamos el estado
   } catch (error) {

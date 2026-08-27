@@ -1,6 +1,7 @@
 import { db } from "@/backend/db/client"; // Ajusta a la ruta de tu instancia Drizzle
 import { tanques } from "@/backend/db/schema"; // Ajusta a la ruta de tu esquema Drizzle
 import { cubicacionApi } from "@/backend/api/cubicacionAPI";
+import { cubicacionService } from "../modules/cubicacionDB";
 
 export interface ResultadoSyncCubicaciones {
   exito: boolean;
@@ -12,6 +13,7 @@ export interface ResultadoSyncCubicaciones {
 /**
  * Recorre todos los tanques locales en SQLite, consulta sus tablas
  * de cubicación al servidor y las persiste localmente.
+ * Solo sincroniza cubicaciones para tanques que NO tienen cubicaciones locales.
  */
 export async function sincronizarCubicacionesMasivas(): Promise<ResultadoSyncCubicaciones> {
   const resultado: ResultadoSyncCubicaciones = {
@@ -34,6 +36,15 @@ export async function sincronizarCubicacionesMasivas(): Promise<ResultadoSyncCub
     // 2. Iterar secuencialmente por cada tanque para descargar e insertar sus datos
     for (const tanque of listaTanques) {
       try {
+        // Verificar si el tanque ya tiene cubicaciones locales
+        const tieneCubicaciones = await cubicacionService.tanqueTieneCubicaciones(tanque.idTanque);
+        
+        if (tieneCubicaciones) {
+          // Si ya tiene cubicaciones, omitir este tanque
+          continue;
+        }
+
+        // Solo sincronizar si el tanque NO tiene cubicaciones locales
         await cubicacionApi.sincronizarCubicacionTanque(tanque.idTanque);
         resultado.procesadosCorrectamente++;
       } catch (error) {

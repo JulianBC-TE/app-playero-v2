@@ -1,6 +1,6 @@
 import { db } from "@/backend/db/client";
 import { cubicacionTanque, CubicacionTanqueInsert } from "../schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, count } from "drizzle-orm";
 import { PuntoCubicacionDTO } from "@/backend/api/cubicacionAPI"; // O la ruta correspondiente a tus DTOs
 
 /**
@@ -89,5 +89,16 @@ export const cubicacionService = {
     await db
       .delete(cubicacionTanque)
       .where(eq(cubicacionTanque.idTanque, idTanque));
+  },
+
+  /**
+   * Verifica si un tanque tiene cubicaciones registradas localmente.
+   */
+  async tanqueTieneCubicaciones(idTanque: number): Promise<boolean> {
+    const resultado = await db
+      .select({ total: count() })
+      .from(cubicacionTanque)
+      .where(eq(cubicacionTanque.idTanque, idTanque));
+    return resultado[0].total > 0;
   },
 };
