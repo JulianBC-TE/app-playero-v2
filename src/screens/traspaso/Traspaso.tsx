@@ -61,6 +61,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   const [bodygaDestino, setBodegaDestino] = useState<BodegaDTO[]>([]);
   const { sucursal, user } = useAppContext();
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [turnoCerrado, setTurnoCerrado] = useState(false);
   const [medicionInicial, setMedicionInicial] = useState<MedicionDTO[]>([]);
   const [medicionFinal, setMedicionFinal] = useState<MedicionDTO[]>([]);
@@ -93,6 +94,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     cargaCombustible: string;
     taxilitroInicial: string;
     taxilitroFinal: string;
+    base64TaxilitroInicial: string;
+    base64TaxilitroFinal: string;
   } | null>(null);
   const insets = useSafeAreaInsets();
 
@@ -177,10 +180,12 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       regla_altura_inicial: medicionInicial[0]?.regla.toString() ?? "",
       litros_tanque_inicial: medicionInicial[0]?.litros ?? 0,
       temp_inicial: medicionInicial[0]?.temperatura ?? 0,
-      regla_altura_final: existing?.regla_altura_final ?? "",
-      litros_tanque_final: existing?.litros_tanque_final ?? 0,
-      temp_final: existing?.temp_final ?? 0,
-      foto_medicion_final: existing?.foto_medicion_final ?? [],
+      regla_altura_final: medicionFinal[0]?.regla?.toString() ?? "",
+      litros_tanque_final: medicionFinal[0]?.litros ?? 0,
+      temp_final: medicionFinal[0]?.temperatura ?? 0,
+      foto_medicion_final: medicionFinal[0]?.foto_tanque
+        ? [medicionFinal[0].foto_tanque]
+        : [],
       id_pico: Number(selectedPico),
       taxilitro_inicial: toNumber(taxilitroInicial),
       taxilitro_final: toNumber(taxilitroFinal),
@@ -194,12 +199,12 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
         : [],
       foto_taxilitro: base64TaxilitroInicial
         ? [base64TaxilitroInicial]
-        : (existing?.foto_taxilitro ?? []),
+        : [],
       foto_taxilitro_fin: base64TaxilitroFinal
         ? [base64TaxilitroFinal]
-        : (existing?.foto_taxilitro_fin ?? []),
-      fecha: existing?.fecha ?? fecha,
-      hora: existing?.hora ?? hora,
+        : [],
+      fecha: fecha,
+      hora: hora,
       firma_receptor: existing?.firma_receptor ?? [],
       id_playero: Number(user.cedula),
       id_encargado_receptor: Number(persona?.cedula) || 0,
@@ -222,6 +227,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       cargaCombustible,
       taxilitroInicial,
       taxilitroFinal,
+      base64TaxilitroInicial,
+      base64TaxilitroFinal,
     };
     return JSON.stringify(actual) !== JSON.stringify(estadoInicial);
   }, [
@@ -236,6 +243,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     cargaCombustible,
     taxilitroInicial,
     taxilitroFinal,
+    base64TaxilitroInicial,
+    base64TaxilitroFinal,
   ]);
 
   useEffect(() => {
@@ -289,6 +298,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   }, [navigation, huboCambios, isLoading, estadoRestaurado, medicionInicial]);
 
   async function handleSaveAll() {
+    if (isSaving) return;
+
     if (!persona) {
       Alert.alert("Persona requerida", "Debe seleccionar un chofer/operador.");
       return;
@@ -394,6 +405,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       delete (payload as any).last_id_salida;
       delete (payload as any).obs_adicional;
 
+      setIsSaving(true);
       setIsLoading(true);
 
       await saveTraspasoLocal(payload);
@@ -407,6 +419,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       console.log(error);
       toastError("Traspaso", "Ocurrió un error al guardar el traspaso.");
     } finally {
+      setIsSaving(false);
       setIsLoading(false);
     }
   }
@@ -507,6 +520,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
             taxilitroFinal: storedTraspaso.taxilitro_final
               ? storedTraspaso.taxilitro_final.toString()
               : "",
+            base64TaxilitroInicial: fotoTaxilitroInit,
+            base64TaxilitroFinal: fotoTaxilitroEnd,
           });
         } else {
           setEstadoInicial({
@@ -519,6 +534,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
             cargaCombustible: "",
             taxilitroInicial: "",
             taxilitroFinal: "",
+            base64TaxilitroInicial: "",
+            base64TaxilitroFinal: "",
           });
           setSelectedBodegaOrigem("");
         }
@@ -567,24 +584,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     base64TaxilitroInicial,
     taxilitroFinal,
     base64TaxilitroFinal,
+    medicionFinal,
   ]);
-
-  useEffect(() => {
-    if (medicionFinal.length > 0) {
-      (async () => {
-        const stored = await getStorageTraspaso();
-        if (stored) {
-          stored.regla_altura_final = medicionFinal[0].regla.toString();
-          stored.litros_tanque_final = medicionFinal[0].litros;
-          stored.temp_final = medicionFinal[0].temperatura;
-          stored.foto_medicion_final = medicionFinal[0].foto_tanque
-            ? [medicionFinal[0].foto_tanque]
-            : [];
-          await saveTraspaso(stored);
-        }
-      })();
-    }
-  }, [medicionFinal]);
 
   useEffect(() => {
     if (selectedBodegaOrigem) {
@@ -627,14 +628,16 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                 return;
               }
               let stored = await getStorageTraspaso();
+              const now = new Date();
+              const fecha = now.toISOString().slice(0, 10);
+              const hora = now.toTimeString().slice(0, 8);
               if (stored) {
                 stored.obs_traspaso = obs;
                 stored.obs_adicional = obsAdicional;
+                stored.fecha = fecha;
+                stored.hora = hora;
                 await saveTraspaso(stored);
               } else {
-                const now = new Date();
-                const fecha = now.toISOString().slice(0, 10);
-                const hora = now.toTimeString().slice(0, 8);
 
                 const minimalData: TraspasoDTO = {
                   bod_origen: Number(selectedBodegaOrigem),
@@ -798,6 +801,20 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 
             {/* Medición Inicial: Muestra botón y desglose de Altura/Litros */}
             <InputCard title="Medición Inicial del Tanque Receptor" required>
+              {medicionInicial && medicionInicial.length > 0 && (
+                <View className="w-full items-center p-2 mt-2 bg-gray-100 rounded-md border border-gray-200">
+                  <Text className="text-md font-bold text-gray-800">
+                    Altura: {medicionInicial[0].regla} cm  —  {medicionInicial[0].litros.toLocaleString()} L
+                  </Text>
+                  {Boolean(medicionInicial[0].temperatura) && (
+                    <Text className="text-xs text-gray-500 mt-1">
+                      Temperatura: {medicionInicial[0].temperatura} °C
+                    </Text>
+                  )}
+                </View>
+              )}
+              <View><Text className="text-xs text-gray-500">
+              </Text></View>
               <Button
                 disabled={selectedBodegaDestino === ""}
                 title="Medir"
@@ -838,19 +855,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                   }
                 }}
               />
-
-              {medicionInicial && medicionInicial.length > 0 && (
-                <View className="w-full items-center p-2 mt-2 bg-gray-100 rounded-md border border-gray-200">
-                  <Text className="text-md font-bold text-gray-800">
-                    Altura: {medicionInicial[0].regla} cm  —  {medicionInicial[0].litros.toLocaleString()} L
-                  </Text>
-                  {Boolean(medicionInicial[0].temperatura) && (
-                    <Text className="text-xs text-gray-500 mt-1">
-                      Temperatura: {medicionInicial[0].temperatura} °C
-                    </Text>
-                  )}
-                </View>
-              )}
               <View><Text className="text-xs text-gray-500">
               </Text></View>
             </InputCard>
@@ -870,6 +874,20 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 
             {/* Medición Final: Muestra botón y desglose de Altura/Litros */}
             <InputCard title="Medición Final del Tanque Receptor" required>
+              {medicionFinal && medicionFinal.length > 0 && (
+                <View className="w-full items-center p-2 mt-2 bg-gray-100 rounded-md border border-gray-200">
+                  <Text className="text-md font-bold text-gray-800">
+                    Altura: {medicionFinal[0].regla} cm  —  {medicionFinal[0].litros.toLocaleString()} L
+                  </Text>
+                  {Boolean(medicionFinal[0].temperatura) && (
+                    <Text className="text-xs text-gray-500 mt-1">
+                      Temperatura: {medicionFinal[0].temperatura} °C
+                    </Text>
+                  )}
+                </View>
+              )}
+              <View><Text className="text-xs text-gray-500">
+              </Text></View>
               <Button
                 disabled={selectedBodegaDestino === ""}
                 title="Medir"
@@ -910,19 +928,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                   }
                 }}
               />
-
-              {medicionFinal && medicionFinal.length > 0 && (
-                <View className="w-full items-center p-2 mt-2 bg-gray-100 rounded-md border border-gray-200">
-                  <Text className="text-md font-bold text-gray-800">
-                    Altura: {medicionFinal[0].regla} cm  —  {medicionFinal[0].litros.toLocaleString()} L
-                  </Text>
-                  {Boolean(medicionFinal[0].temperatura) && (
-                    <Text className="text-xs text-gray-500 mt-1">
-                      Temperatura: {medicionFinal[0].temperatura} °C
-                    </Text>
-                  )}
-                </View>
-              )}
+              <View><Text className="text-xs text-gray-500">
+              </Text></View>
             </InputCard>
 
             <InputCard title="Taxilitro Final" required>
@@ -969,6 +976,40 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                     base64Obs && base64Obs.length > 0 ? "#05a722" : "#000"
                   }
                   setImage={(base64) => setBase64Obs(base64)}
+                  disabled={isLoading}
+                />
+              </View>
+            </InputCard>
+
+            
+            <InputCard title="Foto Taxilitro Final" required>
+                <View className="flex-row items-center p-2 gap-2">
+                  {base64TaxilitroFinal && base64TaxilitroFinal.length > 0 ? (
+                    <Pressable
+                      onPress={() =>
+                        confirmarEliminacion(() => setBase64TaxilitroFinal(""))
+                      }
+                    >
+                      <Image
+                        source={{
+                          uri: `data:image/jpeg;base64,${base64TaxilitroFinal}`,
+                        }}
+                        className="w-56 h-36 rounded-lg border border-gray-300"
+                        resizeMode="cover"
+                      />
+                    </Pressable>
+                  ) : null}
+                </View>
+              <View className="flex-row items-center p-2 gap-2">
+                <Photo
+                  form="button"
+                  iconSize="lg"
+                  iconColor={
+                    base64TaxilitroFinal && base64TaxilitroFinal.length > 0
+                      ? "#05a722"
+                      : "#000"
+                  }
+                  setImage={(base64) => setBase64TaxilitroFinal(base64)}
                   disabled={isLoading}
                 />
               </View>

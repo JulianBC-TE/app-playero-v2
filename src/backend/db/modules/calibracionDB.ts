@@ -124,7 +124,7 @@ export async function marcarCalibracionSync(idLocal: number): Promise<void> {
 export async function marcarCalibracionErrorSync(idLocal: number): Promise<void> {
   await db
     .update(calibraciones)
-    .set({ sync: 0 })
+    .set({ sync: -1 })
     .where(eq(calibraciones.idCalibracion, idLocal));
 }
 

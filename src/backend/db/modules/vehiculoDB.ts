@@ -246,7 +246,7 @@ export async function getVehiculosPendientesSync(): Promise<VehiculoDTO[]> {
     })
     .from(vehiculos)
     .where(eq(vehiculos.sync, 0));
-
+  console.log(`⚪ VEHÍCULOS -> Pendientes de sync: ${rows.length}`);
   return rows.map((r) => ({
     id_vehiculo: r.idVehiculo,
     descripcion_vehiculo: r.descripcionVehiculo,

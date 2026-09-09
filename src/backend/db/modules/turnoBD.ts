@@ -124,24 +124,15 @@ export async function getTipoByBodega(
  */
 export async function getTurnosPendientes() {
   // 1️⃣ Ordenamos por idTurno para asegurar que el conteo (1, 2, 3) sea cronológico
-  let result = await db
+  const result = await db
     .select()
     .from(turnos)
     .where(eq(turnos.sync, 0))
     .orderBy(turnos.idTurno);
 
   if (result.length === 0) {
-    const resultB = await db
-      .select()
-      .from(turnos)
-      .where(eq(turnos.sync, -1))
-      .orderBy(turnos.idTurno);
-    if (resultB.length === 0) {
-      //console.log("⚪ TURNO -> Nada pendiente para subir");
-      return [];
-    } else {
-      result = resultB;
-    }
+    //console.log("⚪ TURNO -> Nada pendiente para subir");
+    return [];
   }
 
   // 2️⃣ Diccionario para llevar la cuenta de "FIN-TURNO" por cada bodega en este lote

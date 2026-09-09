@@ -250,7 +250,7 @@ export async function marcarAbastecimientoSync(id: number): Promise<void> {
 export async function marcarAbastecimientoErrorSync(id: number): Promise<void> {
   await db
     .update(abastecimientos)
-    .set({ sync: 0 })
+    .set({ sync: -1 })
     .where(eq(abastecimientos.idAbastecimiento, id));
 }
 

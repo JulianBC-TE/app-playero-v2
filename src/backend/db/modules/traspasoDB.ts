@@ -251,7 +251,7 @@ export async function marcarTraspasoSync(id: number): Promise<void> {
 export async function marcarTraspasoErrorSync(id: number): Promise<void> {
   await db
     .update(trapasos)
-    .set({ sync: 0, fechaSincronizacion: Date.now() })
+    .set({ sync: -1, fechaSincronizacion: Date.now() })
     .where(eq(trapasos.idTrapaso, id));
 }
 

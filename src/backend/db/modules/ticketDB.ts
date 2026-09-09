@@ -145,7 +145,7 @@ export async function marcarTicketSync(idTicket: number) {
 export async function marcarTicketErrorSync(idTicket: number) {
   await db
     .update(tickets)
-    .set({ sync: 0 })
+    .set({ sync: -1 })
     .where(eq(tickets.idTicket, idTicket));
 }
 
