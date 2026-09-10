@@ -31,10 +31,26 @@ const SYNC_KEY = "__last_sync_vehiculos__";
 // Todos se marcan como sync=1 (ya están en el servidor).
 // ---------------------------------------------------------------------------
 
-export async function saveVehiculos(items: VehiculoDTO[]): Promise<void> {
-  if (items.length === 0) return;
+export async function saveVehiculos(items: VehiculoDTO[]): Promise<{ saved: number; deleted: number }> {
+  if (items.length === 0) return { saved: 0, deleted: 0 };
+
+  let saved = 0;
+  let deleted = 0;
 
   for (const item of items) {
+    if (item.is_deleted) {
+      const existia = await db
+        .select({ id: vehiculos.idVehiculo })
+        .from(vehiculos)
+        .where(eq(vehiculos.idVehiculo, item.id_vehiculo))
+        .get();
+      if (existia) {
+        await eliminarVehiculoLocal(item.id_vehiculo);
+        deleted++;
+      }
+      continue;
+    }
+
     await db
       .insert(vehiculos)
       .values({
@@ -53,6 +69,7 @@ export async function saveVehiculos(items: VehiculoDTO[]): Promise<void> {
           sync: 1,
         },
       });
+    saved++;
   }
 
   // Registrar timestamp de sincronización
@@ -63,6 +80,8 @@ export async function saveVehiculos(items: VehiculoDTO[]): Promise<void> {
       target: syncs.tipo,
       set: { fecha: Date.now() },
     });
+
+  return { saved, deleted };
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +265,9 @@ export async function getVehiculosPendientesSync(): Promise<VehiculoDTO[]> {
     })
     .from(vehiculos)
     .where(eq(vehiculos.sync, 0));
-  console.log(`⚪ VEHÍCULOS -> Pendientes de sync: ${rows.length}`);
+  if (rows.length > 0) {
+    console.log(`⚪ VEHÍCULOS -> Pendientes de sync: ${rows.length}`);
+  }
   return rows.map((r) => ({
     id_vehiculo: r.idVehiculo,
     descripcion_vehiculo: r.descripcionVehiculo,
@@ -321,18 +342,20 @@ export async function getLastSyncDate(): Promise<number | null> {
  * Descarga vehículos nuevos/modificados desde el servidor central.
  *
  * @param lastTimestamp - Solo se traen registros posteriores a este timestamp.
- * @returns Número de vehículos sincronizados.
+ * @returns Objeto con { saved: cantidad guardados, deleted: cantidad eliminados realmente }.
  * @throws Error si la petición HTTP falla.
  */
-export async function syncVehiculosFromCentral(): Promise<number> {
+export async function syncVehiculosFromCentral(): Promise<{ saved: number; deleted: number }> {
   try {
     const items = await syncGetVehiculos(await syncsController.getTimestamp(SYNC_KEY));
+    let result = { saved: 0, deleted: 0 };
     if (items.length > 0) {
-      await saveVehiculos(items);
+      result = await saveVehiculos(items);
     }
     await syncsController.saveOrUpdate(SYNC_KEY, Date.now());
-    if(items.length > 0)console.log(`✅ VEHÍCULOS -> ok (+${items.length})`);
-    return items.length;
+    if (result.saved > 0) console.log(`✅ VEHÍCULOS -> guardados (+${result.saved})`);
+    if (result.deleted > 0) console.log(`🗑️ VEHÍCULOS -> eliminados (-${result.deleted})`);
+    return result;
   } catch (error) {
     console.error("❌ VEHÍCULOS -> Error:", error.message || error);
     throw error;

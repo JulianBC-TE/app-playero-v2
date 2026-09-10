@@ -14,7 +14,7 @@
 //   - Resto: solo controlado por permisos de módulo.
 
 import { HomeHeader } from "@/components/HomeHeader";
-import { FlatList, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Modal, Text, View } from "react-native";
 import { MenuCard } from "@/components/MenuCard";
 import { StackRoutesList, StackRoutesProps } from "@/route/app.routes";
 import { useCallback, useState, useEffect } from "react";
@@ -22,11 +22,12 @@ import { Loading } from "@/components/Loading";
 import { baseMenuItems, menuItemType } from "@/dto/MenuItens";
 import { useFocusEffect } from "@react-navigation/native";
 import { getBodegasConCierreAnulado, getTurnoStatusLocal } from "@DBmodules/turnoBD";
-import { toastError } from "@/utils/toastMessage";
+import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { getSucursalUsuarioActivoLocal } from "@DBmodules/sucursalDB";
 import { getModulosDelUsuario } from "@DBmodules/moduleDB";
-import { useAuth } from "@hooks/useAuth"; // Reemplazamos useAppContext por useAuth para tener acceso al user y al signOut
+import { useAuth } from "@hooks/useAuth";
 import type { TurnoStatus } from "@/backend/db/services/turnoStatusService";
+import { syncTodo } from "@/backend/db/services/syncService";
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -87,10 +88,12 @@ function tienePermiso(
 export function Home({ navigation }: StackRoutesProps<"home">) {
   const [isLoading, setIsLoading] = useState(true);
   const [menuItems, setMenuItems] = useState<menuItemType[]>(baseMenuItems);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
   
   const { user, signOut } = useAuth(); 
   const cedula = user?.cedula; 
-  const estaBloqueado = !!user?.bloqueado; // Evaluamos estado de bloqueo
+  const estaBloqueado = !!user?.bloqueado;
 
   const [sucursal, setSucursal] = useState<{
     id_sucursal: number;
@@ -120,8 +123,28 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
     };
   }, [estaBloqueado, signOut]);
 
-  function handleOpenMenu(route: keyof StackRoutesList, params?: any) {
-    navigation.navigate(route, params);
+  function handleOpenMenu(route: keyof StackRoutesList | "sync", params?: any) {
+    if (route === "sync") {
+      handleSync();
+      return;
+    }
+    navigation.navigate(route as keyof StackRoutesList, params);
+  }
+
+  async function handleSync() {
+    if (isSyncing || !user?.idUser) return;
+    setIsSyncing(true);
+    setSyncMessage("Iniciando sincronización...");
+    try {
+      await syncTodo(user.idUser, (msg) => setSyncMessage(msg));
+      toastSuccess("Sincronización", "Completada exitosamente");
+    } catch (error) {
+      console.error("[Home] Error en sincronización:", error);
+      toastError("Error", "Error durante la sincronización");
+    } finally {
+      setIsSyncing(false);
+      setSyncMessage("");
+    }
   }
 
   useFocusEffect(
@@ -281,6 +304,21 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
           <Loading />
         </View>
       )}
+
+      {/* Modal de sincronización */}
+      <Modal visible={isSyncing} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 items-center justify-center">
+          <View className="bg-white rounded-2xl p-8 items-center mx-8">
+            <ActivityIndicator size="large" color="#000" />
+            <Text className="text-lg font-semibold mt-4 text-center">
+              {syncMessage}
+            </Text>
+            <Text className="text-sm text-gray-500 mt-2 text-center">
+              Por favor espere...
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

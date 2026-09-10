@@ -10,12 +10,13 @@ import {
   Tractor,
   LucideIcon,
   LayoutList,
+  RefreshCw,
 } from "lucide-react-native";
 
 export type menuItemType = {
   name: string;
   icon: LucideIcon;
-  route: keyof StackRoutesList;
+  route: keyof StackRoutesList | "sync";
   enabled?: boolean;
   turno?: "abierto" | "cerrado" | "pendiente" | "iniciar" | "falta_cerrar";
   params: object;
@@ -73,9 +74,16 @@ export const baseMenuItems: menuItemType[] = [
     params: {},
   },
   {
-    name: "Sincronización",
-    icon: LayoutList, // O el nombre del icono de Ionicons/FontAwesome que uses
+    name: "Envío de datos",
+    icon: LayoutList,
     route: "resumenSincronizacion",
+    enabled: true,
+    params: {},
+  },
+  {
+    name: "Sincronizar",
+    icon: RefreshCw,
+    route: "sync",
     enabled: true,
     params: {},
   },

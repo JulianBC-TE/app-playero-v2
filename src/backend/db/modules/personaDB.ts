@@ -24,10 +24,26 @@ const SYNC_KEY = "__last_sync_personas__";
  *
  * @param items - Lista de {@link PersonaDTO} a insertar o actualizar.
  */
-export async function savePersonas(items: PersonaDTO[]): Promise<void> {
-  if (items.length === 0) return;
+export async function savePersonas(items: PersonaDTO[]): Promise<{ saved: number; deleted: number }> {
+  if (items.length === 0) return { saved: 0, deleted: 0 };
+
+  let saved = 0;
+  let deleted = 0;
 
   for (const item of items) {
+    if (item.is_deleted) {
+      const existia = await db
+        .select({ id: personas.cedula })
+        .from(personas)
+        .where(eq(personas.cedula, item.cedula))
+        .get();
+      if (existia) {
+        await eliminarPersonaLocal(item.cedula);
+        deleted++;
+      }
+      continue;
+    }
+
     await db
       .insert(personas)
       .values({
@@ -44,6 +60,7 @@ export async function savePersonas(items: PersonaDTO[]): Promise<void> {
           sync: 1,
         },
       });
+    saved++;
   }
 
   // Registrar timestamp de sincronización
@@ -54,6 +71,8 @@ export async function savePersonas(items: PersonaDTO[]): Promise<void> {
       target: syncs.tipo,
       set: { fecha: Date.now() },
     });
+
+  return { saved, deleted };
 }
 
 /**
@@ -277,35 +296,37 @@ export async function getLastSyncDate(): Promise<number | null> {
  * Descarga personas nuevas/modificadas desde el servidor central.
  *
  * @param lastTimestamp - Solo se traen registros posteriores a este timestamp.
- * @returns Número de personas sincronizadas.
+ * @returns Objeto con { saved: cantidad guardados, deleted: cantidad eliminados realmente }.
  * @throws Error si la petición HTTP falla.
  */
-export async function syncPersonasFromCentral(): Promise<number> {
+export async function syncPersonasFromCentral(): Promise<{ saved: number; deleted: number }> {
   try {
     const items = await syncGetPersonas(await syncsController.getTimestamp(SYNC_KEY));
+    let result = { saved: 0, deleted: 0 };
     if (items.length > 0) {
-      await savePersonas(items);
+      result = await savePersonas(items);
     }
     await syncsController.saveOrUpdate(SYNC_KEY, Date.now());
-    
-    if(items.length > 0)console.log(`✅ PERSONAS -> ok (+${items.length})`);
-    return items.length;
+    if (result.saved > 0) console.log(`✅ PERSONAS -> guardados (+${result.saved})`);
+    if (result.deleted > 0) console.log(`🗑️ PERSONAS -> eliminados (-${result.deleted})`);
+    return result;
   } catch (error) {
     console.error("❌ PERSONAS -> Error:", error.message || error);
     throw error;
   }
 }
 
-export async function syncPersonasFromCentralInit(): Promise<number> {
+export async function syncPersonasFromCentralInit(): Promise<{ saved: number; deleted: number }> {
   try {
     const items = await syncGetPersonas(0);
+    let result = { saved: 0, deleted: 0 };
     if (items.length > 0) {
-      await savePersonas(items);
+      result = await savePersonas(items);
     }
     await syncsController.saveOrUpdate(SYNC_KEY, Date.now());
-    
-    if(items.length > 0)console.log(`✅ PERSONAS -> ok (+${items.length})`);
-    return items.length;
+    if (result.saved > 0) console.log(`✅ PERSONAS -> guardados (+${result.saved})`);
+    if (result.deleted > 0) console.log(`🗑️ PERSONAS -> eliminados (-${result.deleted})`);
+    return result;
   } catch (error) {
     console.error("❌ PERSONAS -> Error:", error.message || error);
     throw error;

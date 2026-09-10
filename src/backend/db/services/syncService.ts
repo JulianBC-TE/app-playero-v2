@@ -73,17 +73,27 @@ async function syncLote<T>(
 
 // ── SUBIDA: syncPendingData ──────────────────────────────────────────────────
 
-export async function syncPendingData() {
+export async function syncPendingData(onStatus?: (msg: string) => void) {
   try {
-    //console.log("📤 SUBIDA -> Iniciando subida de datos pendientes...");
-    
+    onStatus?.("Subiendo personas...");
     await syncPersonasToCentral();
+    
+    onStatus?.("Subiendo vehículos...");
     await syncVehiculosToCentral();
 
+    onStatus?.("Subiendo tickets...");
     await syncLote(await getTicketsPendientes(), (t) => t.idTicket, enviarTicket, marcarTicketSync, marcarTicketErrorSync, "Ticket");
+    
+    onStatus?.("Subiendo traspasos...");
     await syncLote(await getTraspasosPendientes(), (t) => t.idTrapaso, enviarTraspaso, marcarTraspasoSync, marcarTraspasoErrorSync, "Traspaso");
+    
+    onStatus?.("Subiendo calibraciones...");
     await syncLote(await getCalibracionesPendientes(), (t) => t.idCalibracion, enviarCalibracion, marcarCalibracionSync, marcarCalibracionErrorSync, "Calibración");
+    
+    onStatus?.("Subiendo abastecimientos...");
     await syncLote(await getAbastecimientosPendientes(), (dto) => Number(dto.id_abastecimiento), enviarAbastecimiento, marcarAbastecimientoSync, marcarAbastecimientoErrorSync, "Abastecimiento");
+    
+    onStatus?.("Subiendo turnos...");
     await syncLote(await getTurnosPendientes(), (t) => t.idTurno, enviarTurno, marcarTurnoSync, marcarTurnoErrorSync, "Turno");
     
     console.log("📤 SUBIDA -> Finalizada");
@@ -95,30 +105,40 @@ export async function syncPendingData() {
 
 // ── BAJADA: syncCatalogosFromCentral ──────────────────────────────────────────
 
-export async function syncCatalogosFromCentral(idUser: number): Promise<boolean> {
-  let estaBloqueado = false; // Por defecto asumimos false 
+export async function syncCatalogosFromCentral(idUser: number, onStatus?: (msg: string) => void): Promise<boolean> {
+  let estaBloqueado = false;
   try {
-    //console.log("📥 BAJADA -> Descargando catálogos...");
-    
+    onStatus?.("Verificando estado de usuario...");
     try {
-      //console.log(`🔒 SINCRO -> Verificando estado de cuenta para id: ${idUser}`);
       const remoto = await checkUserStatusServer(idUser);
       await updateLocalUserBlockStatus(idUser, remoto.bloqueado);
       
-      estaBloqueado = remoto.bloqueado; // ◄ Guardamos el valor real del servidor
+      estaBloqueado = remoto.bloqueado;
       if(remoto.bloqueado)console.log(`📤 BAJADA -> Estado de bloqueo guardado localmente: ${remoto.bloqueado}`);
     } catch (errorBlock) {
       console.warn("📤 BAJADA -> ⚠️ No se pudo validar el estado de bloqueo con el servidor:", errorBlock);
     }
 
+    onStatus?.("Descargando turnos...");
     await sincronizarUltimosTurnosDesdeBackend(idUser);
+    
+    onStatus?.("Descargando sucursales...");
     await syncSucursalesFromCentral();
+    
+    onStatus?.("Descargando personas...");
     await syncPersonasFromCentral();
+    
+    onStatus?.("Descargando clientes...");
     await syncClientesFromCentral();
+    
+    onStatus?.("Descargando vehículos...");
     await syncVehiculosFromCentral();
+    
+    onStatus?.("Descargando cubicaciones...");
     await sincronizarCubicacionesMasivas();
+    
     console.log("📤 BAJADA -> Finalizada");
-    return estaBloqueado; // ◄ Retornamos el estado
+    return estaBloqueado;
   } catch (error) {
     throw error;
   }
@@ -126,11 +146,11 @@ export async function syncCatalogosFromCentral(idUser: number): Promise<boolean>
 
 // ── SINCRO COMPLETA (ORQUESTADOR) ─────────────────────────────────────────────
 
-export async function syncTodo(idUser: number): Promise<boolean> {
+export async function syncTodo(idUser: number, onStatus?: (msg: string) => void): Promise<boolean> {
   console.log("🔄 ORQUESTADOR -> Iniciando ciclo completo");
-  await syncPendingData();
-  const usuarioBloqueado = await syncCatalogosFromCentral(idUser); // ◄ Capturamos el valor
+  await syncPendingData(onStatus);
+  const usuarioBloqueado = await syncCatalogosFromCentral(idUser, onStatus);
   console.log("🏁 ORQUESTADOR -> Ciclo completo terminado");
   
-  return usuarioBloqueado; // ◄ Lo exponemos al orquestador externo
+  return usuarioBloqueado;
 }
