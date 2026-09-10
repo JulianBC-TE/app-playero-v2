@@ -47,6 +47,9 @@ import { updateLocalUserBlockStatus } from "../modules/authDB";
 import { httpClient } from "@/backend/api/httpClient";
 import { toastError, toastInfo } from "@/utils/toastMessage";
 
+// ── Guardia anti-duplicados ──────────────────────────────────────────────────
+let isSyncing = false;
+
 // ── Helper genérico de envío por lotes ───────────────────────────────────────
 
 async function syncLote<T>(
@@ -153,6 +156,12 @@ export async function syncTodo(
   onStatus?: (msg: string) => void,
   isManual: boolean = false
 ): Promise<boolean> {
+  // Evitar ejecuciones duplicadas
+  if (isSyncing) {
+    console.log("🔄 SYNC -> Ya hay una sincronización en curso. Omitiendo.");
+    return false;
+  }
+
   // Verificar conectividad ANTES de intentar sincronizar
   const online = await httpClient.isOnline();
   if (!online) {
@@ -161,15 +170,19 @@ export async function syncTodo(
       toastError("Intentá de nuevo más tarde", "No se pudo conectar con el servidor");
     }
     return false;
-  }else{
+  }
+
+  isSyncing = true;
+  try {
     if (isManual) {
       toastInfo("Sincronización", "Se sincronizó con el servidor correctamente.");
     }
+    console.log("🔄 ORQUESTADOR -> Iniciando ciclo completo");
+    await syncPendingData(onStatus);
+    const usuarioBloqueado = await syncCatalogosFromCentral(idUser, onStatus);
+    console.log("🏁 ORQUESTADOR -> Ciclo completo terminado");
+    return usuarioBloqueado;
+  } finally {
+    isSyncing = false;
   }
-  console.log("🔄 ORQUESTADOR -> Iniciando ciclo completo");
-  await syncPendingData(onStatus);
-  const usuarioBloqueado = await syncCatalogosFromCentral(idUser, onStatus);
-  console.log("🏁 ORQUESTADOR -> Ciclo completo terminado");
-  
-  return usuarioBloqueado;
 }

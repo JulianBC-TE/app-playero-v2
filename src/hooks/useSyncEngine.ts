@@ -7,17 +7,11 @@ export function useSyncEngine(intervaloMs: number = 15000) {
   // 1. Extraemos 'updateUserProfile' del contexto para poder actualizar la memoria viva de React
   const { user, updateUserProfile } = useAuth(); 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const isSyncingRef = useRef<boolean>(false);
 
   useEffect(() => {
     // Función recursiva que maneja el ciclo de sincronización
     const ejecutarCicloSincro = async () => {
-      // Evitar ejecuciones duplicadas si el ciclo anterior sigue corriendo
-      if (isSyncingRef.current) return;
-
       try {
-        isSyncingRef.current = true;
-        
         //console.log("⏱️ Timer disparado automáticamente.");
         
         // 2. Capturamos el booleano que nos devuelve syncTodo (si está bloqueado o no en el servidor)
@@ -41,8 +35,6 @@ export function useSyncEngine(intervaloMs: number = 15000) {
       } catch (error) {
         console.error("⚠️ Error en el ciclo periódico de sincronización:", error);
       } finally {
-        isSyncingRef.current = false;
-        
         // Solo programamos el siguiente ciclo si el usuario sigue autenticado
         if (user && user.cedula) {
           timerRef.current = setTimeout(ejecutarCicloSincro, intervaloMs);

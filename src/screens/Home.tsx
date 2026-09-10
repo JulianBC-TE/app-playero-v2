@@ -133,14 +133,14 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
   }
 
   async function handleSync() {
-    if (isSyncing || !user?.idUser) return;
+    if (!user?.idUser) return;
     setIsSyncing(true);
     setSyncMessage("Iniciando sincronización...");
     try {
       await syncTodo(user.idUser, (msg) => setSyncMessage(msg), true);
-    } catch (error) {
+    } catch (error: any) {
       console.error("[Home] Error en sincronización:", error);
-      toastError("No se pudo completar la sincronización", error.toString());
+      toastError("No se pudo completar la sincronización", error?.message ?? "Error desconocido");
     } finally {
       setIsSyncing(false);
       setSyncMessage("");
