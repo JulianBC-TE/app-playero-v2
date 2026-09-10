@@ -3,7 +3,8 @@
  * @category UI Components
  */
 import clsx from "clsx";
-import { View, Text } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components";
 import { LockKeyhole, Check } from "lucide-react-native"; // Importa apenas para garantir que os ícones sejam incluídos no bundle
 
 /**

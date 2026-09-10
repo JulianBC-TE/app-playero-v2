@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useNavigation } from "@react-navigation/native";
-import { Image, ScrollView, Text, View } from "react-native";
+import { Image, ScrollView, View } from "react-native";
+import { Text } from "@/components";
 import { Controller, useForm } from "react-hook-form";
 
 import { authNavigatorRoutesProps } from "@route/auth.routes";

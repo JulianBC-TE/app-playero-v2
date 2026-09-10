@@ -3,7 +3,8 @@
  * @category UI Components
  */
 import { MaterialIcons } from "@expo/vector-icons";
-import { TouchableOpacity, View, Text } from "react-native";
+import { TouchableOpacity, View } from "react-native";
+import { Text } from "@/components";
 import { useAuth } from "@hooks/useAuth";
 
 interface HomeHeaderProps {

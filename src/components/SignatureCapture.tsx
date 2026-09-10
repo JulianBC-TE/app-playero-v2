@@ -6,7 +6,8 @@ import React, { useRef, useState } from "react";
 import Signature, {
 	SignatureViewRef as SignatureRef,
 } from "react-native-signature-canvas";
-import { View, Text } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components";
 import { Button } from "@/components/Button";
 import { PersonaDTO } from "@/dto/PersonaDTO";
 

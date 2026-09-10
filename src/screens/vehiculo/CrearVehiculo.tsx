@@ -4,7 +4,8 @@
 //   Eliminado: import axios (no se usaba, era residuo de la versión con API)
 //   Sin otros cambios — ya usaba saveVehiculoLocal desde vehiculoDB
 
-import { Text, TouchableOpacity, View } from "react-native";
+import { TouchableOpacity, View } from "react-native";
+import { Text } from "@/components";
 import { useState } from "react";
 import { StackRoutesProps } from "@/route/app.routes";
 import { toastError, toastSuccess } from "@utils/toastMessage";

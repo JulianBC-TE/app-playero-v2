@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { 
   View, 
-  Text, 
   FlatList, 
   TouchableOpacity, 
   Modal, 
@@ -10,6 +9,7 @@ import {
   Image, 
   TouchableWithoutFeedback 
 } from "react-native";
+import { Text } from "@/components";
 import { getRegistrosPorTipo, eliminarRegistroPorTipo, RegistroResumen, TipoRegistro, ImagenDetalle } from "@DBmodules/resumenBD";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { Loading } from "@/components/Loading";

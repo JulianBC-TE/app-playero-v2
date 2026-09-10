@@ -44,6 +44,8 @@ import { enviarAbastecimiento, enviarCalibracion, enviarTicket, enviarTraspaso, 
 import { useAppContext } from "@/hooks/useAppContext";
 import { checkUserStatusServer } from "@/backend/api/authAPI";
 import { updateLocalUserBlockStatus } from "../modules/authDB";
+import { httpClient } from "@/backend/api/httpClient";
+import { toastError, toastInfo } from "@/utils/toastMessage";
 
 // ── Helper genérico de envío por lotes ───────────────────────────────────────
 
@@ -146,7 +148,24 @@ export async function syncCatalogosFromCentral(idUser: number, onStatus?: (msg: 
 
 // ── SINCRO COMPLETA (ORQUESTADOR) ─────────────────────────────────────────────
 
-export async function syncTodo(idUser: number, onStatus?: (msg: string) => void): Promise<boolean> {
+export async function syncTodo(
+  idUser: number,
+  onStatus?: (msg: string) => void,
+  isManual: boolean = false
+): Promise<boolean> {
+  // Verificar conectividad ANTES de intentar sincronizar
+  const online = await httpClient.isOnline();
+  if (!online) {
+    console.log("📴 SYNC -> Sin conexión al servidor. Omitiendo sincronización.");
+    if (isManual) {
+      toastError("Intentá de nuevo más tarde", "No se pudo conectar con el servidor");
+    }
+    return false;
+  }else{
+    if (isManual) {
+      toastInfo("Sincronización", "Se sincronizó con el servidor correctamente.");
+    }
+  }
   console.log("🔄 ORQUESTADOR -> Iniciando ciclo completo");
   await syncPendingData(onStatus);
   const usuarioBloqueado = await syncCatalogosFromCentral(idUser, onStatus);

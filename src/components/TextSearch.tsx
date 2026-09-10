@@ -2,7 +2,8 @@
  * @module Playero/Components/textSearch
  * @category UI Components
  */
-import { Text, TouchableOpacity, View } from "react-native";
+import { TouchableOpacity, View } from "react-native";
+import { Text } from "@/components";
 import { Search } from "lucide-react-native";
 
 export interface TextSearchProps {

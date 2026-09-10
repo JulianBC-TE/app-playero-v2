@@ -4,7 +4,8 @@
  */
 import { useNavigation } from "@react-navigation/native";
 import { ArrowLeftSquare, UserLock } from "lucide-react-native";
-import { Text, TouchableOpacity, View } from "react-native";
+import { TouchableOpacity, View } from "react-native";
+import { Text } from "@/components";
 type Props = {
 	title: string;
 	disableBackButton?: boolean;

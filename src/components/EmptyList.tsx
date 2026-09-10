@@ -2,7 +2,8 @@
  * @module Playero/Components/EmptyList
  * @category UI Components
  */
-import { Text, View } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components";
 import { Frown } from "lucide-react-native";
 
 /**

@@ -4,11 +4,11 @@
  */
 import { LucideIcon } from "lucide-react-native";
 import {
-	Text,
 	TouchableOpacity,
 	TouchableOpacityProps,
 	View,
 } from "react-native";
+import { Text } from "@/components";
 
 type Props = TouchableOpacityProps & {
 	name: string;

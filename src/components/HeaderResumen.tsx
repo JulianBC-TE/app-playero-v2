@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Modal, TextInput, Alert } from "react-native";
+import { View, TouchableOpacity, Modal, TextInput, Alert } from "react-native";
+import { Text } from "@/components";
 import { useNavigation } from "@react-navigation/native";
 import { ArrowLeftSquare, ChevronLeft, ChevronRight, Calendar, Lock, Unlock, X } from "lucide-react-native";
 import { DatePickerModal } from "react-native-paper-dates";
@@ -142,6 +143,7 @@ export function HeaderResumen({
               placeholder="Clave requerida"
               value={claveInput}
               onChangeText={setClaveInput}
+              allowFontScaling={false}
               className="border border-gray-300 rounded-xl px-4 py-3 text-base text-gray-800 mb-4"
             />
 

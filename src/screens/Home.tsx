@@ -14,7 +14,8 @@
 //   - Resto: solo controlado por permisos de módulo.
 
 import { HomeHeader } from "@/components/HomeHeader";
-import { ActivityIndicator, FlatList, Modal, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Modal, View } from "react-native";
+import { Text } from "@/components";
 import { MenuCard } from "@/components/MenuCard";
 import { StackRoutesList, StackRoutesProps } from "@/route/app.routes";
 import { useCallback, useState, useEffect } from "react";
@@ -136,11 +137,10 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
     setIsSyncing(true);
     setSyncMessage("Iniciando sincronización...");
     try {
-      await syncTodo(user.idUser, (msg) => setSyncMessage(msg));
-      toastSuccess("Sincronización", "Completada exitosamente");
+      await syncTodo(user.idUser, (msg) => setSyncMessage(msg), true);
     } catch (error) {
       console.error("[Home] Error en sincronización:", error);
-      toastError("Error", "Error durante la sincronización");
+      toastError("No se pudo completar la sincronización", error.toString());
     } finally {
       setIsSyncing(false);
       setSyncMessage("");

@@ -3,7 +3,8 @@
  * @category Screens
  */
 import { StackRoutesProps } from "@/route/app.routes";
-import { Button, View, Text, TouchableOpacity } from "react-native";
+import { Button, View, TouchableOpacity } from "react-native";
+import { Text } from "@/components";
 import { seedLocalDB } from "@/backend/db/seeds/seedLocalDB";
 import { useTheme } from "@/contexts/ThemeContext";
 import { ScreenHeader } from "@/components/ScreenHeader";

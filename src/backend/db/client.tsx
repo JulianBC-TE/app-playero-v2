@@ -12,7 +12,8 @@ import * as SQLite from "expo-sqlite";
 import { useMigrations } from "drizzle-orm/expo-sqlite/migrator";
 import { useDrizzleStudio } from "expo-drizzle-studio-plugin";
 import migrations from "./drizzle/migrations";
-import { View, Text } from "react-native";
+import { View } from "react-native";
+import { Text } from "@/components";
 import { Loading } from "@/components/Loading";
 
 /** Instancia SQLite subyacente abierta con soporte de change listener. */

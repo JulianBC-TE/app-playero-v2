@@ -17,6 +17,7 @@ export * from './Photo';
 export * from './ScreenHeader';
 export * from './Select';
 export * from './SignatureCapture';
+export * from './Text';
 export * from './TextSearch';
 //export * from './toastConfig';
 export * from './VehiculoCard';

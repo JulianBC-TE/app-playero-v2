@@ -2,7 +2,8 @@
 import { StackRoutesProps } from "@/route/app.routes";
 import { toastError } from "@/utils/toastMessage";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, ScrollView, Text, View } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
+import { Text } from "@/components";
 import { InputCard } from "@/components/InputCard";
 import { Button } from "@/components/Button";
 import { Select } from "@/components/Select";

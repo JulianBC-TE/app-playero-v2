@@ -3,7 +3,8 @@
  * @category UI Components
  */
 import { useState } from "react";
-import { TextInput, View, Text, TextInputProps } from "react-native";
+import { TextInput, View, TextInputProps } from "react-native";
+import { Text } from "@/components";
 
 type Props = TextInputProps & {
 	isReadOnly?: boolean;
@@ -82,7 +83,8 @@ export function Input({
 						paddingTop: 0,
 						paddingBottom: 0,
 					}}
-					placeholderTextColor='#6B7280' // gray-500 equivalent
+					allowFontScaling={false}
+					placeholderTextColor='#6B7280'
 					editable={!isReadOnly}
 					onFocus={handleFocus}
 					onBlur={handleBlur}
