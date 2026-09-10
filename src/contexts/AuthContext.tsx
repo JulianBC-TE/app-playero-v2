@@ -22,6 +22,7 @@ import { httpClient } from "@/backend/api/httpClient";
 import { login } from "@/backend/api/authAPI";
 import { saveUserLocally, loginOffline, clearSession } from "@DBmodules/authDB";
 import { sincronizarModulos } from "@/backend/db/modules/moduleDB";
+import { reintentarSyncFallidas } from "@/backend/db/modules/reintentarSyncDB";
 import { useInitialSync } from "@/hooks/useInitialSync";
 
 // ---------------------------------------------------------------------------
@@ -108,6 +109,8 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
         }
         }
 
+        await reintentarSyncFallidas(cedula);
+
         httpClient.setToken(loginData.token);
         setUser(userData);
         setIsOffline(false);
@@ -135,6 +138,7 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
           name: result.user.name,
         };
         await saveUser(userData);
+        await reintentarSyncFallidas(Number(result.user.cedula));
         setUser(userData);
         setIsOffline(true);
 
