@@ -15,7 +15,7 @@ import { db } from "@/backend/db/client";
 import { sucursales, syncs, usuariosApp } from "@/backend/db/schema";
 import { eq } from "drizzle-orm";
 import { SucursalDTO } from "@/dto/sucursalDTO";
-import { getSucursalesDestinoTraspaso, syncGetSucursales } from "@/backend/api/sucursalAPI";
+import { getSucursalesDestinoTraspasoPorUsuario } from "@/backend/api/sucursalAPI";
 
 // Clave en tabla syncs para registrar la última sincronización de sucursales.
 const SYNC_KEY = "__last_sync_sucursales__";
@@ -167,17 +167,23 @@ export async function getSucursalUsuarioActivoLocal() {
 
 /**
  * Descarga las sucursales disponibles para el usuario actual desde el servidor central.
- * Envía el idSucursal del usuario app para que el servidor devuelva su catálogo específico.
+ * Usa la V2 del endpoint: filtra por USUARIO (cedula) en vez de por sucursal.
  *
  * @returns Número de sucursales sincronizadas.
  * @throws Error si la petición HTTP falla o no hay usuario guardado.
  */
 export async function syncSucursalesFromCentral(): Promise<number> {
   try {
-    const idSucursal = await getCurrentUserAppIdSucursal();
-    if (!idSucursal) throw new Error("No se detectó sucursal del usuario app.");
+    // Obtener cedula del usuario local
+    const result = await db
+      .select({ cedula: usuariosApp.cedula })
+      .from(usuariosApp)
+      .limit(1);
 
-    const items = await getSucursalesDestinoTraspaso(idSucursal);
+    const cedula = result[0]?.cedula;
+    if (!cedula) throw new Error("No se detectó usuario app local.");
+
+    const items = await getSucursalesDestinoTraspasoPorUsuario(cedula);
     if (items.length > 0) {
       await saveSucursales(items);
     }

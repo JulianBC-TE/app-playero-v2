@@ -119,3 +119,34 @@ export async function syncGetSucursales(
 ): Promise<SucursalDTO[]> {
   return getSucursalesDestinoTraspaso(idSucursal);
 }
+
+// ---------------------------------------------------------------------------
+// getSucursalesDestinoTraspasoPorUsuario
+// GET /sync/usuario-bodega-traspaso/sucursales/:cedula
+// Obtiene las sucursales disponibles como destino para traspasos
+// filtradas por USUARIO (via cedula).
+// ---------------------------------------------------------------------------
+
+/**
+ * Obtiene las sucursales destino disponibles para traspasos filtradas por usuario.
+ *
+ * @param cedula - Cédula del usuario logueado
+ * @returns Array de sucursales destino disponibles para el usuario
+ * @throws Si la llamada al servidor falla
+ */
+export async function getSucursalesDestinoTraspasoPorUsuario(
+  cedula: number
+): Promise<SucursalDTO[]> {
+  const endpoint = SYNC_CONFIG.endpoints.syncSucursalesDestinoV2
+    .replace(":cedula", String(cedula));
+
+  const { data } = await SYNC_CONFIG.http.syncGet<SucursalDTO[]>(endpoint);
+
+  if (!Array.isArray(data)) {
+    throw new Error(
+      "Respuesta inválida del servidor: sucursales destino no es un array"
+    );
+  }
+
+  return data;
+}

@@ -2,10 +2,11 @@
  * @module Playero/Backend/DB/Modules/Ticket
  * @category Database Modules
  */
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { db } from "../client";
 import { tickets } from "../schema";
 import { TicketDTO } from "@/dto/TicketDTO";
+import { crearLog } from "../logs/logModule";
 
 /**
  * Crear ticket local plano y fuertemente tipado
@@ -23,7 +24,15 @@ export async function crearTicketLocal(
     fecha_registro: fechaRegistro ?? Date.now(),
     hora_registro: horaRegistro ?? Date.now(),
   });
-  return (result as any).lastInsertRowId ?? 0;
+  const id = (result as any).lastInsertRowId ?? 0;
+  await crearLog({
+    tipo: "salida",
+    accion: "creacion",
+    registroId: id,
+    detalle: `${dto.litros}L, Tax: ${dto.taxilitro_inicial}-${dto.taxilitro_final}`,
+    payload: dto as any,
+  });
+  return id;
 }
 
 /**
@@ -77,7 +86,7 @@ export async function getTicketById(idTicket: number) {
 /**
  * Obtener tickets pendientes de sincronización mapeados al formato esperado
  */
-export async function getTicketsPendientes(): Promise<{
+export async function getTicketsPendientes(incluirErrores: boolean = false): Promise<{
   idTicket: number;
   tipo: string;
   sync: number;
@@ -86,7 +95,10 @@ export async function getTicketsPendientes(): Promise<{
   estado: number;
   dto: TicketDTO;
 }[]> {
-  const result = await db.select().from(tickets).where(eq(tickets.sync, 0));
+  const filtro = incluirErrores
+    ? or(eq(tickets.sync, 0), eq(tickets.sync, -1))
+    : eq(tickets.sync, 0);
+  const result = await db.select().from(tickets).where(filtro);
   if (result.length === 0) {
     //console.log("⚪ TICKET -> Nada pendiente para subir");
     return [];

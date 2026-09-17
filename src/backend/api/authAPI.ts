@@ -87,6 +87,8 @@ export async function refreshToken(
 export type UserStatusResponse = {
   cedula: number;
   bloqueado: boolean;
+  idSucursal?: number;
+  descripcionSucursal?: string;
 };
 
 /**

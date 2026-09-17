@@ -2,7 +2,7 @@
  * @module Playero/Backend/DB/Modules/Turno
  * @category Database Modules
  */
-import { eq, desc, inArray, and } from "drizzle-orm";
+import { eq, desc, inArray, and, or } from "drizzle-orm";
 import { db } from "../client";
 import { turnos } from "../schema";
 import {
@@ -13,10 +13,12 @@ import {
 } from "../services/turnoStatusService";
 import { getBodegasByIdSucursal, getBodegasDelUsuario } from "./bodegaDB";
 import { BodegaDTO } from "@/dto/BodegaDTO";
+import { getTimestamp } from "@/services/timeService";
 import { TurnoDTO } from "@/dto/TurnoDTO";
 import { TurnoEstado } from "../constants/turnoEstado";
 import { obtenerEstadoTurnosPorBodega } from "@/backend/api/operacionesAPI";
 import { useAppContext } from "@/hooks/useAppContext";
+import { crearLog } from "../logs/logModule";
 
 function normalizarADate(fecha: string | number): Date {
   const fechaStr = fecha.toString();
@@ -62,7 +64,7 @@ export async function crearTurnoLocal({
   console.log(dto.med_tanques[0]);
   console.log(dto.med_tanques[0].foto_tanque);
 
-  return db.insert(turnos).values({
+  const result = await db.insert(turnos).values({
     idBodega,
     json: JSON.stringify(dto),
     tipo: tipoNumber,
@@ -71,6 +73,18 @@ export async function crearTurnoLocal({
     sync: 0,
     estado,
   });
+
+  const id = (result as any).lastInsertRowId ?? 0;
+  const tipoTexto = tipo === 1 ? "INICIO" : "FIN";
+  await crearLog({
+    tipo: "turno",
+    accion: "creacion",
+    registroId: id,
+    detalle: `${tipoTexto} turno, ${dto.litros ?? "N/A"}L`,
+    payload: { ...dto, idBodega, tipo: tipoNumber } as any,
+  });
+
+  return result;
 }
 
 /**
@@ -122,12 +136,15 @@ export async function getTipoByBodega(
  *
  * @returns Lista de turnos pendientes listos para enviar al servidor
  */
-export async function getTurnosPendientes() {
+export async function getTurnosPendientes(incluirErrores: boolean = false) {
   // 1️⃣ Ordenamos por idTurno para asegurar que el conteo (1, 2, 3) sea cronológico
+  const filtro = incluirErrores
+    ? or(eq(turnos.sync, 0), eq(turnos.sync, -1))
+    : eq(turnos.sync, 0);
   const result = await db
     .select()
     .from(turnos)
-    .where(eq(turnos.sync, 0))
+    .where(filtro)
     .orderBy(turnos.idTurno);
 
   if (result.length === 0) {
@@ -608,7 +625,8 @@ export async function getTurnoStatusLocal(
     const idsBodegas = bodegasDelUsuario.map((b: BodegaDTO) =>
       Number(b.id_bodega),
     );
-    const hoy = new Date();
+    const secureTime = await getTimestamp();
+    const hoy = new Date(secureTime.timestampMs);
     const hoyFormatoEntero = parseInt(
       `${hoy.getFullYear()}${String(hoy.getMonth() + 1).padStart(2, "0")}${String(hoy.getDate()).padStart(2, "0")}`,
       10,

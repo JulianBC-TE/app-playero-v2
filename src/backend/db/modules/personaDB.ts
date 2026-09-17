@@ -15,6 +15,7 @@ import { eq, like, or, sql } from "drizzle-orm";
 import { PersonaDTO } from "@/dto/PersonaDTO";
 import { syncGetPersonas, syncPostPersonas } from "@/backend/api/personaAPI";
 import { syncsController } from "./syncsDB";
+import { crearLog } from "../logs/logModule";
 
 // Clave en tabla syncs para registrar la última sincronización de personas.
 const SYNC_KEY = "__last_sync_personas__";
@@ -87,6 +88,13 @@ export async function savePersonaLocal(data: PersonaDTO): Promise<void> {
     nombreApellido: data.nombre_apellido,
     timestamp: Date.now(),
     sync: 0,
+  });
+  await crearLog({
+    tipo: "persona",
+    accion: "creacion",
+    registroId: data.cedula,
+    detalle: `CI: ${data.cedula}`,
+    payload: data as any,
   });
 }
 
@@ -214,7 +222,10 @@ export async function buscarPersonasLocal(
  *
  * @returns Lista de {@link PersonaDTO} con `sync = 0`.
  */
-export async function getPersonasPendientesSync(): Promise<PersonaDTO[]> {
+export async function getPersonasPendientesSync(incluirErrores: boolean = false): Promise<PersonaDTO[]> {
+  const filtro = incluirErrores
+    ? or(eq(personas.sync, 0), eq(personas.sync, -1))
+    : eq(personas.sync, 0);
   const rows = await db
     .select({
       cedula: personas.cedula,
@@ -222,7 +233,7 @@ export async function getPersonasPendientesSync(): Promise<PersonaDTO[]> {
       createdAt: personas.timestamp,  // ✅ Agregado
     })
     .from(personas)
-    .where(eq(personas.sync, 0));
+    .where(filtro);
 
   return rows.map((r) => ({
     cedula: r.cedula,
@@ -339,8 +350,8 @@ export async function syncPersonasFromCentralInit(): Promise<{ saved: number; de
  * @returns Número de personas enviadas.
  * @throws Error si la petición HTTP falla.
  */
-export async function syncPersonasToCentral(): Promise<number> {
-  const pendientes = await getPersonasPendientesSync();
+export async function syncPersonasToCentral(incluirErrores: boolean = false): Promise<number> {
+  const pendientes = await getPersonasPendientesSync(incluirErrores);
   if (pendientes.length === 0) {
     //console.log("⚪ PERSONAS -> Nada pendiente para subir");
     return 0;
@@ -351,6 +362,13 @@ export async function syncPersonasToCentral(): Promise<number> {
     
     for (const p of pendientes) {
       await markPersonaAsSynced(p.cedula);
+      await crearLog({
+        tipo: "persona",
+        accion: "sync_ok",
+        registroId: p.cedula,
+        detalle: `CI: ${p.cedula}`,
+        payload: p as any,
+      });
     }
 
     console.log(`➡️ PERSONAS -> subidas ok (-${pendientes.length})`);

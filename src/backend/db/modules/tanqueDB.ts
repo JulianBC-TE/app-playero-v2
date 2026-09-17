@@ -14,7 +14,7 @@
 import { db } from "@/backend/db/client";
 import { tanques, syncs } from "@/backend/db/schema";
 import { bodegas } from "../schema";   // ← Agregar esta línea
-import { eq } from "drizzle-orm";
+import { eq, inArray, not } from "drizzle-orm";
 import { TanqueDTO } from "@/dto/TanqueDTO";
 import { getIdsBodegasDelUsuario } from "./bodegaDB";
 import { fetchTanquesPorBodegas } from "@/backend/api/tanqueAPI";
@@ -189,13 +189,21 @@ export async function syncTanquesDelOperario(cedula: number): Promise<number> {
       return 0;
     }
    
-    const tanques = await fetchTanquesPorBodegas(idsBodegas);
-    if (tanques.length > 0) {
-      await saveTanques(tanques);
+    const tanquesRemotos = await fetchTanquesPorBodegas(idsBodegas);
+    const remoteTanqueIds = tanquesRemotos.map((t) => t.id_tanque);
+
+    if (remoteTanqueIds.length > 0) {
+      await db.delete(tanques).where(not(inArray(tanques.idTanque, remoteTanqueIds)));
+    } else {
+      await db.delete(tanques);
+    }
+
+    if (tanquesRemotos.length > 0) {
+      await saveTanques(tanquesRemotos);
     }
    
-    console.log(`✅ TANQUES -> ok (+${tanques.length})`);
-    return tanques.length;
+    console.log(`✅ TANQUES -> ok (+${tanquesRemotos.length})`);
+    return tanquesRemotos.length;
   } catch (error) {
     console.error("❌ TANQUES -> Error:", error.message || error);
     throw error;

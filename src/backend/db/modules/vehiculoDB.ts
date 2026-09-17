@@ -20,6 +20,7 @@ import { VehiculoDTO } from "@/dto/VehiculoDTO";
 import { AppError } from "@/utils/AppError";
 import { syncGetVehiculos, syncPostVehiculos } from "@/backend/api/vehiculoAPI";
 import { syncsController } from "./syncsDB";
+import { crearLog } from "../logs/logModule";
 
 
 // Clave en tabla syncs para registrar la última sincronización de vehículos.
@@ -98,6 +99,13 @@ export async function saveVehiculoLocal(data: VehiculoDTO): Promise<void> {
       ruc: data.ruc,
       timestamp: Date.now(),
       sync: 0,
+    });
+    await crearLog({
+      tipo: "vehiculo",
+      accion: "creacion",
+      registroId: 0,
+      detalle: data.id_vehiculo,
+      payload: data as any,
     });
   } catch (error: any) {
     if (
@@ -256,7 +264,10 @@ export async function buscarVehiculosLocal(
 // Devuelve los vehículos creados offline que aún no fueron enviados al servidor.
 // ---------------------------------------------------------------------------
 
-export async function getVehiculosPendientesSync(): Promise<VehiculoDTO[]> {
+export async function getVehiculosPendientesSync(incluirErrores: boolean = false): Promise<VehiculoDTO[]> {
+  const filtro = incluirErrores
+    ? or(eq(vehiculos.sync, 0), eq(vehiculos.sync, -1))
+    : eq(vehiculos.sync, 0);
   const rows = await db
     .select({
       idVehiculo: vehiculos.idVehiculo,
@@ -264,7 +275,7 @@ export async function getVehiculosPendientesSync(): Promise<VehiculoDTO[]> {
       ruc: vehiculos.ruc,
     })
     .from(vehiculos)
-    .where(eq(vehiculos.sync, 0));
+    .where(filtro);
   if (rows.length > 0) {
     console.log(`⚪ VEHÍCULOS -> Pendientes de sync: ${rows.length}`);
   }
@@ -368,8 +379,8 @@ export async function syncVehiculosFromCentral(): Promise<{ saved: number; delet
  * @returns Número de vehículos enviados.
  * @throws Error si la petición HTTP falla.
  */
-export async function syncVehiculosToCentral(): Promise<number> {
-  const pendientes = await getVehiculosPendientesSync();
+export async function syncVehiculosToCentral(incluirErrores: boolean = false): Promise<number> {
+  const pendientes = await getVehiculosPendientesSync(incluirErrores);
   if (pendientes.length === 0) {
     //console.log("⚪ VEHÍCULOS -> Nada pendiente para subir");
     return 0;
@@ -380,6 +391,13 @@ export async function syncVehiculosToCentral(): Promise<number> {
 
     for (const v of pendientes) {
       await markVehiculoAsSynced(v.id_vehiculo);
+      await crearLog({
+        tipo: "vehiculo",
+        accion: "sync_ok",
+        registroId: 0,
+        detalle: v.id_vehiculo,
+        payload: v as any,
+      });
     }
 
     console.log(`➡️ VEHÍCULOS -> subidos ok (-${pendientes.length})`);

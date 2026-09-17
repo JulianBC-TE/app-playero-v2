@@ -360,14 +360,15 @@ export const syncs = sqliteTable("syncs", {
 });
 
 /**
- * Tabla de permisos de traspaso entre sucursal y bodega.
- * Clave primaria compuesta: (idSucursal, idBodega).
+ * Tabla de permisos de traspaso por USUARIO y bodega.
+ * Clave primaria compuesta: (cedula, idBodega).
+ * Cambio: se reemplaza idSucursal por cedula para control por usuario.
  */
 export const habilitadosTrapaso = sqliteTable(
   "habilitados_trapaso",
   {
-    // sucursal que consulta / realiza el traspaso
-    idSucursal: integer("id_sucursal").notNull(),
+    // cedula del usuario que realiza el traspaso
+    cedula: integer("cedula").notNull(),
 
     // bodega relacionada
     idBodega: integer("id_bodega").notNull(),
@@ -375,7 +376,7 @@ export const habilitadosTrapaso = sqliteTable(
   },
   (table) => ({
     pk: primaryKey({
-      columns: [table.idSucursal, table.idBodega],
+      columns: [table.cedula, table.idBodega],
     }),
   })
 );

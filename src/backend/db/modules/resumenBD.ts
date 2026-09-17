@@ -11,8 +11,9 @@ import {
 import { eq } from "drizzle-orm";
 import { TurnoDTO } from "@/dto/TurnoDTO";
 import * as FileSystem from "expo-file-system";
+import { getLogsPorFecha, type LogResumen, type TipoLog, type AccionLog } from "../logs/logModule";
 
-export type TipoRegistro = "salida" | "abastecimiento" | "traspaso" | "calibracion" | "turno";
+export type TipoRegistro = "salida" | "abastecimiento" | "traspaso" | "calibracion" | "turno" | "logs";
 
 export interface ImagenDetalle {
   titulo: string;
@@ -390,6 +391,43 @@ export async function getRegistrosPorTipo(
         })
         .sort((a, b) => (b.rawHora || 0) - (a.rawHora || 0));
     }
+
+    case "logs": {
+      const logsData = await getLogsPorFecha(fechaFiltro);
+      const tipoLabels: Record<TipoLog, string> = {
+        salida: "Salida",
+        traspaso: "Traspaso",
+        calibracion: "Calibración",
+        abastecimiento: "Abastecimiento",
+        turno: "Turno",
+        vehiculo: "Vehículo",
+        persona: "Persona",
+        cliente: "Cliente",
+      };
+      const accionLabels: Record<AccionLog, string> = {
+        creacion: "creación",
+        sync_ok: "sync_ok",
+        sync_error: "sync_error",
+      };
+
+      return logsData.map((log) => ({
+        id: log.id,
+        datoPrincipal: `${tipoLabels[log.tipo]} #${log.registroId}`,
+        datoSecundario: log.detalle || "",
+        litros: "",
+        hora: log.fecha.substring(11, 16),
+        syncStatus: (log.accion === "sync_ok" ? 1 : log.accion === "sync_error" ? -1 : 0) as 1 | 0 | -1,
+        camposDetalle: [
+          { label: "Fecha", value: log.fecha },
+          { label: "Tipo", value: tipoLabels[log.tipo] },
+          { label: "Acción", value: accionLabels[log.accion] },
+          { label: "ID Registro", value: log.registroId },
+          { label: "Detalle", value: log.detalle || "N/A" },
+        ],
+        imagenes: [],
+      }));
+    }
+
     default:
       return [];
   }

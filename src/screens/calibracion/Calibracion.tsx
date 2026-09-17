@@ -45,6 +45,7 @@ import {
   getTurnoStatusLocal,
 } from "@DBmodules/turnoBD";
 import { saveCalibracionLocal } from "@/backend/db/modules/calibracionDB";
+import { getTimestamp } from "@/services/timeService";
 
 interface MedicionesCalibracionExtendida {
   taxilitroInicial: number;
@@ -413,7 +414,8 @@ export function Calibracion({
 
     setIsLoading(true);
     try {
-      const now = new Date();
+      const secureTime = await getTimestamp();
+      const now = new Date(secureTime.timestampMs);
       const fecha = now.toISOString().slice(0, 10);
       const hora = now.toTimeString().slice(0, 8);
       let id_bodega = 0;

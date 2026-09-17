@@ -36,7 +36,9 @@ export const SYNC_CONFIG = {
 
      // Sincronización de la app (POST/GET según corresponda)
     syncBodegasCompleto: "api/app/sync/sucursal-bodega-traspaso/bodegas/:id_sucursal/:cedula",
+    syncBodegasCompletoV2: "api/app/sync/usuario-bodega-traspaso/bodegas/:cedula",
     syncSucursalesDestino: "api/app/sync/sucursal-bodega-traspaso/sucursales/:id_sucursal",
+    syncSucursalesDestinoV2: "api/app/sync/usuario-bodega-traspaso/sucursales/:cedula",
     syncPicos: "api/app/sync/pico",
     ultimosTurnos: "/api/app/ultimosTurnosActivos",
     syncTanques: "api/app/sync/tanque",

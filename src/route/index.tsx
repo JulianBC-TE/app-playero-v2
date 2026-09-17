@@ -13,7 +13,7 @@ export function Routes() {
 
   // 2. Invocas el motor de sincronización aquí.
   // El hook internamente se encargará de validar si 'user.cedula' existe antes de iniciar el timer.
-  useSyncEngine(20000);
+  useSyncEngine(12000); // Intervalo de 2 minutos (120000 ms)
 
   if (isLoadingUserData || isLoadingServerIP) {
     console.log("loading");

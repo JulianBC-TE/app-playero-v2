@@ -49,6 +49,7 @@ import {
   getTurnoStatusLocal,
 } from "@DBmodules/turnoBD";
 import { TicketDTO } from "@/dto/TicketDTO";
+import { getTimestamp } from "@/services/timeService";
 
 // ─── Form & Schema ────────────────────────────────────────────────────────────
 
@@ -64,11 +65,13 @@ type FormData = {
 const registrarSalidaSchema = yup.object({
   horometro: yup
     .string()
+    .transform((_, val) => (val === "" ? null : val))
     .nullable()
     .notRequired()
     .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123,45)"),
   kilometraje: yup
     .string()
+    .transform((_, val) => (val === "" ? null : val))
     .nullable()
     .notRequired()
     .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123,45)"),
@@ -317,7 +320,8 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
         return;
       }
 
-      const now = new Date();
+      const secureTime = await getTimestamp();
+      const now = new Date(secureTime.timestampMs);
 
       const ticket: TicketDTO = {
         id_suc: sucursal.id_sucursal,
@@ -352,7 +356,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
         foto_observaciones: base64Obs ? [base64Obs] : [],
       };
 
-      await crearTicketLocal(ticket, normalizarFecha(now), Date.now());
+      await crearTicketLocal(ticket, normalizarFecha(now), secureTime.timestampMs);
       await anularUltimoFinTurnoPorBodega(ticket.id_bod, obsAdicional);
       await removeSalida();
 

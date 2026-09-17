@@ -52,6 +52,7 @@ import {
 import { saveTraspasoLocal } from "@DBmodules/traspasoDB";
 import { BodegaDTO } from "@/dto/BodegaDTO";
 import { MedicionDTO } from "@/dto/MedicionDTO";
+import { getTimestamp } from "@/services/timeService";
 
 export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   const [selectedBodegaOrigem, setSelectedBodegaOrigem] = useState<string>(" ");
@@ -156,7 +157,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       const bodegasOrigen = await getBodegasDelUsuario(user.cedula);
       await setBodegaOrigem(bodegasOrigen);
       await setSelectedBodegaOrigem(bodegasOrigen[0].id_bodega);
-      const bodegasDestino = await getBodegasTraspaso(sucursal.id_sucursal);
+      const bodegasDestino = await getBodegasTraspaso(user.cedula);
       await setBodegaDestino(bodegasDestino);
       await setSelectedBodegaDestino(bodegasDestino[0].id_bodega);
     } catch (error) {
@@ -408,7 +409,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       setIsSaving(true);
       setIsLoading(true);
 
-      await saveTraspasoLocal(payload);
+      const secureTime = await getTimestamp();
+      await saveTraspasoLocal(payload, secureTime.timestampMs);
       await anularUltimoFinTurnoPorBodega(payload.bod_origen, obsAdicional);
 
       toastSuccess("Traspaso", "Traspaso guardado exitosamente.");
@@ -628,7 +630,8 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                 return;
               }
               let stored = await getStorageTraspaso();
-              const now = new Date();
+              const secureTime = await getTimestamp();
+              const now = new Date(secureTime.timestampMs);
               const fecha = now.toISOString().slice(0, 10);
               const hora = now.toTimeString().slice(0, 8);
               if (stored) {

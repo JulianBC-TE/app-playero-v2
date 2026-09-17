@@ -10,9 +10,10 @@
  */
 import { db } from "@/backend/db/client";
 import { calibraciones, syncs } from "@/backend/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, or } from "drizzle-orm";
 import { CalibracionDTO } from "@/dto/CalibracionDTO";
 import { FilaCalibracion } from "@/backend/api/operacionesAPI";
+import { crearLog } from "../logs/logModule";
 
 const SYNC_KEY = "__last_sync_calibraciones__";
 
@@ -50,17 +51,28 @@ export async function saveCalibracionLocal(
     sync: 0,
   });
   
-  return (result as any).lastInsertRowId ?? 0;
+  const id = (result as any).lastInsertRowId ?? 0;
+  await crearLog({
+    tipo: "calibracion",
+    accion: "creacion",
+    registroId: id,
+    detalle: `Tax: ${dto.taxilitro_inicial}-${dto.taxilitro_final}`,
+    payload: dto as any,
+  });
+  return id;
 }
 
 /**
  * Devuelve las calibraciones pendientes inyectando el ID autogenerado y la clave en el DTO.
  */
-export async function getCalibracionesPendientes(): Promise<FilaCalibracion[]> {
+export async function getCalibracionesPendientes(incluirErrores: boolean = false): Promise<FilaCalibracion[]> {
+  const filtro = incluirErrores
+    ? or(eq(calibraciones.sync, 0), eq(calibraciones.sync, -1))
+    : eq(calibraciones.sync, 0);
   const rows = await db
     .select()
     .from(calibraciones)
-    .where(eq(calibraciones.sync, 0))
+    .where(filtro)
     .orderBy(desc(calibraciones.idCalibracion));
     
   if (rows.length === 0) {

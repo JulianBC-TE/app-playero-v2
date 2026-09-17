@@ -32,7 +32,15 @@ export type FullBodegaSyncResponse = {
   bodegas_propias: BodegaServerSyncDTO[];
   bodegas_traspaso: BodegaServerSyncDTO[];
   relaciones_traspaso: RelacionTraspasoServerDTO[];
-  usuario_bodegas: RelacionUsuarioBodegaServerDTO[]; // 🚀 Agregado para solucionar el error de compilación
+  usuario_bodegas: RelacionUsuarioBodegaServerDTO[];
+};
+
+// Respuesta V2: relaciones_traspaso usa cedula en vez de id_sucursal
+export type FullBodegaSyncResponseV2 = {
+  bodegas_propias: BodegaServerSyncDTO[];
+  bodegas_traspaso: BodegaServerSyncDTO[];
+  relaciones_traspaso: { cedula: number; id_bodega_destino: number }[];
+  usuario_bodegas: RelacionUsuarioBodegaServerDTO[];
 };
 
 export type SucursalConTraspasoDTO = {
@@ -82,5 +90,23 @@ export async function getSucursalesDestinoTraspaso(
     throw new Error("Respuesta inválida del servidor: no es un array de sucursales");
   }
 
+  return data;
+}
+
+/**
+ * Obtiene el paquete completo de bodegas del usuario usando la V2 (por cedula).
+ * Filtra las relaciones de traspaso por USUARIO en vez de por sucursal.
+ *
+ * @param cedula - Cédula del usuario
+ * @returns FullBodegaSyncResponseV2 con bodegas propias, traspaso y relaciones
+ * @throws Si la llamada al servidor falla
+ */
+export async function getFullDataSincronizacionBodegasV2(
+  cedula: number
+): Promise<FullBodegaSyncResponseV2> {
+  const endpoint = SYNC_CONFIG.endpoints.syncBodegasCompletoV2
+    .replace(":cedula", String(cedula));
+
+  const { data } = await SYNC_CONFIG.http.get<FullBodegaSyncResponseV2>(endpoint);
   return data;
 }

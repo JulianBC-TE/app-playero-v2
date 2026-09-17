@@ -10,8 +10,9 @@
 
 import { db } from "@/backend/db/client";
 import { abastecimientos, medicionesTanque, syncs } from "@/backend/db/schema";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, or } from "drizzle-orm";
 import { AbastecimientoDTO } from "@/dto/AbastecimientoDTO";
+import { crearLog } from "../logs/logModule";
 
 const SYNC_KEY = "__last_sync_abastecimientos__";
 
@@ -25,7 +26,7 @@ const SYNC_KEY = "__last_sync_abastecimientos__";
 export async function saveAbastecimientoLocal(
   dto: AbastecimientoDTO,
 ): Promise<number> {
-  return await db.transaction(async (tx) => {
+  const abastecimientoId = await db.transaction(async (tx) => {
     // 1. Insertar el registro principal en la tabla de abastecimientos
     //console.log(dto.foto_rev_docs);
     console.log(dto.foto_rev_docs[0].slice(0, 10));
@@ -60,9 +61,9 @@ export async function saveAbastecimientoLocal(
       })
       .returning({ idInserted: abastecimientos.idAbastecimiento });
 
-    const abastecimientoId = result?.idInserted;
+    const id = result?.idInserted;
 
-    if (!abastecimientoId) {
+    if (!id) {
       throw new Error("No se pudo obtener el ID del abastecimiento insertado");
     }
 
@@ -72,7 +73,7 @@ export async function saveAbastecimientoLocal(
       dto.mediciones_tanque.length > 0
     ) {
       const medicionesParaInsertar = dto.mediciones_tanque.map((med) => ({
-        abastecimientoId: abastecimientoId,
+        abastecimientoId: id,
         idTanque: med.id_tanque,
         inicioRegla: med.inicio.regla,
         inicioTemperatura: med.inicio.temperatura,
@@ -87,8 +88,18 @@ export async function saveAbastecimientoLocal(
       await tx.insert(medicionesTanque).values(medicionesParaInsertar);
     }
 
-    return abastecimientoId;
+    return id;
   });
+
+  await crearLog({
+    tipo: "abastecimiento",
+    accion: "creacion",
+    registroId: abastecimientoId,
+    detalle: `${dto.litros_remision}L, OC: ${dto.nro_oc}`,
+    payload: dto as any,
+  });
+
+  return abastecimientoId;
 }
 
 /**
@@ -98,14 +109,17 @@ export async function saveAbastecimientoLocal(
  *
  * @returns Lista de abastecimientos con sus mediciones listas para el payload del backend.
  */
-export async function getAbastecimientosPendientes(): Promise<
+export async function getAbastecimientosPendientes(incluirErrores: boolean = false): Promise<
   AbastecimientoDTO[]
 > {
   // 1. Consultar todos los abastecimientos pendientes de forma tradicional
+  const filtro = incluirErrores
+    ? or(eq(abastecimientos.sync, 0), eq(abastecimientos.sync, -1))
+    : eq(abastecimientos.sync, 0);
   const rows = await db
     .select()
     .from(abastecimientos)
-    .where(eq(abastecimientos.sync, 0))
+    .where(filtro)
     .orderBy(desc(abastecimientos.idAbastecimiento));
   if (rows.length === 0) {
     //console.log("⚪ ABASTECIMIENTO -> Nada pendiente para subir");

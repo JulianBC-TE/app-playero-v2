@@ -23,11 +23,14 @@ import { login } from "@/backend/api/authAPI";
 import { saveUserLocally, loginOffline, clearSession } from "@DBmodules/authDB";
 import { sincronizarModulos } from "@/backend/db/modules/moduleDB";
 import { reintentarSyncFallidas } from "@/backend/db/modules/reintentarSyncDB";
+import { sync as syncSecureTime } from "@/services/timeService";
 import { useInitialSync } from "@/hooks/useInitialSync";
 
 // ---------------------------------------------------------------------------
 // Tipos del contexto
 // ---------------------------------------------------------------------------
+
+export type SyncStatus = "idle" | "syncing";
 
 export type AuthContextDataProps = {
   user: UserDTO;
@@ -45,6 +48,14 @@ export type AuthContextDataProps = {
   isLoadingServerIP: boolean;
   sucursal: SucursalDTO;
   setSucursal: (sucursal: SucursalDTO | null) => void;
+  syncStatus: SyncStatus;
+  setSyncStatus: (status: SyncStatus) => void;
+  syncMessage: string;
+  setSyncMessage: (msg: string) => void;
+  isManualSync: boolean;
+  setIsManualSync: (value: boolean) => void;
+  syncCompleteCounter: number;
+  incrementSyncComplete: () => void;
 };
 
 type AuthContextProviderProps = { children: React.ReactNode };
@@ -65,6 +76,14 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
   const [isLoadingServerIP, setIsLoadingServerIP] = useState(true);
   const [serverIP, setServerIPState] = useState<string | null>(null);
   const [isOffline, setIsOffline] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [syncMessage, setSyncMessage] = useState("");
+  const [isManualSync, setIsManualSync] = useState(false);
+  const [syncCompleteCounter, setSyncCompleteCounter] = useState(0);
+
+  const incrementSyncComplete = useCallback(() => {
+    setSyncCompleteCounter((c) => c + 1);
+  }, []);
   
   async function signIn(cedula: number, password: string, onSyncInitialData?: () => Promise<void>): Promise<boolean> {
     setIsLoadingUserData(true);
@@ -112,6 +131,10 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
         await reintentarSyncFallidas(cedula);
 
         httpClient.setToken(loginData.token);
+
+        // Establecer ancla de tiempo segura inmediatamente al login
+        try { await syncSecureTime(); } catch {}
+
         setUser(userData);
         setIsOffline(false);
 
@@ -268,6 +291,14 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
         setCliente,
         sucursal,
         setSucursal,
+        syncStatus,
+        setSyncStatus,
+        syncMessage,
+        setSyncMessage,
+        isManualSync,
+        setIsManualSync,
+        syncCompleteCounter,
+        incrementSyncComplete,
       }}
     >
       {children}

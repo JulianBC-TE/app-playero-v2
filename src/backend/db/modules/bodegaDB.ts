@@ -12,11 +12,11 @@
  */
 
 import { db } from "@/backend/db/client";
-import { bodegas, syncs, usuariosBodegas, habilitadosTrapaso, usuariosApp } from "@/backend/db/schema";
-import { eq, and } from "drizzle-orm";
+import { bodegas, picos, tanques, syncs, usuariosBodegas, habilitadosTrapaso, usuariosApp } from "@/backend/db/schema";
+import { eq, and, inArray, not } from "drizzle-orm";
 import { BodegaDTO } from "@/dto/BodegaDTO";
 import { getCurrentUserAppIdSucursal } from "./sucursalDB"; // Importamos la función de sucursalDB
-import { getFullDataSincronizacionBodegas } from "@/backend/api/bodegaAPI";
+import { getFullDataSincronizacionBodegasV2 } from "@/backend/api/bodegaAPI";
 // Clave en tabla syncs para registrar la última sincronización de bodegas.
 const SYNC_KEY = "__last_sync_bodegas__";
 
@@ -109,14 +109,14 @@ export async function getBodegasByIdSucursal(
   }));
 }
 /**
- * Devuelve las bodegas habilitadas como destino de traspaso para una sucursal,
- * basándose en la tabla de relación `habilitadosTrapaso`.
+ * Devuelve las bodegas habilitadas como destino de traspaso para un usuario,
+ * basándose en la tabla de relación `habilitadosTrapaso` (ahora por cedula).
  *
- * @param idSucursal - ID de la sucursal activa.
- * @returns Lista de {@link BodegaDTO} con `trapaso = true` vinculadas a la sucursal.
+ * @param cedula - Cédula del usuario logueado.
+ * @returns Lista de {@link BodegaDTO} con `trapaso = true` vinculadas al usuario.
  */
 export async function getBodegasTraspaso(
-  idSucursal: number,
+  cedula: number,
 ): Promise<BodegaDTO[]> {
   const rows = await db
     .select({
@@ -124,21 +124,17 @@ export async function getBodegasTraspaso(
       descripcionBodega: bodegas.descripcionBodega,
     })
     .from(bodegas)
-    // Hacemos un JOIN con la tabla intermedia
     .innerJoin(
       habilitadosTrapaso,
       eq(bodegas.idBodega, habilitadosTrapaso.idBodega)
     )
     .where(
       and(
-        // Filtramos por la sucursal que hace el traspaso
-        eq(habilitadosTrapaso.idSucursal, idSucursal),
-        // Movemos el filtro del boolean directamente a la query SQL
+        eq(habilitadosTrapaso.cedula, cedula),
         eq(bodegas.trapaso, true)
       )
     );
 
-  // Mapeamos el resultado al DTO deseado
   return rows.map((r) => ({
     id_bodega: String(r.idBodega),
     descripcion_bodega: r.descripcionBodega,
@@ -245,13 +241,14 @@ export async function getBodegasDelUsuario(
 }
 
 /**
- * Obtiene todas las bodegas de destino a las que una sucursal específica puede hacer traspasos.
- * Usa un INNER JOIN explícito para evitar problemas de esquema genérico en Drizzle.
- * * @param idSucursalOrigen - ID de la sucursal que envía el traspaso.
+ * Obtiene todas las bodegas de destino a las que un usuario específico puede hacer traspasos.
+ * Usa cedula en vez de idSucursal para filtrar por usuario.
+ *
+ * @param cedula - Cédula del usuario que realiza el traspaso.
  * @returns Lista de {@link BodegaDTO} habilitadas como destino.
  */
 export async function getBodegasDestinoTraspaso(
-  idSucursalOrigen: number
+  cedula: number
 ): Promise<BodegaDTO[]> {
   try {
     const result = await db
@@ -264,21 +261,19 @@ export async function getBodegasDestinoTraspaso(
         bodegas, 
         eq(habilitadosTrapaso.idBodega, bodegas.idBodega)
       )
-      .where(eq(habilitadosTrapaso.idSucursal, idSucursalOrigen));
+      .where(eq(habilitadosTrapaso.cedula, cedula));
 
-    // Drizzle ya infiere el tipo exacto basándose en el objeto select de arriba,
-    // eliminando por completo los errores de tipo implícito 'any'.
     return result.map((row) => ({
       id_bodega: String(row.idBodega),
       descripcion_bodega: row.descripcionBodega,
     }));
   } catch (error) {
-    console.error(`[DB] Error en getBodegasDestinoTraspaso para sucursal ${idSucursalOrigen}:`, error);
+    console.error(`[DB] Error en getBodegasDestinoTraspaso para cedula ${cedula}:`, error);
     return [];
   }
 }
 
-async function getDatosUsuarioLogueadoLocal(): Promise<{ cedula: number; idSucursal: number } | null> {
+export async function getDatosUsuarioLogueadoLocal(): Promise<{ cedula: number; idSucursal: number } | null> {
   try {
     const res = await db
       .select({
@@ -298,6 +293,7 @@ async function getDatosUsuarioLogueadoLocal(): Promise<{ cedula: number; idSucur
 /**
  * Sincroniza en una sola operación atómica todas las bodegas del operario,
  * las bodegas externas de traspaso y el mapa intermedio de habilitados.
+ * Usa la V2 del endpoint (filtrado por USUARIO via cedula).
  * @returns Total de registros de bodegas procesados de forma local.
  */
 export async function syncCatalogoYTraspasosBodega(): Promise<number> {
@@ -305,18 +301,35 @@ export async function syncCatalogoYTraspasosBodega(): Promise<number> {
     const usuarioLocal = await getDatosUsuarioLogueadoLocal();
     if (!usuarioLocal) throw new Error("No hay usuario activo local.");
 
-    const { idSucursal, cedula } = usuarioLocal;
+    const { cedula } = usuarioLocal;
     
+    // V2: usa cedula para filtrar relaciones de traspaso por USUARIO
     const { 
       bodegas_propias, 
       bodegas_traspaso, 
       relaciones_traspaso,
       usuario_bodegas 
-    } = await getFullDataSincronizacionBodegas(idSucursal, cedula);
+    } = await getFullDataSincronizacionBodegasV2(cedula);
+
+    const remoteBodegaIds = [
+      ...bodegas_propias.map((b) => b.id_bodega),
+      ...bodegas_traspaso.map((b) => b.id_bodega),
+    ];
 
     await db.transaction(async (tx) => {
+      // Limpiar relaciones por CEDULA (ya no por idSucursal)
       await tx.delete(usuariosBodegas).where(eq(usuariosBodegas.cedula, cedula));
-      await tx.delete(habilitadosTrapaso).where(eq(habilitadosTrapaso.idSucursal, idSucursal));
+      await tx.delete(habilitadosTrapaso).where(eq(habilitadosTrapaso.cedula, cedula));
+
+      if (remoteBodegaIds.length > 0) {
+        await tx.delete(picos).where(not(inArray(picos.idBodega, remoteBodegaIds)));
+        await tx.delete(tanques).where(not(inArray(tanques.idBodega, remoteBodegaIds)));
+        await tx.delete(bodegas).where(not(inArray(bodegas.idBodega, remoteBodegaIds)));
+      } else {
+        await tx.delete(picos);
+        await tx.delete(tanques);
+        await tx.delete(bodegas);
+      }
 
       for (const bp of bodegas_propias) {
         await tx.insert(bodegas).values({
@@ -348,8 +361,9 @@ export async function syncCatalogoYTraspasosBodega(): Promise<number> {
         });
       }
 
+      // V2: relaciones_traspaso viene con { cedula, id_bodega_destino }
       for (const rel of relaciones_traspaso) {
-        await tx.insert(habilitadosTrapaso).values({ idSucursal: rel.id_sucursal, idBodega: rel.id_bodega_destino });
+        await tx.insert(habilitadosTrapaso).values({ cedula: rel.cedula, idBodega: rel.id_bodega_destino });
       }
     });
 

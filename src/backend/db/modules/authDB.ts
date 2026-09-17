@@ -244,3 +244,17 @@ export async function updateLocalUserBlockStatus(cedula: number, bloqueado: bool
     .set({ bloqueado: bloqueado })
     .where(eq(usuariosApp.idUser, cedula));
 }
+
+/**
+ * Actualiza la sucursal asignada al usuario en la BD local.
+ * Útil cuando el servidor cambia la sucursal del usuario durante la sincronización.
+ *
+ * @param cedula - Cédula del usuario
+ * @param idSucursal - Nuevo ID de sucursal
+ */
+export async function updateLocalUserSucursal(cedula: number, idSucursal: number): Promise<void> {
+  await db
+    .update(usuariosApp)
+    .set({ idSucursal })
+    .where(eq(usuariosApp.cedula, cedula));
+}

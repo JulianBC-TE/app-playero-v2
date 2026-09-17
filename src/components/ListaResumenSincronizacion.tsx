@@ -7,13 +7,16 @@ import {
   Alert, 
   ScrollView, 
   Image, 
-  TouchableWithoutFeedback 
+  TouchableWithoutFeedback,
+  ActivityIndicator
 } from "react-native";
 import { Text } from "@/components";
 import { getRegistrosPorTipo, eliminarRegistroPorTipo, RegistroResumen, TipoRegistro, ImagenDetalle } from "@DBmodules/resumenBD";
+import { reenviarRegistroIndividual } from "@DBmodules/reenviarRegistroDB";
+import { duplicarRegistroConError } from "@DBmodules/duplicarConErrorDB";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { Loading } from "@/components/Loading";
-import { CheckCircle2, AlertTriangle, Clock, Trash2, X, Image as ImageIcon } from "lucide-react-native";
+import { CheckCircle2, AlertTriangle, Clock, Trash2, X, Image as ImageIcon, RefreshCw, Copy } from "lucide-react-native";
 
 type ListaProps = {
   tipo: TipoRegistro;
@@ -61,11 +64,109 @@ function TarjetaImagen({ img, onPress }: { img: ImagenDetalle; onPress: () => vo
   );
 }
 
+// Componente de vista de logs con filtros y colores
+function ListaLogs({ registros }: { registros: RegistroResumen[] }) {
+  const [filtroActivo, setFiltroActivo] = useState<"todos" | "creacion" | "sync_ok" | "sync_error">("todos");
+
+  const registrosFiltrados = useMemo(() => {
+    if (filtroActivo === "todos") return registros;
+    return registros.filter((r) => {
+      if (filtroActivo === "creacion" && r.syncStatus === 0) return true;
+      if (filtroActivo === "sync_ok" && r.syncStatus === 1) return true;
+      if (filtroActivo === "sync_error" && r.syncStatus === -1) return true;
+      return false;
+    });
+  }, [registros, filtroActivo]);
+
+  const getBackgroundColor = (syncStatus: number) => {
+    switch (syncStatus) {
+      case 0: return "#fef9c3"; // amarillo - creacion
+      case 1: return "#dcfce7"; // verde - sync_ok
+      case -1: return "#fee2e2"; // rojo - sync_error
+      default: return "#ffffff";
+    }
+  };
+
+  const getAccionLabel = (syncStatus: number) => {
+    switch (syncStatus) {
+      case 0: return "creación";
+      case 1: return "sync_ok";
+      case -1: return "sync_error";
+      default: return "";
+    }
+  };
+
+  const renderLogItem = ({ item }: { item: RegistroResumen }) => (
+    <View 
+      style={{ 
+        backgroundColor: getBackgroundColor(item.syncStatus),
+        padding: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e5e5',
+      }}
+    >
+      <Text style={{ fontSize: 13, color: '#000000' }}>
+        {item.hora}  {item.datoPrincipal}  {item.datoSecundario}  {getAccionLabel(item.syncStatus)}
+      </Text>
+    </View>
+  );
+
+  return (
+    <View className="flex-1 bg-gray-50">
+      {/* Filtros */}
+      <View className="flex-row px-3 py-2 gap-2 bg-white border-b border-gray-200">
+        {[
+          { key: "todos", label: "Todos" },
+          { key: "creacion", label: "Creación" },
+          { key: "sync_ok", label: "Sync OK" },
+          { key: "sync_error", label: "Sync Error" },
+        ].map((f) => (
+          <TouchableOpacity
+            key={f.key}
+            onPress={() => setFiltroActivo(f.key as any)}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 16,
+              backgroundColor: filtroActivo === f.key ? "#2563eb" : "#e5e7eb",
+            }}
+          >
+            <Text style={{ 
+              fontSize: 12, 
+              fontWeight: "bold",
+              color: filtroActivo === f.key ? "#ffffff" : "#374151" 
+            }}>
+              {f.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Lista de logs */}
+      <FlatList
+        data={registrosFiltrados}
+        keyExtractor={(item) => `log-${item.id}`}
+        renderItem={renderLogItem}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 32 }}
+        ListEmptyComponent={
+          <View className="flex-1 items-center justify-center pt-16">
+            <Text className="text-gray-400 text-base text-center px-6">
+              No se encontraron logs para esta fecha.
+            </Text>
+          </View>
+        }
+      />
+    </View>
+  );
+}
+
 export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: ListaProps) {
   const [registros, setRegistros] = useState<RegistroResumen[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [itemSeleccionado, setItemSeleccionado] = useState<RegistroResumen | null>(null);
   const [imagenModalUri, setImagenModalUri] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   async function cargarRegistros() {
     try {
@@ -156,12 +257,75 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
     );
   }
 
+  async function handleReenviar() {
+    if (!itemSeleccionado || isRetrying) return;
+
+    Alert.alert(
+      "Reenviar Registro",
+      "¿Deseas reintentar el envío de este registro al servidor?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Reenviar",
+          onPress: async () => {
+            setIsRetrying(true);
+            try {
+              const result = await reenviarRegistroIndividual(tipo, itemSeleccionado.id);
+              if (result.success) {
+                toastSuccess("Éxito", "Registro enviado correctamente.");
+                setItemSeleccionado(null);
+                cargarRegistros();
+              } else {
+                toastError("Error al reenviar", result.error || "No se pudo enviar el registro.");
+              }
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              toastError("Error inesperado", msg);
+            } finally {
+              setIsRetrying(false);
+            }
+          }
+        }
+      ]
+    );
+  }
+
+  function handleDuplicar() {
+    if (!itemSeleccionado) return;
+
+    Alert.alert(
+      "Duplicar Registro (Test)",
+      "Se creará una copia de este registro con sync = -1 para probar el reenvío.",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Duplicar",
+          onPress: async () => {
+            const ok = await duplicarRegistroConError(tipo, itemSeleccionado.id);
+            if (ok) {
+              toastSuccess("Duplicado", "Copia creada con error de sync.");
+              setItemSeleccionado(null);
+              cargarRegistros();
+            } else {
+              toastError("Error", "No se pudo duplicar el registro.");
+            }
+          }
+        }
+      ]
+    );
+  }
+
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-gray-50">
         <Loading />
       </View>
     );
+  }
+
+  // Si es tipo logs, renderizar componente especial
+  if (tipo === "logs") {
+    return <ListaLogs registros={registros} />;
   }
 
   const renderDetalleModal = () => {
@@ -251,6 +415,35 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
                 <View className="p-4 bg-gray-50 rounded-xl border border-gray-100 mb-4 items-center">
                   <Text className="text-xs text-gray-400">Sin imágenes adjuntas en este registro.</Text>
                 </View>
+              )}
+
+              {/* Reenvío (solo para sync = -1) */}
+              {itemSeleccionado.syncStatus === -1 && (
+                <TouchableOpacity 
+                  onPress={handleReenviar}
+                  disabled={isRetrying}
+                  className={`mt-2 flex-row justify-center items-center gap-2 py-3.5 rounded-xl shadow-sm ${isRetrying ? "bg-blue-400" : "bg-blue-600 active:bg-blue-700"}`}
+                >
+                  {isRetrying ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <RefreshCw color="#fff" size={20} />
+                  )}
+                  <Text className="text-white font-bold text-base">
+                    {isRetrying ? "Reenviando..." : "Reenviar"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Duplicar (modo admin/test) - crea copia con sync = -1, solo visible para admin */}
+              {isUnlocked && (
+                <TouchableOpacity 
+                  onPress={handleDuplicar}
+                  className={`mt-2 flex-row justify-center items-center gap-2 py-3.5 rounded-xl shadow-sm bg-green-600 active:bg-green-700`}
+                >
+                  <Copy color="#fff" size={20} />
+                  <Text className="text-white font-bold text-base">Duplicar para Test</Text>
+                </TouchableOpacity>
               )}
 
               {/* Borrado */}

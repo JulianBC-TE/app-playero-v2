@@ -20,6 +20,7 @@ import m0015 from './0015_rapid_betty_brant.sql';
 import m0016 from './0016_burly_sunspot.sql';
 import m0017 from './0017_smiling_rattler.sql';
 import m0018 from './0018_married_cerebro.sql';
+import m0019 from './0019_usuario_traspaso.sql';
 
   export default {
     journal,
@@ -42,7 +43,8 @@ m0014,
 m0015,
 m0016,
 m0017,
-m0018
+m0018,
+m0019
     }
   }
   

@@ -23,7 +23,7 @@ import { Loading } from "@/components/Loading";
 import { baseMenuItems, menuItemType } from "@/dto/MenuItens";
 import { useFocusEffect } from "@react-navigation/native";
 import { getBodegasConCierreAnulado, getTurnoStatusLocal } from "@DBmodules/turnoBD";
-import { toastError, toastSuccess } from "@/utils/toastMessage";
+import { toastError, toastInfo, toastSuccess } from "@/utils/toastMessage";
 import { getSucursalUsuarioActivoLocal } from "@DBmodules/sucursalDB";
 import { getModulosDelUsuario } from "@DBmodules/moduleDB";
 import { useAuth } from "@hooks/useAuth";
@@ -89,10 +89,8 @@ function tienePermiso(
 export function Home({ navigation }: StackRoutesProps<"home">) {
   const [isLoading, setIsLoading] = useState(true);
   const [menuItems, setMenuItems] = useState<menuItemType[]>(baseMenuItems);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncMessage, setSyncMessage] = useState("");
   
-  const { user, signOut } = useAuth(); 
+  const { user, signOut, syncStatus, syncMessage, setSyncStatus, setSyncMessage, isManualSync, setIsManualSync, syncCompleteCounter, incrementSyncComplete } = useAuth();
   const cedula = user?.cedula; 
   const estaBloqueado = !!user?.bloqueado;
 
@@ -134,16 +132,23 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 
   async function handleSync() {
     if (!user?.idUser) return;
-    setIsSyncing(true);
-    setSyncMessage("Iniciando sincronización...");
+    if (syncStatus === "syncing") {
+      toastInfo("Sync en curso", syncMessage || "Ya hay un proceso activo");
+      return;
+    }
     try {
-      await syncTodo(user.idUser, (msg) => setSyncMessage(msg), true);
+      setIsManualSync(true);
+      await syncTodo(
+        user.idUser,
+        (msg) => setSyncMessage(msg),
+        (status) => setSyncStatus(status),
+        true
+      );
+      // Forzar refresco del Home después del sync
+      incrementSyncComplete();
     } catch (error: any) {
       console.error("[Home] Error en sincronización:", error);
       toastError("No se pudo completar la sincronización", error?.message ?? "Error desconocido");
-    } finally {
-      setIsSyncing(false);
-      setSyncMessage("");
     }
   }
 
@@ -235,7 +240,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
       }
 
       loadDashboardData();
-    }, [cedula, estaBloqueado]) 
+    }, [cedula, estaBloqueado, syncCompleteCounter]) 
   );
 
   // ── Render si el usuario está bloqueado ──────────────────────────────────────
@@ -306,7 +311,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
       )}
 
       {/* Modal de sincronización */}
-      <Modal visible={isSyncing} transparent animationType="fade">
+      <Modal visible={syncStatus === "syncing" && isManualSync} transparent animationType="fade">
         <View className="flex-1 bg-black/50 items-center justify-center">
           <View className="bg-white rounded-2xl p-8 items-center mx-8">
             <ActivityIndicator size="large" color="#000" />

@@ -41,6 +41,7 @@ import {
   TurnoStatus,
 } from "@/backend/db/services/turnoStatusService";
 import { getSucursalUsuarioActivoLocal } from "@DBmodules/sucursalDB";
+import { getTimestamp } from "@/services/timeService";
 
 interface SesionLocalType {
   cedula: number;
@@ -211,7 +212,8 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
         fotos: fotosPicos[pico.id_pico] || [], // ◄ NUEVO: Extrae el array de fotos del estado
       }));
 
-      const now = new Date();
+      const secureTime = await getTimestamp();
+      const now = new Date(secureTime.timestampMs);
       const fecha = now.toISOString().slice(0, 10);
       const hora = now.toTimeString().slice(0, 8);
 
@@ -258,8 +260,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
       // Proceso normal de inserción del nuevo turno (el INICIO-TURNO de hoy)
       // Generamos el entero YYYYMMDD consistente con el backend y las consultas locales
       const fechaEnteroLocal = parseInt(fecha.replace(/-/g, ""), 10); // Ej: 20260703
-      const ahora = new Date();
-      const horaEnteroLocal = ahora.getHours() * 100 + ahora.getMinutes();
+      const horaEnteroLocal = now.getHours() * 100 + now.getMinutes();
       // Proceso normal de inserción del nuevo turno
       console.log("turno cargado",inicioTurno, "fecha", fechaEnteroLocal)
       await crearTurnoLocal({

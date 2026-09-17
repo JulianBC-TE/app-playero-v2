@@ -13,8 +13,9 @@
 
 import { db } from "@/backend/db/client";
 import { trapasos, type Traspaso, type TraspasoInsert } from "@/backend/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, or } from "drizzle-orm";
 import { TraspasoDTO } from "@/dto/TraspasoDTO";
+import { crearLog } from "../logs/logModule";
 
 const SYNC_KEY = "__last_sync_traspasos__";
 
@@ -26,7 +27,7 @@ const SYNC_KEY = "__last_sync_traspasos__";
  * Convierte un TraspasoDTO a un objeto Traspaso para insertar en la BD.
  * Serializa los arrays de fotos como JSON en campos de texto.
  */
-export function dtoToTraspasoInsert(dto: TraspasoDTO): TraspasoInsert {
+export function dtoToTraspasoInsert(dto: TraspasoDTO, timestampMs?: number): TraspasoInsert {
   return {
     idTraspasoMongo: dto.id_trapaso,
     bodOrigen: dto.bod_origen,
@@ -65,7 +66,7 @@ export function dtoToTraspasoInsert(dto: TraspasoDTO): TraspasoInsert {
     lastIdSalida: dto.last_id_salida,
     estado: 1,
     sync: 0,
-    fechaCreacion: Date.now(),
+    fechaCreacion: timestampMs ?? Date.now(),
   };
 }
 
@@ -125,12 +126,20 @@ export function traspasoToDTO(row: Traspaso): TraspasoDTO {
  * @param dto El DTO del traspaso a guardar
  * @returns El ID generado en SQLite
  */
-export async function saveTraspasoLocal(dto: TraspasoDTO): Promise<number> {
-  const values = dtoToTraspasoInsert(dto);
+export async function saveTraspasoLocal(dto: TraspasoDTO, timestampMs?: number): Promise<number> {
+  const values = dtoToTraspasoInsert(dto, timestampMs);
   
   const result = await db.insert(trapasos).values(values);
   
-  return (result as any).lastInsertRowId ?? 0;
+  const id = (result as any).lastInsertRowId ?? 0;
+  await crearLog({
+    tipo: "traspaso",
+    accion: "creacion",
+    registroId: id,
+    detalle: `${dto.litros_pico}L, Tax: ${dto.taxilitro_inicial}-${dto.taxilitro_final}`,
+    payload: dto as any,
+  });
+  return id;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,11 +152,14 @@ export async function saveTraspasoLocal(dto: TraspasoDTO): Promise<number> {
  * Incluye un campo `clave` alfanumérico para identificar de forma única cada traspaso.
  * @returns Array de traspasos con el DTO ya convertido
  */
-export async function getTraspasosPendientes(): Promise<Array<Traspaso & { dto: TraspasoDTO }>> {
+export async function getTraspasosPendientes(incluirErrores: boolean = false): Promise<Array<Traspaso & { dto: TraspasoDTO }>> {
+  const filtro = incluirErrores
+    ? or(eq(trapasos.sync, 0), eq(trapasos.sync, -1))
+    : eq(trapasos.sync, 0);
   const rows = await db
     .select()
     .from(trapasos)
-    .where(eq(trapasos.sync, 0))
+    .where(filtro)
     .orderBy(desc(trapasos.fechaCreacion));
   if (rows.length === 0) {
     //console.log("⚪ TRASPASO -> Nada pendiente para subir");

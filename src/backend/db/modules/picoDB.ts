@@ -15,7 +15,7 @@
 
 import { db } from "@/backend/db/client";
 import { picos, syncs } from "@/backend/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray, not } from "drizzle-orm";
 import { PicoDTO } from "@/dto/PicosDTO";
 import { bodegas } from "../schema";   // ← Agregar esta línea
 import { getIdsBodegasDelUsuario } from "./bodegaDB";
@@ -191,13 +191,21 @@ export async function syncPicosDelOperario(cedula: number): Promise<number> {
       return 0;
     }
    
-    const picos = await fetchPicosPorBodegas(idsBodegas);
-    if (picos.length > 0) {
-      await savePicos(picos);
+    const picosRemotos = await fetchPicosPorBodegas(idsBodegas);
+    const remotePicoIds = picosRemotos.map((p) => p.id_pico);
+
+    if (remotePicoIds.length > 0) {
+      await db.delete(picos).where(not(inArray(picos.idPico, remotePicoIds)));
+    } else {
+      await db.delete(picos);
+    }
+
+    if (picosRemotos.length > 0) {
+      await savePicos(picosRemotos);
     }
    
-    console.log(`✅ PICOS -> ok (+${picos.length})`);
-    return picos.length;
+    console.log(`✅ PICOS -> ok (+${picosRemotos.length})`);
+    return picosRemotos.length;
   } catch (error) {
     console.error("❌ PICOS -> Error:", error.message || error);
     throw error;

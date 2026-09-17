@@ -79,6 +79,18 @@ export function ResumenSincronizacion({ navigation }: StackRoutesProps<"resumenS
             />
           )}
         </Tab.Screen>
+
+        {isUnlocked && (
+          <Tab.Screen name="resumenLogs" options={{ tabBarLabel: "Logs" }}>
+            {() => (
+              <ListaResumenSincronizacion 
+                tipo="logs" 
+                fechaFiltro={fechaISOString} 
+                isUnlocked={isUnlocked} 
+              />
+            )}
+          </Tab.Screen>
+        )}
       </Tab.Navigator>
     </View>
   );

@@ -8,6 +8,7 @@
 import { db } from "@/backend/db/client";
 import { turnos } from "@/backend/db/schema";
 import { TurnoEstado } from "../constants/turnoEstado";
+import { getTimestamp } from "@/services/timeService";
 import { eq, and, lt, inArray, desc } from "drizzle-orm";
 
 /**
@@ -66,7 +67,8 @@ export async function calcularEstadoTurno(
     };
   }
 
-  const hoy = new Date();
+  const secureTime = await getTimestamp();
+  const hoy = new Date(secureTime.timestampMs);
   const fecha = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
   const fechaTimestamp = Math.floor(fecha.getTime() / 1000); 
 

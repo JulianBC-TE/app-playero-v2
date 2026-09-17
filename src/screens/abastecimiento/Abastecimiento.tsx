@@ -45,6 +45,7 @@ import {
 } from "@DBmodules/turnoBD";
 import { saveAbastecimientoLocal } from "@DBmodules/abastecimientoDB";
 import { removeCargaCombustible } from "@/storage/storageCargaCombustible";
+import { getTimestamp } from "@/services/timeService";
 
 export function Abastecimiento({
   navigation,
@@ -372,7 +373,8 @@ export function Abastecimiento({
   }
 
   async function saveAll() {
-    const now = new Date();
+    const secureTime = await getTimestamp();
+    const now = new Date(secureTime.timestampMs);
     const fecha = now.toISOString().slice(0, 10);
     const hora = now.toTimeString().slice(0, 8);
 

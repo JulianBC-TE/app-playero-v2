@@ -15,6 +15,7 @@ import { eq, and } from "drizzle-orm";
 import { ClienteDTO } from "@/dto/ClienteDTO";
 import { syncGetClientes, syncPostClientes } from "@/backend/api/clienteAPI";
 import { syncsController } from "./syncsDB";
+import { crearLog } from "../logs/logModule";
 
 // Clave en tabla syncs para registrar la última sincronización de clientes.
 const SYNC_KEY = "__last_sync_clientes__";
@@ -68,6 +69,13 @@ export async function saveClienteLocal(data: ClienteDTO): Promise<void> {
     descripcionCliente: data.descripcion_cliente,
     timestamp: Date.now(),
     sync: 0,
+  });
+  await crearLog({
+    tipo: "cliente",
+    accion: "creacion",
+    registroId: 0,
+    detalle: `RUC: ${data.ruc}`,
+    payload: data as any,
   });
 }
 

@@ -4,8 +4,7 @@ import { Text } from "@/components";
 import { useNavigation } from "@react-navigation/native";
 import { ArrowLeftSquare, ChevronLeft, ChevronRight, Calendar, Lock, Unlock, X } from "lucide-react-native";
 import { DatePickerModal } from "react-native-paper-dates";
-
-const CLAVE_HARDCODEADA = "EliminaciónLocalNoEnElServidor"; // ◄ Modifica aquí tu clave
+import { verifyAdminPassword } from "@/backend/db/logs/logPassword";
 
 type HeaderResumenProps = {
   title: string;
@@ -56,8 +55,9 @@ export function HeaderResumen({
     });
   }
 
-  function handleValidarClave() {
-    if (claveInput === CLAVE_HARDCODEADA) {
+  async function handleValidarClave() {
+    const isValid = await verifyAdminPassword(claveInput);
+    if (isValid) {
       setIsUnlocked(true);
       setModalClaveVisible(false);
       setClaveInput("");
