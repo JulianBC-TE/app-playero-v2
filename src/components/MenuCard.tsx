@@ -16,6 +16,7 @@ type Props = TouchableOpacityProps & {
 	route: string;
 	enabled?: boolean;
 	turno?: "abierto" | "cerrado" | "pendiente" | "iniciar" | "falta_cerrar";
+	syncErrorCount?: number;
 };
 
 /**
@@ -28,6 +29,7 @@ type Props = TouchableOpacityProps & {
  * @param route - Ruta de navegación asociada a la tarjeta.
  * @param enabled - Si es `true`, habilita la tarjeta cuando no hay estado de turno. Por defecto `false`.
  * @param turno - Estado del turno: `"abierto"` | `"cerrado"` | `"pendiente"` | `"iniciar"` | `"falta_cerrar"`.
+ * @param syncErrorCount - Cantidad de registros con error de sincronización (se muestra como badge rojo).
  */
 export function MenuCard({
 	name,
@@ -35,9 +37,10 @@ export function MenuCard({
 	route,
 	enabled = false,
 	turno,
+	syncErrorCount,
 	...rest
 }: Props) {
-	// Define a cor de fundo com base no turno ou no enabled
+	// Define color de fondo basado en el turno o en enabled
 	const getBackgroundClass = () => {
 		if (turno) {
 			switch (turno) {
@@ -81,6 +84,32 @@ export function MenuCard({
 					height={64}
 					color={isActive ? "#000" : "#c9c0c0"}
 				/>
+
+				{syncErrorCount > 0 && (
+					<View style={{
+						position: "absolute",
+						top: 8,
+						right: 8,
+						backgroundColor: "#dc2626",
+						width: 20,
+						height: 20,
+						borderRadius: 10,
+						alignItems: "center",
+						justifyContent: "center",
+						minWidth: 20,
+						padding: 0,
+					}}>
+						<Text
+							style={{
+								color: "#ffffff",
+								fontSize: 12,
+								fontWeight: "bold",
+							}}>
+							{syncErrorCount}
+						</Text>
+					</View>
+				)}
+
 				<Text
 					className='text-lg mt-2'
 					style={{ color: isActive ? "#000" : "#c9c0c0" }}

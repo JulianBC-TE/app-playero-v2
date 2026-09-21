@@ -49,8 +49,35 @@ import { saveSucursales } from "../modules/sucursalDB";
 import { httpClient } from "@/backend/api/httpClient";
 import { toastError, toastInfo } from "@/utils/toastMessage";
 import { sync as syncSecureTime } from "@/services/timeService";
-import type { SyncStatus } from "@/contexts/AuthContext";
+import type { SyncStatus, SyncErrorCount } from "@/contexts/AuthContext";
+import { db } from "@/backend/db/client";
+import { tickets, abastecimientos, trapasos, calibraciones, turnos } from "@/backend/db/schema";
+import { count, eq } from "drizzle-orm";
 import { crearLog, limpiarLogsAntiguos } from "../logs/logModule";
+
+// Contador de registros con error de sincronización (sync = -1)
+async function contarRegistrosSyncError(): Promise<number> {
+  try {
+    const [ticketsCount, abastecimientosCount, trapasosCount, calibracionesCount, turnosCount] = await Promise.all([
+      db.select({ count: count() }).from(tickets).where(eq(tickets.sync, -1)),
+      db.select({ count: count() }).from(abastecimientos).where(eq(abastecimientos.sync, -1)),
+      db.select({ count: count() }).from(trapasos).where(eq(trapasos.sync, -1)),
+      db.select({ count: count() }).from(calibraciones).where(eq(calibraciones.sync, -1)),
+      db.select({ count: count() }).from(turnos).where(eq(turnos.sync, -1)),
+    ]);
+
+    const total = (ticketsCount[0]?.count ?? 0) +
+                  (abastecimientosCount[0]?.count ?? 0) +
+                  (trapasosCount[0]?.count ?? 0) +
+                  (calibracionesCount[0]?.count ?? 0) +
+                  (turnosCount[0]?.count ?? 0);
+
+    return total;
+  } catch (error) {
+    console.error("Error contando registros con sync = -1:", error);
+    return 0;
+  }
+}
 
 // ── Helper genérico de envío por lotes ───────────────────────────────────────
 
@@ -222,6 +249,7 @@ export async function syncTodo(
   idUser: number,
   onStatus?: (msg: string) => void,
   onSyncStatus?: (status: SyncStatus) => void,
+  onSyncErrorCount?: (count: number) => void,
   isManual: boolean = false
 ): Promise<boolean> {
   // Verificar conectividad ANTES de intentar sincronizar
@@ -256,6 +284,11 @@ export async function syncTodo(
     console.log("🔄 ORQUESTADOR -> Iniciando ciclo completo");
     await syncPendingData(onStatus, isManual);
     const usuarioBloqueado = await syncCatalogosFromCentral(idUser, onStatus);
+
+    // Actualizar contador de registros con error de sincronización
+    const errorCount = await contarRegistrosSyncError();
+    onSyncErrorCount?.(errorCount);
+
     console.log("🏁 ORQUESTADOR -> Ciclo completo terminado");
     return usuarioBloqueado;
   } finally {

@@ -32,6 +32,8 @@ import { useInitialSync } from "@/hooks/useInitialSync";
 
 export type SyncStatus = "idle" | "syncing";
 
+export type SyncErrorCount = number;
+
 export type AuthContextDataProps = {
   user: UserDTO;
   updateUserProfile: (userUpdated: UserDTO) => Promise<void>;
@@ -56,6 +58,8 @@ export type AuthContextDataProps = {
   setIsManualSync: (value: boolean) => void;
   syncCompleteCounter: number;
   incrementSyncComplete: () => void;
+  syncErrorCount: SyncErrorCount;
+  setSyncErrorCount: (count: SyncErrorCount) => void;
 };
 
 type AuthContextProviderProps = { children: React.ReactNode };
@@ -80,6 +84,7 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
   const [syncMessage, setSyncMessage] = useState("");
   const [isManualSync, setIsManualSync] = useState(false);
   const [syncCompleteCounter, setSyncCompleteCounter] = useState(0);
+  const [syncErrorCount, setSyncErrorCount] = useState(0);
 
   const incrementSyncComplete = useCallback(() => {
     setSyncCompleteCounter((c) => c + 1);
@@ -291,7 +296,7 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
         setCliente,
         sucursal,
         setSucursal,
-        syncStatus,
+syncStatus,
         setSyncStatus,
         syncMessage,
         setSyncMessage,
@@ -299,6 +304,8 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
         setIsManualSync,
         syncCompleteCounter,
         incrementSyncComplete,
+        syncErrorCount,
+        setSyncErrorCount
       }}
     >
       {children}

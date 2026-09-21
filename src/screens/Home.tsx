@@ -90,7 +90,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
   const [isLoading, setIsLoading] = useState(true);
   const [menuItems, setMenuItems] = useState<menuItemType[]>(baseMenuItems);
   
-  const { user, signOut, syncStatus, syncMessage, setSyncStatus, setSyncMessage, isManualSync, setIsManualSync, syncCompleteCounter, incrementSyncComplete } = useAuth();
+  const { user, signOut, syncStatus, syncMessage, setSyncStatus, setSyncMessage, isManualSync, setIsManualSync, syncCompleteCounter, incrementSyncComplete, syncErrorCount, setSyncErrorCount } = useAuth();
   const cedula = user?.cedula; 
   const estaBloqueado = !!user?.bloqueado;
 
@@ -142,6 +142,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
         user.idUser,
         (msg) => setSyncMessage(msg),
         (status) => setSyncStatus(status),
+        setSyncErrorCount,
         true
       );
       // Forzar refresco del Home después del sync
@@ -279,19 +280,20 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
                 }}
                 contentContainerStyle={{ paddingVertical: 24 }}
                 renderItem={({ item }) => (
-                  <MenuCard
-                    name={item.name}
-                    icon={item.icon}
-                    route={item.route}
-                    onPress={() =>
-                      handleOpenMenu(
-                        item.route as keyof StackRoutesList,
-                        item.params,
-                      )
-                    }
-                    enabled={item.enabled}
-                    turno={item.turno}
-                  />
+<MenuCard
+                  name={item.name}
+                  icon={item.icon}
+                  route={item.route}
+                  onPress={() =>
+                    handleOpenMenu(
+                      item.route as keyof StackRoutesList,
+                      item.params,
+                    )
+                  }
+                  enabled={item.enabled}
+                  turno={item.turno}
+                  syncErrorCount={syncErrorCount}
+                />
                 )}
               />
             </View>
