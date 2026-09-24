@@ -9,6 +9,7 @@ import { Text } from "@/components";
 type Props = {
 	title: string;
 	disableBackButton?: boolean;
+	actions?: React.ReactNode;
 };
 
 /**
@@ -19,7 +20,7 @@ type Props = {
  * @param title - Título a mostrar en el encabezado.
  * @param disableBackButton - Si es `true`, oculta el botón de retroceso y muestra el ícono de bloqueo.
  */
-export function ScreenHeader({ title, disableBackButton }: Props) {
+export function ScreenHeader({ title, disableBackButton, actions }: Props) {
 	const navigation = useNavigation();
 	return (
 		<View className='flex-row items-center bg-teColorPrincipal pt-14 px-8 pb-2 gap-4'>
@@ -38,6 +39,7 @@ export function ScreenHeader({ title, disableBackButton }: Props) {
 				/>
 			)}
 			<Text className='flex-1 text-3xl font-bold text-white'>{title}</Text>
+			{actions}
 		</View>
 	);
 }

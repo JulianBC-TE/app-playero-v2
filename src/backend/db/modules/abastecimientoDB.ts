@@ -13,19 +13,68 @@ import { abastecimientos, medicionesTanque, syncs } from "@/backend/db/schema";
 import { eq, desc, inArray, or } from "drizzle-orm";
 import { AbastecimientoDTO } from "@/dto/AbastecimientoDTO";
 import { crearLog } from "../logs/logModule";
+import { compararCamposClave } from "./duplicadosHelper";
 
 const SYNC_KEY = "__last_sync_abastecimientos__";
 
 /**
+ * Verifica si un abastecimiento es duplicado comparándolo con el último de la misma bodega.
+ * Compara: fecha, hora (sin seg), nro_oc, litros_remision, taxilitro_inicial, taxilitro_final
+ */
+export async function esAbastecimientoDuplicadoLocal(dto: AbastecimientoDTO): Promise<boolean> {
+  const ultimo = await db
+    .select()
+    .from(abastecimientos)
+    .where(eq(abastecimientos.idBod, dto.id_bod))
+    .orderBy(desc(abastecimientos.idAbastecimiento))
+    .limit(1);
+
+  if (ultimo.length === 0) return false;
+
+  const row = ultimo[0];
+  return compararCamposClave(
+    {
+      fecha: dto.fecha,
+      nro_oc: dto.nro_oc,
+      litros_remision: dto.litros_remision,
+      taxilitro_inicial: dto.taxilitro_inicial,
+      taxilitro_final: dto.taxilitro_final,
+    },
+    {
+      fecha: row.fecha,
+      nro_oc: row.nroOc,
+      litros_remision: row.litrosRemision,
+      taxilitro_inicial: row.taxilitroInicial,
+      taxilitro_final: row.taxilitroFinal,
+    },
+    ["fecha", "nro_oc", "litros_remision", "taxilitro_inicial", "taxilitro_final"]
+  );
+}
+
+/**
  * Inserta un nuevo abastecimiento pendiente de sincronización y sus respectivas mediciones.
  * Utiliza una transacción para asegurar que todo se guarde correctamente o nada lo haga.
+ * Retorna -1 si el abastecimiento es duplicado (no se insertó).
  *
  * @param dto - Datos del abastecimiento a guardar (aplanados, tal como definimos el DTO).
- * @returns ID generado por SQLite (`idAbastecimiento`).
+ * @returns ID generado por SQLite (`idAbastecimiento`), o -1 si es duplicado.
  */
 export async function saveAbastecimientoLocal(
   dto: AbastecimientoDTO,
 ): Promise<number> {
+  const esDuplicado = await esAbastecimientoDuplicadoLocal(dto);
+  if (esDuplicado) {
+    console.log("⚠️ ABASTECIMIENTO DUPLICADO detectado, no se inserta:", dto.fecha, dto.hora, dto.nro_oc);
+    await crearLog({
+      tipo: "abastecimiento",
+      accion: "duplicado_detectado",
+      registroId: 0,
+      detalle: `${dto.litros_remision}L, OC: ${dto.nro_oc}`,
+      payload: dto as any,
+    });
+    return -1;
+  }
+
   const abastecimientoId = await db.transaction(async (tx) => {
     // 1. Insertar el registro principal en la tabla de abastecimientos
     //console.log(dto.foto_rev_docs);

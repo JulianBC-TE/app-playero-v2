@@ -112,6 +112,55 @@ function mapearNombreTipo(nombre: string): "salida" | "traspaso" | "calibracion"
 async function syncLote<T>(
   items: T[],
   getPk: (item: T) => number,
+  enviar: (item: T) => Promise<{ duplicado?: boolean }>,
+  marcarOk: (id: number) => Promise<void>,
+  marcarError: (id: number) => Promise<void>,
+  nombre: string,
+) {
+  if (items.length === 0) return;
+
+  for (const item of items) {
+    const id = getPk(item);
+    try {
+      const resultado = await enviar(item);
+      await marcarOk(id);
+      if (resultado.duplicado) {
+        console.log(`⚠️ ${nombre.toUpperCase()} -> duplicado detectado por servidor (#${id}), marcado como sync`);
+        await crearLog({
+          tipo: mapearNombreTipo(nombre),
+          accion: "sync_duplicado",
+          registroId: id,
+          detalle: extraerDetalle(nombre, item),
+          payload: item as any,
+        });
+      } else {
+        console.log(`➡️ ${nombre.toUpperCase()} -> ok (#${id})`);
+        await crearLog({
+          tipo: mapearNombreTipo(nombre),
+          accion: "sync_ok",
+          registroId: id,
+          detalle: extraerDetalle(nombre, item),
+          payload: item as any,
+        });
+      }
+    } catch (err) {
+      await marcarError(id);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`❌ ${nombre.toUpperCase()} -> falló (#${id}):`, msg);
+      await crearLog({
+        tipo: mapearNombreTipo(nombre),
+        accion: "sync_error",
+        registroId: id,
+        detalle: extraerDetalle(nombre, item),
+        payload: item as any,
+      });
+    }
+  }
+}
+
+async function syncLoteSimple<T>(
+  items: T[],
+  getPk: (item: T) => number,
   enviar: (item: T) => Promise<void>,
   marcarOk: (id: number) => Promise<void>,
   marcarError: (id: number) => Promise<void>,
@@ -170,7 +219,7 @@ export async function syncPendingData(onStatus?: (msg: string) => void, isManual
     await syncLote(await getAbastecimientosPendientes(isManual), (dto) => Number(dto.id_abastecimiento), enviarAbastecimiento, marcarAbastecimientoSync, marcarAbastecimientoErrorSync, "Abastecimiento");
     
     onStatus?.("Subiendo turnos...");
-    await syncLote(await getTurnosPendientes(isManual), (t) => t.idTurno, enviarTurno, marcarTurnoSync, marcarTurnoErrorSync, "Turno");
+    await syncLoteSimple(await getTurnosPendientes(isManual), (t) => t.idTurno, enviarTurno, marcarTurnoSync, marcarTurnoErrorSync, "Turno");
     
     console.log("📤 SUBIDA -> Finalizada");
   } catch (error) {

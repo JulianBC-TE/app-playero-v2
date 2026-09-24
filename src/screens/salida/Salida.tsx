@@ -9,7 +9,7 @@ import { PersonaDTO } from "@/dto/PersonaDTO";
 import { VehiculoDTO } from "@/dto/VehiculoDTO";
 import { BodegaDTO } from "@/dto/BodegaDTO";
 import { StackRoutesProps } from "@/route/app.routes";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   View,
@@ -22,9 +22,10 @@ import {
   Platform,
   Pressable,
   Image,
+  FlatList,
 } from "react-native";
 import { Controller, useForm } from "react-hook-form";
-import { Pencil, SaveAll } from "lucide-react-native";
+import { Pencil, SaveAll, Plus } from "lucide-react-native";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
@@ -36,12 +37,18 @@ import { Photo } from "@/components/Photo";
 import {
   getStorageSalida,
   removeSalida,
-  saveSalida,
   SalidaStorageDTO,
 } from "@/storage/storageSalida";
+import {
+  getSalidaQueue,
+  addToSalidaQueue,
+  updateSalidaQueueEntry,
+  removeFromSalidaQueue,
+  SalidaQueueEntry,
+} from "@/storage/storageQueueSalida";
 import { crearTicketLocal } from "@DBmodules/ticketDB";
 import { normalizarFecha } from "@/backend/db/services/turnoStatusService";
-import { getPicosByBodega } from "@DBmodules/picoDB";
+import { getPicosByBodega, getPicos } from "@DBmodules/picoDB";
 import { getBodegasDelUsuario } from "@DBmodules/bodegaDB";
 import {
   anularUltimoFinTurnoPorBodega,
@@ -50,6 +57,8 @@ import {
 } from "@DBmodules/turnoBD";
 import { TicketDTO } from "@/dto/TicketDTO";
 import { getTimestamp } from "@/services/timeService";
+import { EntryListItem, getSalidaLabel } from "@/components/EntryListItem";
+import { EmptyList } from "@/components/EmptyList";
 
 // ─── Form & Schema ────────────────────────────────────────────────────────────
 
@@ -68,30 +77,61 @@ const registrarSalidaSchema = yup.object({
     .transform((_, val) => (val === "" ? null : val))
     .nullable()
     .notRequired()
-    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123,45)"),
+    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato invalido (ej: 123,45)"),
   kilometraje: yup
     .string()
     .transform((_, val) => (val === "" ? null : val))
     .nullable()
     .notRequired()
-    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123,45)"),
+    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato invalido (ej: 123,45)"),
   taxilitro_inicial: yup
     .string()
     .required("El taxilitro inicial es requerido")
-    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123,45)"),
+    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato invalido (ej: 123,45)"),
   taxilitro_final: yup
     .string()
     .required("El taxilitro final es requerido")
-    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123,45)"),
+    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato invalido (ej: 123,45)"),
   litros: yup
     .string()
     .required("Los litros cargados son requeridos")
-    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato inválido (ej: 123,45)"),
+    .matches(/^[0-9]+([.,][0-9]{1,2})?$/, "Formato invalido (ej: 123,45)"),
   observaciones: yup
     .string()
     .optional()
-    .max(500, "Máximo 500 caracteres permitidos"),
+    .max(500, "Maximo 500 caracteres permitidos"),
 });
+
+// ─── Datos vacios para nueva entrada ──────────────────────────────────────────
+
+function emptyStorageData(appte: string): SalidaStorageDTO {
+  return {
+    persona: null,
+    vehiculo: null,
+    firma: null,
+    selectedBodega: "",
+    selectedPico: "",
+    idPico_surtidor: 0,
+    salida: 0,
+    cargaCombustible: "",
+    totalizadorPicoInicial: 0,
+    totalizadorPicoFinal: 0,
+    base64Vehiculo: "",
+    base64Horometro: "",
+    base64Kilometraje: "",
+    base64TaxInicio: "",
+    base64TaxFin: "",
+    base64Obs: "",
+    horometro: "",
+    kilometraje: "",
+    taxilitro_inicial: "",
+    taxilitro_final: "",
+    observaciones: "",
+    obsAdicional: "",
+    appte,
+    turnoCerrado: false,
+  };
+}
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 
@@ -99,16 +139,17 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   const { sucursal, user } = useAppContext();
 
   // ─── UI State ───────────────────────────────────────────────────────────────
+  const [viewMode, setViewMode] = useState<"list" | "form">("list");
+  const [queue, setQueue] = useState<SalidaQueueEntry[]>([]);
+  const [currentEntryId, setCurrentEntryId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [estadoRestaurado, setEstadoRestaurado] = useState(false);
-  const [estadoInicial, setEstadoInicial] = useState<SalidaStorageDTO | null>(
-    null,
-  );
   const [turnoCerrado, setTurnoCerrado] = useState(false);
   const [motivoConfirmado, setMotivoConfirmado] = useState(false);
   const [valoresTemporales, setValoresTemporales] = useState<FormData | null>(
-    null,
+    null
   );
+  const autosaveBloqueadoRef = useRef(false);
 
   // ─── Datos ──────────────────────────────────────────────────────────────────
   const [bodegas, setBodegas] = useState<BodegaDTO[]>([]);
@@ -117,7 +158,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   const [vehiculo, setVehiculo] = useState<VehiculoDTO | null>(null);
   const [firma, setFirma] = useState<string | null>(null);
   const [location, setLocation] = useState<Location.LocationObject | null>(
-    null,
+    null
   );
   const insets = useSafeAreaInsets();
 
@@ -125,6 +166,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   const [selectedBodega, setSelectedBodega] = useState<string>("");
   const [selectedPico, setSelectedPico] = useState<string>("");
   const [obsAdicional, setObsAdicional] = useState<string>("");
+  const [appte, setAppte] = useState<string>("");
 
   // ─── Fotos ──────────────────────────────────────────────────────────────────
   const [base64Vehiculo, setBase64Vehiculo] = useState<string>("");
@@ -155,16 +197,42 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 
   const watchedValues = watch();
 
-  // ─── Init: turno + bodegas ────────────────────────────────────────────────
+  // ─── Init: cola + bodegas + draft pendiente ──────────────────────────────
   useEffect(() => {
     async function init() {
       setIsLoading(true);
       try {
+        // 1. Cargar cola
+        const q = await getSalidaQueue();
+        setQueue(q);
+
+        // 2. Verificar draft pendiente → mover a la cola
+        const draft = await getStorageSalida();
+        if (draft && tieneDatosRelevantes(draft)) {
+          await addToSalidaQueue({
+            id: Date.now().toString(),
+            data: draft,
+            fechaCreacion: Date.now(),
+          });
+          await removeSalida();
+          const updatedQueue = await getSalidaQueue();
+          setQueue(updatedQueue);
+        }
+
+        // 3. Cargar bodegas y picos
         const bodegasLocales = await getBodegasDelUsuario(user.cedula);
         setBodegas(bodegasLocales);
+        const picosLocales = await getPicos();
+        setPicos(picosLocales);
+
+        // 4. Init appte
+        const secureTime = await getTimestamp();
+        const now = new Date(secureTime.timestampMs);
+        const appteStr = `appte ${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+        setAppte(appteStr);
       } catch (err) {
-        console.error("[Salida] Error al obtener bodegas:", err);
-        toastError("Error", "No se pudieron cargar las bodegas.");
+        console.error("[Salida] Error al inicializar:", err);
+        toastError("Error", "No se pudieron cargar los datos.");
       } finally {
         setIsLoading(false);
       }
@@ -180,7 +248,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
     })();
   }, []);
 
-  // ─── Picos según bodega seleccionada ─────────────────────────────────────
+  // ─── Picos segun bodega seleccionada ─────────────────────────────────────
   useEffect(() => {
     if (!selectedBodega) {
       setPicos([]);
@@ -202,7 +270,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
     cargarPicos();
   }, [selectedBodega]);
 
-  // ─── Params de navegación (persona, vehículo, firma) ─────────────────────
+  // ─── Params de navegacion (persona, vehiculo, firma) ─────────────────────
   useEffect(() => {
     if (route.params?.onPersona) setPersona(route.params.onPersona);
     if (route.params?.onVehiculo) setVehiculo(route.params.onVehiculo);
@@ -213,31 +281,196 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
     route.params?.onFirma,
   ]);
 
-  const confirmarEliminacion = (
-    onConfirm: () => void,
-    titulo: string = "Eliminar imagen",
-    mensaje: string = "¿Estás seguro de que deseas eliminar esta foto?",
-  ) => {
-    Alert.alert(
-      titulo,
-      mensaje,
-      [
-        {
-          text: "Cancelar",
-          style: "cancel",
-        },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: onConfirm,
-        },
-      ],
-      { cancelable: true },
-    );
-  };
+  // ─── Funciones auxiliares ────────────────────────────────────────────────
 
-  // ─── Guardar ticket ───────────────────────────────────────────────────────
+  function tieneDatosRelevantes(draft: SalidaStorageDTO): boolean {
+    return (
+      draft.persona !== null ||
+      draft.vehiculo !== null ||
+      draft.selectedBodega !== "" ||
+      draft.selectedPico !== ""
+    );
+  }
+
+  async function loadQueue() {
+    const q = await getSalidaQueue();
+    setQueue(q);
+  }
+
+  function clearForm() {
+    setPersona(null);
+    setVehiculo(null);
+    setFirma(null);
+    setSelectedBodega("");
+    setSelectedPico("");
+    setBase64Vehiculo("");
+    setBase64Horometro("");
+    setBase64Kilometraje("");
+    setBase64TaxInicio("");
+    setBase64TaxFin("");
+    setBase64Obs("");
+    setObsAdicional("");
+    setMotivoConfirmado(false);
+    reset();
+  }
+
+  function buildStorageData(): SalidaStorageDTO {
+    return {
+      persona,
+      vehiculo,
+      firma,
+      selectedBodega,
+      selectedPico,
+      idPico_surtidor: 0,
+      salida: 0,
+      cargaCombustible: watchedValues.litros ?? "",
+      totalizadorPicoInicial: 0,
+      totalizadorPicoFinal: 0,
+      base64Vehiculo,
+      base64Horometro,
+      base64Kilometraje,
+      base64TaxInicio,
+      base64TaxFin,
+      base64Obs,
+      horometro: watchedValues.horometro ?? "",
+      kilometraje: watchedValues.kilometraje ?? "",
+      taxilitro_inicial: watchedValues.taxilitro_inicial ?? "",
+      taxilitro_final: watchedValues.taxilitro_final ?? "",
+      observaciones: watchedValues.observaciones ?? "",
+      obsAdicional,
+      appte,
+      turnoCerrado,
+    };
+  }
+
+  // ─── Persistencia a la cola (auto-save) ──────────────────────────────────
+  const guardarEstado = useCallback(async () => {
+    if (!currentEntryId || viewMode !== "form" || autosaveBloqueadoRef.current)
+      return;
+    try {
+      const data = buildStorageData();
+      await updateSalidaQueueEntry(currentEntryId, data);
+    } catch (error) {
+      console.log("[Salida] Error al guardar en cola:", error);
+    }
+  }, [
+    currentEntryId,
+    viewMode,
+    persona,
+    vehiculo,
+    firma,
+    selectedBodega,
+    selectedPico,
+    base64Vehiculo,
+    base64Horometro,
+    base64Kilometraje,
+    base64TaxInicio,
+    base64TaxFin,
+    base64Obs,
+    obsAdicional,
+    appte,
+    turnoCerrado,
+    watchedValues,
+  ]);
+
+  useEffect(() => {
+    guardarEstado();
+  }, [guardarEstado]);
+
+  // ─── Nueva entrada ───────────────────────────────────────────────────────
+  async function handleNewEntry() {
+    const id = Date.now().toString();
+    const now = await getTimestamp();
+    const d = new Date(now.timestampMs);
+    const appteStr = `appte ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+    setAppte(appteStr);
+
+    const data = emptyStorageData(appteStr);
+    await addToSalidaQueue({ id, data, fechaCreacion: Date.now() });
+    setCurrentEntryId(id);
+    setIsCreating(true);
+    setViewMode("form");
+    await loadQueue();
+  }
+
+  // ─── Editar entrada ──────────────────────────────────────────────────────
+  async function handleEditEntry(entry: SalidaQueueEntry) {
+    setCurrentEntryId(entry.id);
+    setIsCreating(false);
+
+    // Cargar datos en el form
+    const d = entry.data;
+    setPersona(d.persona);
+    setVehiculo(d.vehiculo);
+    setFirma(d.firma);
+    setSelectedBodega(d.selectedBodega);
+    setSelectedPico(d.selectedPico);
+    setBase64Vehiculo(d.base64Vehiculo);
+    setBase64Horometro(d.base64Horometro);
+    setBase64Kilometraje(d.base64Kilometraje);
+    setBase64TaxInicio(d.base64TaxInicio);
+    setBase64TaxFin(d.base64TaxFin);
+    setBase64Obs(d.base64Obs);
+    setObsAdicional(d.obsAdicional);
+    if (d.obsAdicional) setMotivoConfirmado(true);
+    setAppte(d.appte);
+    setTurnoCerrado(d.turnoCerrado);
+    setValue("horometro", d.horometro);
+    setValue("kilometraje", d.kilometraje);
+    setValue("taxilitro_inicial", d.taxilitro_inicial);
+    setValue("taxilitro_final", d.taxilitro_final);
+    setValue("litros", d.cargaCombustible);
+    setValue("observaciones", d.observaciones);
+
+    setViewMode("form");
+  }
+
+  // ─── Salir sin guardar (elimina entrada de la cola) ──────────────────────
+  async function handleSalirSinGuardar() {
+    if (currentEntryId) {
+      autosaveBloqueadoRef.current = true;
+      await removeFromSalidaQueue(currentEntryId);
+    }
+    clearForm();
+    setCurrentEntryId(null);
+    setIsCreating(false);
+    setViewMode("list");
+    await loadQueue();
+  }
+
+  // ─── Guardar y salir (valida bodega, guarda en cola, vuelve a lista) ─────
+  async function handleGuardarYSalir() {
+    if (!selectedBodega) {
+      Alert.alert("Bodega requerida", "Debe seleccionar una bodega.");
+      return;
+    }
+    // La actualizacion ya se hizo via auto-save
+    autosaveBloqueadoRef.current = true;
+    clearForm();
+    setCurrentEntryId(null);
+    setIsCreating(false);
+    setViewMode("list");
+    await loadQueue();
+  }
+
+  // ─── Eliminar entrada ────────────────────────────────────────────────────
+  async function handleEliminarEntrada(entry: SalidaQueueEntry) {
+    Alert.alert("Eliminar", "Desea eliminar esta entrada de la lista?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          await removeFromSalidaQueue(entry.id);
+          await loadQueue();
+        },
+      },
+    ]);
+  }
+
+  // ─── Guardar ticket (desde formulario, directo a SQLite) ─────────────────
   async function handleSaveAll(data: FormData) {
+    setIsLoading(true);
     const {
       horometro,
       kilometraje,
@@ -249,65 +482,74 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 
     if (!persona) {
       Alert.alert("Persona requerida", "Debe seleccionar un operador.");
+      setIsLoading(false);
       return;
     }
     if (!vehiculo) {
-      Alert.alert("Vehículo requerido", "Debe seleccionar un vehículo.");
+      Alert.alert("Vehiculo requerido", "Debe seleccionar un vehiculo.");
+      setIsLoading(false);
       return;
     }
     if (!base64Vehiculo) {
       Alert.alert("Foto requerida", "Debe capturar una foto...");
+      setIsLoading(false);
       return;
     }
     if (!selectedBodega) {
       Alert.alert("Bodega requerida", "Debe seleccionar una bodega.");
+      setIsLoading(false);
       return;
     }
     if (!selectedPico) {
       Alert.alert("Pico requerido", "Debe seleccionar un pico.");
+      setIsLoading(false);
       return;
     }
     if (!base64TaxInicio) {
       Alert.alert(
         "Foto requerida",
-        "Debe capturar la foto de evidencia para el Taxilitro Inicial.",
+        "Debe capturar la foto de evidencia para el Taxilitro Inicial."
       );
+      setIsLoading(false);
       return;
     }
     if (!base64TaxFin) {
       Alert.alert(
         "Foto requerida",
-        "Debe capturar la foto de evidencia para el Taxilitro Final.",
+        "Debe capturar la foto de evidencia para el Taxilitro Final."
       );
+      setIsLoading(false);
       return;
     }
 
     if (!kilometraje && !horometro) {
       Alert.alert(
         "Campos requeridos",
-        "Debe completar al menos Horómetro o Kilometraje.",
+        "Debe completar al menos Horometro o Kilometraje."
       );
+      setIsLoading(false);
       return;
     }
 
     if (horometro && !base64Horometro) {
-      Alert.alert("Foto requerida", "Debe capturar una foto del horómetro.");
+      Alert.alert("Foto requerida", "Debe capturar una foto del horometro.");
+      setIsLoading(false);
       return;
     }
     if (kilometraje && !base64Kilometraje) {
       Alert.alert("Foto requerida", "Debe capturar una foto del kilometraje.");
+      setIsLoading(false);
       return;
     }
 
     const pico = picos.find((p) => p.id_pico === Number(selectedPico));
     if (!pico) {
-      Alert.alert("Error", "No se encontró el pico seleccionado.");
+      Alert.alert("Error", "No se encontro el pico seleccionado.");
+      setIsLoading(false);
       return;
     }
 
     try {
-      setIsLoading(true);
-
       const tipoTurno = await getTipoByBodega(Number(selectedBodega));
       const turnoData = await getTurnoStatusLocal(user.cedula);
       const estaCerrado =
@@ -349,35 +591,32 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
         ubicacion_carga: location
           ? `https://www.google.com/maps?q=${location.coords.latitude},${location.coords.longitude}`
           : "",
-        obs: observaciones ?? "",
+        obs: [observaciones, appte].filter(Boolean).join(" | "),
         observaciones_ticket: motivoConfirmado
-          ? `${observaciones ?? ""} >> MOTIVO EXCEPCIONAL: ${obsAdicional}`
-          : (observaciones ?? ""),
+          ? `${[observaciones, appte].filter(Boolean).join(" | ")} >> MOTIVO EXCEPCIONAL: ${obsAdicional}`
+          : [observaciones, appte].filter(Boolean).join(" | "),
         foto_observaciones: base64Obs ? [base64Obs] : [],
       };
 
-      await crearTicketLocal(ticket, normalizarFecha(now), secureTime.timestampMs);
+      await crearTicketLocal(
+        ticket,
+        normalizarFecha(now),
+        secureTime.timestampMs
+      );
       await anularUltimoFinTurnoPorBodega(ticket.id_bod, obsAdicional);
-      await removeSalida();
 
-      setPersona(null);
-      setVehiculo(null);
-      setFirma(null);
-      setSelectedBodega("");
-      setSelectedPico("");
-      setBase64Vehiculo("");
-      setBase64Horometro("");
-      setBase64Kilometraje("");
-      setBase64TaxInicio("");
-      setBase64TaxFin("");
-      setBase64Obs("");
-      setObsAdicional("");
-      setMotivoConfirmado(false);
-      setValoresTemporales(null);
-      reset();
+      // Si habia una entrada en la cola, eliminarla
+      if (currentEntryId) {
+        await removeFromSalidaQueue(currentEntryId);
+      }
+
+      clearForm();
+      setCurrentEntryId(null);
+      setIsCreating(false);
+      setViewMode("list");
 
       toastSuccess("Registro de Salida", "Salida registrada localmente.");
-      navigation.navigate("home");
+      await loadQueue();
     } catch (error) {
       console.error("[Salida] Error al guardar salida:", error);
       toastError("Registro de Salida", "No se pudo guardar la salida.");
@@ -386,161 +625,108 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
     }
   }
 
-  // ─── Persistencia (Borrador) ──────────────────────────────────────────────
-  const guardarEstado = useCallback(async () => {
-    if (!estadoRestaurado) return;
-    try {
-      const estado: SalidaStorageDTO = {
-        persona,
-        vehiculo,
-        firma,
-        selectedBodega,
-        selectedPico,
-        idPico_surtidor: 0,
-        salida: 0,
-        cargaCombustible: watchedValues.litros ?? "",
-        totalizadorPicoInicial: 0,
-        totalizadorPicoFinal: 0,
-        base64Vehiculo,
-        base64Horometro,
-        base64Kilometraje,
-        base64TaxInicio,
-        base64TaxFin,
-        base64Obs,
-        horometro: watchedValues.horometro ?? "",
-        kilometraje: watchedValues.kilometraje ?? "",
-        taxilitro_inicial: watchedValues.taxilitro_inicial ?? "",
-        taxilitro_final: watchedValues.taxilitro_final ?? "",
-        observaciones: watchedValues.observaciones ?? "",
-        obsAdicional,
-        turnoCerrado,
-      };
-      await saveSalida(estado);
-    } catch (error) {
-      console.log("[Salida] Error al guardar estado:", error);
-    }
-  }, [
-    estadoRestaurado,
-    persona,
-    vehiculo,
-    firma,
-    selectedBodega,
-    selectedPico,
-    base64Vehiculo,
-    base64Horometro,
-    base64Kilometraje,
-    base64TaxInicio,
-    base64TaxFin,
-    base64Obs,
-    obsAdicional,
-    turnoCerrado,
-    watchedValues,
-  ]);
-
+  // ─── Guardar/Salir (beforeRemove listener) ──────────────────────────────
   useEffect(() => {
-    guardarEstado();
-  }, [guardarEstado]);
+    if (viewMode !== "form") return;
 
-  // ─── Restaurar estado ─────────────────────────────────────────────────────
-  useEffect(() => {
-    async function restaurarEstado() {
-      let guardado: SalidaStorageDTO | null = null;
-      try {
-        guardado = await getStorageSalida();
-        if (guardado) {
-          setPersona(guardado.persona);
-          setVehiculo(guardado.vehiculo);
-          setFirma(guardado.firma);
-          setSelectedBodega(guardado.selectedBodega ?? "");
-          setSelectedPico(guardado.selectedPico);
-          setBase64Vehiculo(guardado.base64Vehiculo);
-          setBase64Horometro(guardado.base64Horometro);
-          setBase64Kilometraje(guardado.base64Kilometraje);
-          setBase64TaxInicio(guardado.base64TaxInicio ?? "");
-          setBase64TaxFin(guardado.base64TaxFin ?? "");
-          setBase64Obs(guardado.base64Obs);
-          setValue("horometro", guardado.horometro);
-          setValue("kilometraje", guardado.kilometraje);
-          setValue("taxilitro_inicial", guardado.taxilitro_inicial ?? "");
-          setValue("taxilitro_final", guardado.taxilitro_final ?? "");
-          setValue("litros", guardado.cargaCombustible);
-          setValue("observaciones", guardado.observaciones);
-          setObsAdicional(guardado.obsAdicional);
-          if (guardado.obsAdicional) setMotivoConfirmado(true);
-          setTurnoCerrado(guardado.turnoCerrado);
-          setEstadoInicial(guardado);
-        }
-      } catch (error) {
-        console.log("[Salida] Error al restaurar estado:", error);
-      } finally {
-        if (!guardado) {
-          setEstadoInicial({
-            persona: null,
-            vehiculo: null,
-            firma: null,
-            selectedBodega: "",
-            selectedPico: "",
-            idPico_surtidor: 0,
-            salida: 0,
-            cargaCombustible: "",
-            totalizadorPicoInicial: 0,
-            totalizadorPicoFinal: 0,
-            base64Vehiculo: "",
-            base64Horometro: "",
-            base64Kilometraje: "",
-            base64TaxInicio: "",
-            base64TaxFin: "",
-            base64Obs: "",
-            horometro: "",
-            kilometraje: "",
-            taxilitro_inicial: "",
-            taxilitro_final: "",
-            observaciones: "",
-            obsAdicional: "",
-            turnoCerrado: false,
-          });
-        }
-        setEstadoRestaurado(true);
-      }
-    }
-    restaurarEstado();
-  }, []);
-
-  // ─── Guardar/Salir ────────────────────────────────────────────────────────
-  useEffect(() => {
     const unsubscribe = navigation.addListener("beforeRemove", (e) => {
-      if (isLoading || !estadoRestaurado) return;
+      if (isLoading) return;
       e.preventDefault();
-      Alert.alert("Salir de salida", "¿Qué desea hacer?", [
+      Alert.alert("Salir de salida", "Que desea hacer?", [
         { text: "Cancelar", style: "cancel" },
         {
           text: "Salir sin guardar",
           style: "destructive",
           onPress: () => {
-            Alert.alert("¿Estás seguro?", "Se perderán todos los datos.", [
-              { text: "Cancelar", style: "cancel" },
-              {
-                text: "Sí, salir sin guardar",
-                style: "destructive",
-                onPress: async () => {
-                  await removeSalida();
-                  navigation.dispatch(e.data.action);
+            Alert.alert(
+              "Estas seguro?",
+              "Se eliminara esta entrada de la lista.",
+              [
+                { text: "Cancelar", style: "cancel" },
+                {
+                  text: "Si, salir sin guardar",
+                  style: "destructive",
+                  onPress: async () => {
+                    await handleSalirSinGuardar();
+                    navigation.dispatch(e.data.action);
+                  },
                 },
-              },
-            ]);
+              ]
+            );
           },
         },
         {
           text: "Guardar y salir",
           onPress: async () => {
-            await guardarEstado();
+            if (!selectedBodega) {
+              Alert.alert(
+                "Bodega requerida",
+                "Debe seleccionar una bodega para guardar."
+              );
+              return;
+            }
+            await handleGuardarYSalir();
             navigation.dispatch(e.data.action);
           },
         },
       ]);
     });
     return unsubscribe;
-  }, [navigation, guardarEstado, isLoading, estadoRestaurado]);
+  }, [navigation, viewMode, isLoading, selectedBodega]);
+
+  // ─── Confirmar eliminacion de foto ───────────────────────────────────────
+  const confirmarEliminacion = (
+    onConfirm: () => void,
+    titulo: string = "Eliminar imagen",
+    mensaje: string = "Desea eliminar esta foto?"
+  ) => {
+    Alert.alert(titulo, mensaje, [
+      { text: "Cancelar", style: "cancel" },
+      { text: "Eliminar", style: "destructive", onPress: onConfirm },
+    ], { cancelable: true });
+  };
+
+  // ─── Render: modo Lista ──────────────────────────────────────────────────
+  if (viewMode === "list") {
+    return (
+      <View className="flex-1">
+        <ScreenHeader
+          title="Salida Combustible"
+          actions={
+            <TouchableOpacity
+              onPress={handleNewEntry}
+              className="p-1"
+            >
+              <Plus color="#fff" size={30} />
+            </TouchableOpacity>
+          }
+        />
+        {queue.length === 0 ? (
+          <EmptyList />
+        ) : (
+          <>
+            <FlatList
+              data={queue}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{
+                paddingVertical: 16,
+                paddingBottom: insets.bottom + 80,
+              }}
+              renderItem={({ item }) => (
+                <EntryListItem
+                  id={item.id}
+                  label={getSalidaLabel(item.data, bodegas, picos)}
+                  fechaCreacion={item.fechaCreacion}
+                  onEditar={() => handleEditEntry(item)}
+                  onEliminar={() => handleEliminarEntrada(item)}
+                />
+              )}
+            />
+          </>
+        )}
+      </View>
+    );
+  }
 
   // ─── Render: turno cerrado ────────────────────────────────────────────────
   if (turnoCerrado && !motivoConfirmado) {
@@ -561,7 +747,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
             <View style={styles.overlay}>
               <View style={styles.modalContent}>
                 <Text className="font-bold text-red-500 text-center text-2xl underline mb-4">
-                  ¡Importante!
+                  Importante!
                 </Text>
                 <Text className="font-medium text-justify text-xl mb-4">
                   El turno se encuentra cerrado. Indique el motivo de esta
@@ -586,7 +772,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                     if (!obsAdicional.trim()) {
                       Alert.alert(
                         "Motivo requerido",
-                        "Por favor describa el motivo.",
+                        "Por favor describa el motivo."
                       );
                       return;
                     }
@@ -613,7 +799,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
     );
   }
 
-  // ─── Render: flujo normal ─────────────────────────────────────────────────
+  // ─── Render: modo Formulario ─────────────────────────────────────────────
   return (
     <View className="flex-1">
       <ScreenHeader title="Salida Combustible" />
@@ -644,12 +830,12 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
               />
             </InputCard>
 
-            {/* Equipo/Vehículo */}
-            <InputCard title="Equipo/Vehículo" required>
+            {/* Equipo/Vehiculo */}
+            <InputCard title="Equipo/Vehiculo" required>
               <View className="flex-row items-center p-2 gap-2">
                 <TextSearch
                   textValue={vehiculo?.descripcion_vehiculo}
-                  placeholder="Buscar vehículo"
+                  placeholder="Buscar vehiculo"
                   onPress={() =>
                     navigation.navigate("buscarvehiculo", {
                       enabledSelect: true,
@@ -659,7 +845,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                 />
               </View>
             </InputCard>
-            <InputCard title="Foto del Equipo/Vehículo" required>
+            <InputCard title="Foto del Equipo/Vehiculo" required>
               <View className="flex-row items-center p-2 gap-2">
                 {base64Vehiculo ? (
                   <Pressable
@@ -687,8 +873,8 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
               </View>
             </InputCard>
 
-            {/* Horómetro */}
-            <InputCard title="Horómetro">
+            {/* Horometro */}
+            <InputCard title="Horometro">
               <View className="flex-row items-center p-2 gap-2">
                 <Controller
                   control={control}
@@ -697,7 +883,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                     <Input
                       keyboardType="decimal-pad"
                       align="center"
-                      placeholder="Informe el horómetro"
+                      placeholder="Informe el horometro"
                       value={value ?? ""}
                       onChangeText={(text) => onChange(text.replace(".", ","))}
                       errorMessage={errors.horometro?.message}
@@ -706,7 +892,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
                 />
               </View>
             </InputCard>
-            <InputCard title="Foto Horómetro">
+            <InputCard title="Foto Horometro">
               <View className="flex-row items-center p-2 gap-2">
                 {base64Horometro ? (
                   <Pressable
@@ -784,7 +970,20 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
             {/* Bodega */}
             <InputCard title="Bodega" required>
               <Select
-                data={bodegas}
+                data={bodegas.filter((b) => {
+                  const picosDeBodega = picos.filter(
+                    (p) => p.id_bodega === Number(b.id_bodega)
+                  );
+                  if (picosDeBodega.length === 0) return true;
+                  return picosDeBodega.some(
+                    (p) =>
+                      !queue.some(
+                        (e) =>
+                          Number(e.data.selectedPico) === p.id_pico &&
+                          e.id !== currentEntryId
+                      )
+                  );
+                })}
                 isLoading={isLoading}
                 selectedValue={selectedBodega}
                 setSelectedValue={setSelectedBodega}
@@ -796,7 +995,14 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
             {/* Pico expendedor */}
             <InputCard title="Pico expendedor" required>
               <Select
-                data={picos}
+                data={picos.filter(
+                  (p) =>
+                    !queue.some(
+                      (e) =>
+                        Number(e.data.selectedPico) === p.id_pico &&
+                        e.id !== currentEntryId
+                    )
+                )}
                 isLoading={isLoading && !!selectedBodega}
                 selectedValue={selectedPico}
                 setSelectedValue={setSelectedPico}
@@ -942,7 +1148,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
               </View>
             </InputCard>
 
-            {/* Firma y Grabar */}
+            {/* Firma + Guardar Registro + Grabar */}
             <View className="flex-row gap-4">
               <Button
                 title="Firmar"
@@ -959,7 +1165,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
               />
               {firma && (
                 <Button
-                  title="Grabar"
+                  title="Enviar"
                   onPress={handleSubmit(handleSaveAll)}
                   isLoading={isLoading}
                   icon={SaveAll}

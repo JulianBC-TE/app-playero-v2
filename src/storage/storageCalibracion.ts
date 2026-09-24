@@ -23,6 +23,7 @@ export type calibracionDTO = {
   idBodega: number;
   obs: string;
   obsAdicional: string;
+  appte: string;
   cedula: number;
   nombre: string;
   id_pico: number;

@@ -79,6 +79,7 @@ export function Calibracion({
   const [selectedPico, setSelectedPico] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [obs, setObs] = useState("");
+  const [appte, setAppte] = useState("");
   const [photoObs, setPhotoObs] = useState<string | null>(null);
   const [obsAdicional, setObsAdicional] = useState("");
   const [persona, setPersona] = useState<PersonaDTO | null>(null);
@@ -153,6 +154,7 @@ export function Calibracion({
         id_pico,
         obs,
         obsAdicional,
+        appte,
         cedula: persona?.cedula ?? 0,
         nombre: persona?.nombre_apellido ?? "",
         selectedPico,
@@ -183,6 +185,7 @@ export function Calibracion({
     selectedPico,
     obs,
     obsAdicional,
+    appte,
     numeroPrecintoAtual,
     numeroPrecintoColocado,
     photoPrecintoAtual,
@@ -220,6 +223,7 @@ export function Calibracion({
                     text: "Sí, salir sin guardar",
                     style: "destructive",
                     onPress: async () => {
+                      autosaveBloqueadoRef.current = true;
                       await removeCalibracion();
                       navigation.navigate("home"); // ◄ Redirige directamente a Home
                     },
@@ -231,6 +235,7 @@ export function Calibracion({
           {
             text: "Guardar y salir",
             onPress: async () => {
+              autosaveBloqueadoRef.current = true;
               await guardarEstado();
               navigation.navigate("home"); // ◄ Redirige directamente a Home
             },
@@ -244,6 +249,11 @@ export function Calibracion({
   // ─── Restaurar estado desde storage al montar ─────────────────────────────
   useEffect(() => {
     async function restaurarEstado() {
+      const secureTime = await getTimestamp();
+      const now = new Date(secureTime.timestampMs);
+      const appteDefault = `appte ${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+      setAppte(appteDefault);
+
       try {
         const estadoGuardado = await getStorageCalibracion();
         if (estadoGuardado) {
@@ -254,6 +264,9 @@ export function Calibracion({
           setObs(estadoGuardado.obs);
           setObsAdicional(estadoGuardado.obsAdicional);
           if (estadoGuardado.obsAdicional) setMotivoConfirmado(true);
+          if (estadoGuardado.appte) {
+            setAppte(estadoGuardado.appte);
+          }
           setNumeroPrecintoAtual(estadoGuardado.numeroPrecintoAtual);
           setNumeroPrecintoColocado(estadoGuardado.numeroPrecintoColocado);
           setPhotoPrecintoAtual(estadoGuardado.photoPrecintoAtual);
@@ -400,19 +413,21 @@ export function Calibracion({
   }
 
   async function saveAllData() {
+    setIsLoading(true);
     if (!persona) {
       Alert.alert(
         "Persona requerida",
         "Debe seleccionar una persona encargada.",
       );
+      setIsLoading(false);
       return;
     }
     if (!firma) {
       Alert.alert("Firma requerida", "Debe firmar para continuar.");
+      setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
     try {
       const secureTime = await getTimestamp();
       const now = new Date(secureTime.timestampMs);
@@ -445,7 +460,7 @@ export function Calibracion({
         fecha_hora: fecha,
         hora,
         bodega: id_bodega,
-        obs_gral: obs + " | " + obsAdicional,
+        obs_gral: [obs, obsAdicional, appte].filter(Boolean).join(" | "),
         ci_encargado: persona?.cedula,
         nombre_encargado: persona?.nombre_apellido,
         pico: id_pico,
@@ -477,6 +492,25 @@ export function Calibracion({
       await saveCalibracionLocal(payload);
       await anularUltimoFinTurnoPorBodega(id_bodega, obsAdicional);
       await removeCalibracion();
+      setTipoOperacionSeleccionado("");
+      setSelectedPico("");
+      setObs("");
+      setObsAdicional("");
+      setPhotoObs(null);
+      setNumeroPrecintoAtual("");
+      setNumeroPrecintoColocado("");
+      setPhotoPrecintoAtual("");
+      setPhotoPrecintoColocado("");
+      setFirma(null);
+      setPersona(null);
+      setMediciones({
+        taxilitroInicial: 0,
+        taxilitroFinal: 0,
+        fotoInicialTaxilitro: "",
+        fotoFinalTaxilitro: "",
+        totalMediciones: 0,
+        sequencias: [],
+      });
 
       toastSuccess(
         "Calibración guardada",

@@ -9,12 +9,14 @@ import {
   ScrollView,
   Pressable,
   Image,
+  FlatList,
 } from "react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  CheckCheck,
   Edit,
   Fuel,
+  Plus,
   RulerDimensionLine,
   SaveAll,
 } from "lucide-react-native";
@@ -33,10 +35,26 @@ import { MedicionDTO } from "@/dto/MedicionDTO";
 import {
   getStorageAbastecimiento,
   removeAbastecimiento,
-  saveAbastecimiento,
   AbastecimientoStorageDTO,
 } from "@/storage/storageAbastecimiento";
-import { removeMedicionAbastecimiento } from "@/storage/storageMedicionAbastecimiento";
+import {
+  getAbastecimientoQueue,
+  getAbastecimientoQueueEntry,
+  addToAbastecimientoQueue,
+  updateAbastecimientoQueueEntry,
+  removeFromAbastecimientoQueue,
+  AbastecimientoQueueEntry,
+} from "@/storage/storageQueueAbastecimiento";
+import {
+  removeMedicionAbastecimiento,
+  migrarMedicionAbastecimientoLegacy,
+  limpiarMedicionAbastecimientoLegacy,
+} from "@/storage/storageMedicionAbastecimiento";
+import {
+  removeCargaCombustible,
+  migrarCargaCombustibleLegacy,
+  limpiarCargaCombustibleLegacy,
+} from "@/storage/storageCargaCombustible";
 import { getBodegasByIdSucursal } from "@DBmodules/bodegaDB";
 import {
   anularUltimoFinTurnoPorBodega,
@@ -44,8 +62,58 @@ import {
   getTurnoStatusLocal,
 } from "@DBmodules/turnoBD";
 import { saveAbastecimientoLocal } from "@DBmodules/abastecimientoDB";
-import { removeCargaCombustible } from "@/storage/storageCargaCombustible";
 import { getTimestamp } from "@/services/timeService";
+import { EntryListItem } from "@/components/EntryListItem";
+import { EmptyList } from "@/components/EmptyList";
+
+// ─── Datos vacios para nueva entrada ──────────────────────────────────────────
+
+function emptyAbastecimientoData(appte: string): AbastecimientoStorageDTO {
+  return {
+    ordenCompra: "",
+    remision: "",
+    litros: "",
+    selectedBodega: "",
+    tipoOperacionSeleccionado: "",
+    base64Images: [],
+    base64FotoObs: [],
+    obs: "",
+    obsAdicional: "",
+    appte,
+    cargaZeta: null,
+    medicionInicial: [],
+    medicionFinal: [],
+    turnoCerrado: false,
+  };
+}
+
+function tieneDatosRelevantes(draft: AbastecimientoStorageDTO): boolean {
+  return (
+    draft.selectedBodega !== "" ||
+    draft.ordenCompra !== "" ||
+    draft.remision !== "" ||
+    draft.litros !== "" ||
+    draft.base64Images.length > 0 ||
+    draft.cargaZeta !== null ||
+    draft.medicionInicial.length > 0
+  );
+}
+
+function getAbastecimientoLabel(
+  data: AbastecimientoStorageDTO,
+  bodegas: BodegaDTO[]
+): string {
+  const bodega = bodegas.find(
+    (b) => Number(b.id_bodega) === Number(data.selectedBodega)
+  );
+  const bodegaName =
+    bodega?.descripcion_bodega ||
+    (data.selectedBodega ? `Bodega #${data.selectedBodega}` : "Sin bodega");
+  const oc = data.ordenCompra ? `OC ${data.ordenCompra}` : "Sin OC";
+  return `${bodegaName} - ${oc}`;
+}
+
+// ─── Componente ───────────────────────────────────────────────────────────────
 
 export function Abastecimiento({
   navigation,
@@ -57,12 +125,20 @@ export function Abastecimiento({
   ]);
   const [tipoOperacionSeleccionado, setTipoOperacionSeleccionado] =
     useState("");
-  const [turnoCerrado, setTurnoCerrado] = useState(false); 
+  const [turnoCerrado, setTurnoCerrado] = useState(false);
   const { sucursal, user } = useAppContext();
   const [isLoading, setIsLoading] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  // ─── Cola de pendientes (lista / formulario) ───────────────────────────────
+  const [viewMode, setViewMode] = useState<"list" | "form">("list");
+  const [queue, setQueue] = useState<AbastecimientoQueueEntry[]>([]);
+  const [currentEntryId, setCurrentEntryId] = useState<string | null>(null);
+
   const [obs, setObs] = useState<string>("");
   const [base64FotoObs, setBase64FotoObs] = useState<string[]>([]);
   const [obsAdicional, setObsAdicional] = useState("");
+  const [appte, setAppte] = useState("");
   const [ordenCompra, setOrdenCompra] = useState("");
   const [remision, setRemision] = useState("");
   const [litros, setLitros] = useState("");
@@ -73,55 +149,12 @@ export function Abastecimiento({
   const [cargaZeta, setCargaZeta] = useState<CargaZetaDTO | null>(null);
   const [medicionInicial, setMedicionInicial] = useState<MedicionDTO[]>([]);
   const [medicionFinal, setMedicionFinal] = useState<MedicionDTO[]>([]);
-  const [estadoRestaurado, setEstadoRestaurado] = useState(false);
   const [motivoConfirmado, setMotivoConfirmado] = useState(false);
-  const [estadoInicial, setEstadoInicial] =
-    useState<AbastecimientoStorageDTO | null>(null);
+  const autosaveBloqueadoRef = useRef(false);
 
-  // ─── Persistencia: guarda el estado cada vez que cambia algo relevante ───
-  const guardarEstado = useCallback(async () => {
-    if (!estadoRestaurado) return;
-    try {
-      const estado: AbastecimientoStorageDTO = {
-        ordenCompra,
-        remision,
-        litros,
-        selectedBodega,
-        tipoOperacionSeleccionado,
-        base64Images,
-        base64FotoObs,
-        obs,
-        obsAdicional,
-        cargaZeta,
-        medicionInicial,
-        medicionFinal,
-        turnoCerrado,
-      };
-      await saveAbastecimiento(estado);
-    } catch (error) {
-      console.log("[Abastecimiento] Error al guardar estado:", error);
-    }
-  }, [
-    estadoRestaurado,
-    ordenCompra,
-    remision,
-    litros,
-    selectedBodega,
-    tipoOperacionSeleccionado,
-    base64Images,
-    base64FotoObs,
-    obs,
-    obsAdicional,
-    cargaZeta,
-    medicionInicial,
-    medicionFinal,
-    turnoCerrado,
-  ]);
-
-  const huboCambios = useCallback(() => {
-    if (!estadoInicial || !estadoRestaurado) return false;
-
-    const actual = {
+  // ─── Persistencia: autosave a la entrada de la cola ────────────────────────
+  function buildStorageData(): AbastecimientoStorageDTO {
+    return {
       ordenCompra,
       remision,
       litros,
@@ -131,15 +164,25 @@ export function Abastecimiento({
       base64FotoObs,
       obs,
       obsAdicional,
+      appte,
       cargaZeta,
       medicionInicial,
       medicionFinal,
       turnoCerrado,
     };
+  }
 
-    return JSON.stringify(actual) !== JSON.stringify(estadoInicial);
+  const guardarEstado = useCallback(async () => {
+    if (!currentEntryId || viewMode !== "form" || autosaveBloqueadoRef.current)
+      return;
+    try {
+      await updateAbastecimientoQueueEntry(currentEntryId, buildStorageData());
+    } catch (error) {
+      console.log("[Abastecimiento] Error al guardar en cola:", error);
+    }
   }, [
-    estadoInicial,
+    currentEntryId,
+    viewMode,
     ordenCompra,
     remision,
     litros,
@@ -149,6 +192,7 @@ export function Abastecimiento({
     base64FotoObs,
     obs,
     obsAdicional,
+    appte,
     cargaZeta,
     medicionInicial,
     medicionFinal,
@@ -156,147 +200,8 @@ export function Abastecimiento({
   ]);
 
   useEffect(() => {
-    if (!estadoRestaurado) return;
-
     guardarEstado();
-  }, [guardarEstado, estadoRestaurado]);
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("beforeRemove", (e) => {
-      if (isLoading || !estadoRestaurado) return;
-
-      e.preventDefault();
-
-      Alert.alert(
-        "Salir de abastecimiento",
-        "Hay cambios sin confirmar. ¿Qué desea hacer?",
-        [
-          {
-            text: "Cancelar",
-            style: "cancel",
-          },
-          {
-            text: "Salir sin guardar",
-            style: "destructive",
-            onPress: () => {
-              Alert.alert(
-                "¿Estás seguro?",
-                "Se perderán todos los datos de este Abastecimiento. Esta acción no se puede deshacer.",
-                [
-                  {
-                    text: "Cancelar",
-                    style: "cancel",
-                  },
-                  {
-                    text: "Sí, salir sin guardar",
-                    style: "destructive",
-                    onPress: async () => {
-                      await removeAbastecimiento();
-                      await removeCargaCombustible();
-                      await removeMedicionAbastecimiento();
-                      setEstadoInicial(null);
-                      navigation.dispatch(e.data.action);
-                    },
-                  },
-                ],
-              );
-            },
-          },
-          {
-            text: "Guardar y salir",
-            onPress: async () => {
-              await guardarEstado();
-              navigation.dispatch(e.data.action);
-            },
-          },
-        ],
-      );
-    });
-
-    return unsubscribe;
-  }, [navigation, guardarEstado, huboCambios, isLoading, estadoRestaurado]);
-
-  // ─── Restaurar estado al montar ───
-  useEffect(() => {
-    async function restaurarEstado() {
-      let guardado: AbastecimientoStorageDTO | null = null;
-      try {
-        guardado = await getStorageAbastecimiento();
-        if (guardado) {
-          setEstadoInicial(guardado);
-          setOrdenCompra(guardado.ordenCompra);
-          setRemision(guardado.remision);
-          setLitros(guardado.litros);
-          setSelectedBodega(guardado.selectedBodega);
-          setTipoOperacionSeleccionado(guardado.tipoOperacionSeleccionado);
-          setBase64Images(guardado.base64Images);
-          setBase64FotoObs(guardado.base64FotoObs);
-          setObs(guardado.obs);
-          setObsAdicional(guardado.obsAdicional);
-          if (guardado.obsAdicional) setMotivoConfirmado(true);
-          if (guardado.cargaZeta) {
-            setCargaZeta({
-              ...guardado.cargaZeta,
-              id_pico_para_zeta:
-                Number(guardado.cargaZeta.id_pico_para_zeta) || 0,
-              taxilitro_inicial:
-                Number(guardado.cargaZeta.taxilitro_inicial) || 0,
-              taxilitro_final: Number(guardado.cargaZeta.taxilitro_final) || 0,
-              litros_zeta: Number(guardado.cargaZeta.litros_zeta) || 0,
-            });
-          } else {
-            setCargaZeta(null);
-          }
-          setMedicionInicial(guardado.medicionInicial);
-          setMedicionFinal(guardado.medicionFinal);
-          setTurnoCerrado(guardado.turnoCerrado);
-        }
-      } catch (error) {
-        console.log("[Abastecimiento] Error al restaurar estado:", error);
-      } finally {
-        if (!guardado) {
-          setEstadoInicial({
-            ordenCompra: "",
-            remision: "",
-            litros: "",
-            selectedBodega: "",
-            tipoOperacionSeleccionado: "",
-            base64Images: [],
-            base64FotoObs: [],
-            obs: "",
-            obsAdicional: "",
-            cargaZeta: null,
-            medicionInicial: [],
-            medicionFinal: [],
-            turnoCerrado: false,
-          });
-        }
-        setEstadoRestaurado(true);
-      }
-    }
-    restaurarEstado();
-  }, []);
-
-  async function handlePhotoCapture(image: string) {
-    setBase64Images((prev) => [...prev, image]);
-  }
-
-  const removerFoto = (indexParaRemover: number) => {
-    Alert.alert("Borrar Foto", "Está seguro de que desea eliminar esta foto?", [
-      {
-        text: "Cancelar",
-        style: "cancel",
-      },
-      {
-        text: "Remover",
-        onPress: () => {
-          setBase64Images((prev) =>
-            prev.filter((_, index) => index !== indexParaRemover),
-          );
-        },
-      },
-    ]);
-  };
+  }, [guardarEstado]);
 
   async function fetchBodegas() {
     try {
@@ -321,6 +226,45 @@ export function Abastecimiento({
     fetchBodegas();
   }, []);
 
+  // ─── Init: cola + migración de borrador legacy + appte ─────────────────────
+  useEffect(() => {
+    async function init() {
+      setIsLoading(true);
+      try {
+        const draft = await getStorageAbastecimiento();
+        if (draft && tieneDatosRelevantes(draft)) {
+          const id = Date.now().toString();
+          await addToAbastecimientoQueue({
+            id,
+            data: draft,
+            fechaCreacion: Date.now(),
+          });
+          await migrarCargaCombustibleLegacy(id);
+          await migrarMedicionAbastecimientoLegacy(id);
+          await removeAbastecimiento();
+        } else {
+          if (draft) await removeAbastecimiento();
+          await limpiarCargaCombustibleLegacy();
+          await limpiarMedicionAbastecimientoLegacy();
+        }
+
+        const q = await getAbastecimientoQueue();
+        setQueue(q);
+
+        const secureTime = await getTimestamp();
+        const now = new Date(secureTime.timestampMs);
+        const appteStr = `appte ${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+        setAppte(appteStr);
+      } catch (error) {
+        console.log("[Abastecimiento] Error al inicializar:", error);
+        toastError("Error", "No se pudieron cargar los datos.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    init();
+  }, []);
+
   useEffect(() => {
     if (
       ordenCompra === "" ||
@@ -335,6 +279,8 @@ export function Abastecimiento({
   }, [ordenCompra, remision, litros, base64Images]);
 
   useEffect(() => {
+    if (viewMode !== "form" || !currentEntryId) return;
+
     if (route.params?.onCargaZeta) {
       setCargaZeta(route.params.onCargaZeta);
     }
@@ -345,22 +291,6 @@ export function Abastecimiento({
     if (newMedicionInicial && newMedicionFinal) {
       setMedicionInicial(newMedicionInicial);
       setMedicionFinal(newMedicionFinal);
-
-      saveAbastecimiento({
-        ordenCompra,
-        remision,
-        litros,
-        selectedBodega,
-        tipoOperacionSeleccionado,
-        base64Images,
-        base64FotoObs,
-        obs,
-        obsAdicional,
-        cargaZeta,
-        medicionInicial: newMedicionInicial,
-        medicionFinal: newMedicionFinal,
-        turnoCerrado,
-      }).catch(console.error);
     }
   }, [
     route.params?.onCargaZeta,
@@ -372,11 +302,209 @@ export function Abastecimiento({
     setBase64FotoObs((prev) => [...prev, image]);
   }
 
+  async function handlePhotoCapture(image: string) {
+    setBase64Images((prev) => [...prev, image]);
+  }
+
+  const removerFoto = (indexParaRemover: number) => {
+    Alert.alert("Borrar Foto", "Está seguro de que desea eliminar esta foto?", [
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+      {
+        text: "Remover",
+        onPress: () => {
+          setBase64Images((prev) =>
+            prev.filter((_, index) => index !== indexParaRemover),
+          );
+        },
+      },
+    ]);
+  };
+
+  // ─── Funciones auxiliares ──────────────────────────────────────────────────
+
+  async function loadQueue() {
+    const q = await getAbastecimientoQueue();
+    setQueue(q);
+  }
+
+  function clearForm() {
+    setOrdenCompra("");
+    setRemision("");
+    setLitros("");
+    setSelectedBodega("");
+    setTipoOperacionSeleccionado("");
+    setBase64Images([]);
+    setBase64FotoObs([]);
+    setObs("");
+    setObsAdicional("");
+    setCargaZeta(null);
+    setMedicionInicial([]);
+    setMedicionFinal([]);
+    setTurnoCerrado(false);
+    setMotivoConfirmado(false);
+  }
+
+  async function limpiarBorradoresDeEntrada(entryId: string) {
+    await removeCargaCombustible(entryId);
+    await removeMedicionAbastecimiento(entryId);
+  }
+
+  // ─── Nueva entrada ─────────────────────────────────────────────────────────
+  async function handleNewEntry() {
+    autosaveBloqueadoRef.current = false;
+    clearForm();
+
+    const id = Date.now().toString();
+    const now = await getTimestamp();
+    const d = new Date(now.timestampMs);
+    const appteStr = `appte ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+    setAppte(appteStr);
+
+    const data = emptyAbastecimientoData(appteStr);
+    await addToAbastecimientoQueue({ id, data, fechaCreacion: Date.now() });
+    setCurrentEntryId(id);
+    setViewMode("form");
+    await loadQueue();
+  }
+
+  // ─── Editar entrada ────────────────────────────────────────────────────────
+  async function handleEditEntry(entry: AbastecimientoQueueEntry) {
+    const full = await getAbastecimientoQueueEntry(entry.id);
+    if (!full) {
+      toastError("Abastecimiento", "No se pudo cargar la entrada.");
+      await loadQueue();
+      return;
+    }
+
+    autosaveBloqueadoRef.current = false;
+    setCurrentEntryId(entry.id);
+
+    const d = full.data;
+    setOrdenCompra(d.ordenCompra);
+    setRemision(d.remision);
+    setLitros(d.litros);
+    setSelectedBodega(d.selectedBodega);
+    setTipoOperacionSeleccionado(d.tipoOperacionSeleccionado);
+    setBase64Images(d.base64Images);
+    setBase64FotoObs(d.base64FotoObs);
+    setObs(d.obs);
+    setObsAdicional(d.obsAdicional);
+    setMotivoConfirmado(Boolean(d.obsAdicional));
+    setAppte(d.appte);
+    setCargaZeta(d.cargaZeta);
+    setMedicionInicial(d.medicionInicial);
+    setMedicionFinal(d.medicionFinal);
+    setTurnoCerrado(d.turnoCerrado);
+
+    setViewMode("form");
+  }
+
+  // ─── Salir sin guardar (elimina entrada de la cola) ────────────────────────
+  async function handleSalirSinGuardar() {
+    autosaveBloqueadoRef.current = true;
+    if (currentEntryId) {
+      await removeFromAbastecimientoQueue(currentEntryId);
+      await limpiarBorradoresDeEntrada(currentEntryId);
+    }
+    clearForm();
+    setCurrentEntryId(null);
+    setViewMode("list");
+    await loadQueue();
+  }
+
+  // ─── Guardar y salir (conserva la entrada en la cola) ──────────────────────
+  async function handleGuardarYSalir() {
+    if (!selectedBodega) {
+      Alert.alert("Bodega requerida", "Debe seleccionar una bodega.");
+      return;
+    }
+    autosaveBloqueadoRef.current = true;
+    clearForm();
+    setCurrentEntryId(null);
+    setViewMode("list");
+    await loadQueue();
+  }
+
+  // ─── Eliminar entrada ──────────────────────────────────────────────────────
+  async function handleEliminarEntrada(entry: AbastecimientoQueueEntry) {
+    Alert.alert("Eliminar", "Desea eliminar esta entrada de la lista?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          await removeFromAbastecimientoQueue(entry.id);
+          await limpiarBorradoresDeEntrada(entry.id);
+          await loadQueue();
+        },
+      },
+    ]);
+  }
+
+  // ─── Guardar/Salir (beforeRemove listener) ─────────────────────────────────
+  useEffect(() => {
+    if (viewMode !== "form") return;
+
+    const unsubscribe = navigation.addListener("beforeRemove", (e) => {
+      if (isLoading) return;
+      e.preventDefault();
+      Alert.alert("Salir de abastecimiento", "Qué desea hacer?", [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Salir sin guardar",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Estás seguro?",
+              "Se eliminará esta entrada de la lista.",
+              [
+                { text: "Cancelar", style: "cancel" },
+                {
+                  text: "Sí, salir sin guardar",
+                  style: "destructive",
+                  onPress: async () => {
+                    await handleSalirSinGuardar();
+                    navigation.dispatch(e.data.action);
+                  },
+                },
+              ],
+            );
+          },
+        },
+        {
+          text: "Guardar y salir",
+          onPress: async () => {
+            if (!selectedBodega) {
+              Alert.alert(
+                "Bodega requerida",
+                "Debe seleccionar una bodega para guardar.",
+              );
+              return;
+            }
+            await handleGuardarYSalir();
+            navigation.dispatch(e.data.action);
+          },
+        },
+      ]);
+    });
+    return unsubscribe;
+  }, [navigation, viewMode, isLoading, selectedBodega]);
+
   async function saveAll() {
+    setIsLoading(true);
     const secureTime = await getTimestamp();
     const now = new Date(secureTime.timestampMs);
     const fecha = now.toISOString().slice(0, 10);
     const hora = now.toTimeString().slice(0, 8);
+
+    if (!selectedBodega) {
+      Alert.alert("Bodega requerida", "Debe seleccionar una bodega.");
+      setIsLoading(false);
+      return;
+    }
 
     const litrosTotalMedicionInicial =
       medicionInicial?.reduce((acc, med) => acc + med.litros, 0) || 0;
@@ -405,7 +533,7 @@ export function Abastecimiento({
       taxilitro_inicial: Number(cargaZeta?.taxilitro_inicial) || 0,
       taxilitro_final: Number(cargaZeta?.taxilitro_final) || 0,
       litros_zeta: Number(cargaZeta?.litros_zeta) || 0,
-      obs_repos: obs + "|" + obsAdicional,
+      obs_repos: [obs, obsAdicional, appte].filter(Boolean).join("|"),
       foto_obs_repos: base64FotoObs,
       litros_total_repos: String(
         litrosTotalMedicionFinal -
@@ -432,20 +560,61 @@ export function Abastecimiento({
     };
 
     try {
-      setIsLoading(true);
       await saveAbastecimientoLocal(payload);
       await anularUltimoFinTurnoPorBodega(payload.id_bod, obsAdicional);
-      await removeAbastecimiento();
-      await removeCargaCombustible();
-      await removeMedicionAbastecimiento();
+      autosaveBloqueadoRef.current = true;
+      if (currentEntryId) {
+        await removeFromAbastecimientoQueue(currentEntryId);
+        await limpiarBorradoresDeEntrada(currentEntryId);
+      }
+      clearForm();
+      setCurrentEntryId(null);
+      setViewMode("list");
       toastSuccess("Abastecimiento", "Abastecimiento registrado con éxito");
-      navigation.navigate("home");
+      await loadQueue();
     } catch (error) {
       console.error("Error al registrar el abastecimiento:", error);
       toastError("Abastecimiento", "Error al registrar el abastecimiento");
     } finally {
       setIsLoading(false);
     }
+  }
+
+  // ─── Render: modo Lista ────────────────────────────────────────────────────
+  if (viewMode === "list") {
+    return (
+      <View className="flex-1">
+        <ScreenHeader
+          title="Abastecimiento"
+          actions={
+            <TouchableOpacity onPress={handleNewEntry} className="p-1">
+              <Plus color="#fff" size={30} />
+            </TouchableOpacity>
+          }
+        />
+        {queue.length === 0 ? (
+          <EmptyList />
+        ) : (
+          <FlatList
+            data={queue}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{
+              paddingVertical: 16,
+              paddingBottom: insets.bottom + 80,
+            }}
+            renderItem={({ item }) => (
+              <EntryListItem
+                id={item.id}
+                label={getAbastecimientoLabel(item.data, bodegas)}
+                fechaCreacion={item.fechaCreacion}
+                onEditar={() => handleEditEntry(item)}
+                onEliminar={() => handleEliminarEntrada(item)}
+              />
+            )}
+          />
+        )}
+      </View>
+    );
   }
 
   return turnoCerrado && !motivoConfirmado ? (
@@ -589,7 +758,15 @@ export function Abastecimiento({
               verified={selectedBodega !== ""}
             >
               <Select
-                data={bodegas}
+                data={bodegas.filter(
+                  (b) =>
+                    !queue.some(
+                      (e) =>
+                        e.id !== currentEntryId &&
+                        e.data.selectedBodega !== "" &&
+                        Number(e.data.selectedBodega) === Number(b.id_bodega),
+                    ),
+                )}
                 isLoading={isLoading}
                 selectedValue={selectedBodega}
                 setSelectedValue={setSelectedBodega}
@@ -624,8 +801,10 @@ export function Abastecimiento({
                       <Button
                         title="Iniciar"
                         onPress={() => {
+                          if (!currentEntryId) return;
                           navigation.navigate("cargaCombustible", {
                             idBodega: selectedBodega,
+                            entryId: currentEntryId,
                           });
                         }}
                         icon={Fuel}
@@ -652,11 +831,13 @@ export function Abastecimiento({
                         iconColor={"#000"}
                         iconSize="md"
                         onPress={() => {
+                          if (!currentEntryId) return;
                           navigation.navigate("medicionAbastecimiento", {
                             fromScreen: "abastecimiento",
                             idBodega: selectedBodega,
                             cargaZeta: cargaZeta?.litros_zeta || 0,
                             litrosRemision: Number(litros),
+                            entryId: currentEntryId,
                           });
                         }}
                       />
@@ -667,7 +848,7 @@ export function Abastecimiento({
                           return (
                             <View
                               key={index}
-                              className="p-3 bg-gray-100 rounded-lg border border-gray-300 gap-1"
+                              className="p-3 bg-gray-100 rounded-lg border border-gray-200 gap-1"
                             >
                               <View className="flex-row justify-between border-b border-gray-200 pb-1">
                                 <Text className="font-bold text-gray-800 text-base text-lg">
@@ -700,11 +881,13 @@ export function Abastecimiento({
                             iconColor={"#000"}
                             iconSize="md"
                             onPress={() => {
+                              if (!currentEntryId) return;
                               navigation.navigate("medicionAbastecimiento", {
                                 fromScreen: "abastecimiento",
                                 idBodega: selectedBodega,
                                 cargaZeta: cargaZeta?.litros_zeta || 0,
                                 litrosRemision: Number(litros),
+                                entryId: currentEntryId,
                               });
                             }}
                           />

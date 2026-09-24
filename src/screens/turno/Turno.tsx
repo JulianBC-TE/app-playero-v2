@@ -42,6 +42,12 @@ import {
 } from "@/backend/db/services/turnoStatusService";
 import { getSucursalUsuarioActivoLocal } from "@DBmodules/sucursalDB";
 import { getTimestamp } from "@/services/timeService";
+import {
+  getListasPendientes,
+  getListaLabel,
+  hayListasPendientes,
+  ResumenLista,
+} from "@/services/listasPendientesService";
 
 interface SesionLocalType {
   cedula: number;
@@ -59,6 +65,14 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
   } | null>(null);
   const [listaBodegasFaltaAnterior, setListaBodegasFaltaAnterior] = useState<
     BodegaDTO[]
+  >([]);
+  // Guarda Caso A: overlay no descartable cuando hay cierre de hoy pendiente + entradas en listas
+  const [bloqueoListas, setBloqueoListas] = useState<ResumenLista[] | null>(
+    null,
+  );
+  // Caso B: resumen de listas a mostrar dentro del modal "Turno no Cerrado"
+  const [resumenListasFaltaAnterior, setResumenListasFaltaAnterior] = useState<
+    ResumenLista[]
   >([]);
   const [turnoStatusOriginal, setTurnoStatusOriginal] =
     useState<StatusTurnoDTO | null>(null);
@@ -163,11 +177,13 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
   // procesarTurno
   // ---------------------------------------------------------------------------
   async function procesarTurno() {
+    setIsLoading(true);
     if (!sesionLocal) {
       Alert.alert(
         "Error de sesión", 
         "No se encontró información del usuario activo localmente.", 
       );
+      setIsLoading(false);
       return;
     }
 
@@ -176,9 +192,28 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
         "Medición requerida",
         "Debe realizar las mediciones de tanque antes de procesar el turno.",
       );
+      setIsLoading(false);
       return;
     }
     console.log(medicion);
+
+    // Guarda de refuerzo: no permitir CERRAR turno con cierre de hoy pendiente
+    // y entradas en las listas (aunque el overlay ya lo bloquee al entrar).
+    if (
+      !inicioTurno &&
+      !faltaAnterior &&
+      (turnoStatusOriginal?.Fin_turno?.falta?.length ?? 0) > 0
+    ) {
+      const conListas = await hayListasPendientes();
+      if (conListas) {
+        Alert.alert(
+          "Listas pendientes",
+          "No se puede cerrar el turno mientras hay entradas pendientes en las listas. Guarde o procese las listas primero.",
+        );
+        setIsLoading(false);
+        return;
+      }
+    }
 
     const taxilitrosFaltantes = picosList.filter(
       (p) => !taxilitros[p.id_pico] || taxilitros[p.id_pico].trim() === "",
@@ -188,6 +223,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
         "Taxilitros requeridos",
         `Faltan taxilitros para: ${taxilitrosFaltantes.map((p) => p.descripcion_pico).join(", ")}`,
       );
+      setIsLoading(false);
       return;
     }
 
@@ -200,12 +236,11 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
         "Fotos requeridas",
         `Debe capturar al menos una foto del taxilitro para: ${fotosFaltantes.map((p) => p.descripcion_pico).join(", ")}`,
       );
+      setIsLoading(false);
       return;
     }
 
     try {
-      setIsLoading(true);
-
       const resultadosTotalizadores = picosList.map((pico) => ({
         pico: pico.id_pico,
         totalizador: Number(taxilitros[pico.id_pico]),
@@ -373,6 +408,9 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
       };
       setTurnoStatusOriginal(turnoData);
 
+      // Resumen de entradas pendientes en listas (traspaso, salida, abastecimiento)
+      const resumenListas = await getListasPendientes();
+
       // Obtener el universo total de bodegas que tiene asignadas el usuario
       const bodegasDelUsuario = await getBodegasDelUsuario(cedula);
       if (!bodegasDelUsuario) return;
@@ -390,11 +428,20 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
         }
 
         setListaBodegasFaltaAnterior(bodegasFaltantes);
+        setResumenListasFaltaAnterior(resumenListas);
         setFaltaAnterior(true);
 
         // ✨ MODIFICACIÓN: Inyectamos las bodegas y pedimos la APERTURA (Inicio de turno)
         setBodegas(bodegasFaltantes);
         setInicioTurno(true);
+        return;
+      }
+
+      // 1b. Guarda Caso A: cierre de HOY pendiente + entradas en alguna lista
+      //     → overlay no descartable (el usuario debe guardar las listas primero)
+      const cierreHoyPendiente = turnoData.Fin_turno?.falta?.length > 0;
+      if (cierreHoyPendiente && resumenListas.length > 0) {
+        setBloqueoListas(resumenListas);
         return;
       }
 
@@ -437,11 +484,69 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
     }
   }
 
+  // ─── Render: bloqueo por listas pendientes (Caso A — mismo día) ────────────
+  if (!faltaAnterior && bloqueoListas) {
+    return (
+      <View className="flex-1">
+        <ScreenHeader title="Listas Pendientes" />
+        <View style={styles.overlay}>
+          <ScrollView
+            style={styles.modalScroll}
+            contentContainerStyle={styles.modalScrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <Text className="font-bold text-red-500 text-center text-2xl underline mb-4">
+              Importante!!!
+            </Text>
+            <Text className="font-medium text-justify text-xl mb-4">
+              No se puede cerrar el turno mientras hayan bodegas con entradas
+              pendientes en las listas y cierre del día sin realizar. Guarde o
+              procese las siguientes listas:
+            </Text>
+
+            {bloqueoListas.map((resumen) => (
+              <View key={resumen.lista} className="mb-3">
+                <Text className="font-bold text-lg">
+                  {getListaLabel(resumen.lista)} ({resumen.total}{" "}
+                  {resumen.total === 1 ? "entrada" : "entradas"})
+                </Text>
+                {resumen.bodegas.map((b) => (
+                  <Text
+                    key={`${resumen.lista}-${b.idBodega}`}
+                    className="font-medium text-base ml-3"
+                  >
+                    - {b.descripcion} ({b.total}{" "}
+                    {b.total === 1 ? "entrada" : "entradas"})
+                  </Text>
+                ))}
+              </View>
+            ))}
+
+            <Text className="font-medium text-justify text-xl mb-4">
+              Obs: una vez guardadas las listas, regrese al apartado Turno para
+              realizar el cierre.
+            </Text>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={() => navigation.navigate("home")}
+            >
+              <Text style={styles.buttonText}>Volver al inicio</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </View>
+    );
+  }
+
   return faltaAnterior ? (
     <View className="flex-1">
       <ScreenHeader title="Turno no Cerrado" />
       <View style={styles.overlay}>
-        <View style={styles.modalContent}>
+        <ScrollView
+          style={styles.modalScroll}
+          contentContainerStyle={styles.modalScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           <Text className="font-bold text-red-500 text-center text-2xl underline mb-4">
             Importante!!!
           </Text>
@@ -458,6 +563,31 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
               - {bodega.descripcion_bodega}
             </Text>
           ))}
+
+          {resumenListasFaltaAnterior.length > 0 && (
+            <View className="mb-4 mt-2 border-t border-gray-300 pt-3">
+              <Text className="font-bold text-red-600 text-lg mb-2">
+                Listas con entradas pendientes:
+              </Text>
+              {resumenListasFaltaAnterior.map((resumen) => (
+                <View key={resumen.lista} className="mb-2">
+                  <Text className="font-bold text-base">
+                    {getListaLabel(resumen.lista)} ({resumen.total}{" "}
+                    {resumen.total === 1 ? "entrada" : "entradas"})
+                  </Text>
+                  {resumen.bodegas.map((b) => (
+                    <Text
+                      key={`${resumen.lista}-${b.idBodega}`}
+                      className="font-medium text-base ml-3"
+                    >
+                      - {b.descripcion} ({b.total}{" "}
+                      {b.total === 1 ? "entrada" : "entradas"})
+                    </Text>
+                  ))}
+                </View>
+              ))}
+            </View>
+          )}
 
           <InputCard
             className="min-h-40 mt-4"
@@ -492,7 +622,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
           >
             <Text style={styles.buttonText}>Guardar</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </View>
     </View>
   ) : (
@@ -753,13 +883,16 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     alignItems: "center",
   },
-  modalContent: {
-    marginTop: 100,
+  modalScroll: {
+    marginTop: 60,
     width: 350,
-    padding: 20,
+    maxHeight: "85%",
     backgroundColor: "#fff",
     borderRadius: 10,
     elevation: 5,
+  },
+  modalScrollContent: {
+    padding: 20,
   },
   button: {
     marginTop: 20,

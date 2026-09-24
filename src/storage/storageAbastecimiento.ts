@@ -13,6 +13,7 @@ export type AbastecimientoStorageDTO = {
 	base64FotoObs: string[];
 	obs: string;
 	obsAdicional: string;
+	appte: string;
 	cargaZeta: CargaZetaDTO | null;
 	medicionInicial: MedicionDTO[];
 	medicionFinal: MedicionDTO[];

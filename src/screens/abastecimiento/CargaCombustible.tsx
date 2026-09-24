@@ -31,6 +31,7 @@ export function CargaCombustible({
   route,
 }: StackRoutesProps<"cargaCombustible">) {
   const idBodega = route.params?.idBodega || "0";
+  const entryId = route.params?.entryId || "0";
 
   const [salida, setSalida] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -78,17 +79,20 @@ export function CargaCombustible({
   const guardarEstado = useCallback(async () => {
     if (!estadoRestaurado) return;
     try {
-      await saveCargaCombustible({
-        selectedPico,
-        idPico_surtidor,
-        salida,
-        idBodega,
-        taxilitroInicial,
-        taxilitroFinal,
-        litrosCargados,
-        base64FotoTaxilitro,
-        base64FotoTaxilitroFin,
-      });
+      await saveCargaCombustible(
+        {
+          selectedPico,
+          idPico_surtidor,
+          salida,
+          idBodega,
+          taxilitroInicial,
+          taxilitroFinal,
+          litrosCargados,
+          base64FotoTaxilitro,
+          base64FotoTaxilitroFin,
+        },
+        entryId
+      );
     } catch (error) {
       console.log("[CargaCombustible] Error guardando:", error);
     }
@@ -98,6 +102,7 @@ export function CargaCombustible({
     idPico_surtidor,
     salida,
     idBodega,
+    entryId,
     taxilitroInicial,
     taxilitroFinal,
     litrosCargados,
@@ -112,7 +117,7 @@ export function CargaCombustible({
   useEffect(() => {
     async function restaurarEstado() {
       try {
-        const guardado = await getStorageCargaCombustible();
+        const guardado = await getStorageCargaCombustible(entryId);
         if (guardado && guardado.idBodega === idBodega) {
           setSelectedPico(guardado.selectedPico);
           setIdPicoSurtidor(Number(guardado.idPico_surtidor) || 0);
@@ -124,7 +129,7 @@ export function CargaCombustible({
           if (guardado.base64FotoTaxilitro) setBase64FotoTaxilitro(guardado.base64FotoTaxilitro);
           if (guardado.base64FotoTaxilitroFin) setBase64FotoTaxilitroFin(guardado.base64FotoTaxilitroFin);
         } else {
-          await removeCargaCombustible();
+          await removeCargaCombustible(entryId);
         }
       } catch (error) {
         console.log("[CargaCombustible] Error restaurando:", error);
@@ -133,7 +138,7 @@ export function CargaCombustible({
       }
     }
     restaurarEstado();
-  }, [idBodega]);
+  }, [idBodega, entryId]);
 
   function handleSalida() {
     if (!selectedPico) {
@@ -178,7 +183,7 @@ export function CargaCombustible({
       foto_taxilitro_fin: base64FotoTaxilitroFin,
     };
 
-    await removeCargaCombustible();
+    await removeCargaCombustible(entryId);
     navigation.popTo("abastecimiento", { onCargaZeta: carga });
   }
 

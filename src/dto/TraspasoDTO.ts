@@ -27,6 +27,7 @@ export type TraspasoDTO = {
   foto_taxilitro_fin?: string[];
   last_id_salida?: number | null;
   obs_adicional?: string | null;
+  appte?: string | null;
   id_autorizado?: number | null;
   corte_id?: number | null;
 };

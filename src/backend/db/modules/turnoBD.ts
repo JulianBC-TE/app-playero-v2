@@ -61,6 +61,7 @@ export async function crearTurnoLocal({
 }) {
   // CORRECCIÓN: Convertir a string de forma segura ("1" o "2")
   const tipoNumber = String(tipo);
+
   console.log(dto.med_tanques[0]);
   console.log(dto.med_tanques[0].foto_tanque);
 

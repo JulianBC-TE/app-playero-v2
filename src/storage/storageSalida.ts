@@ -26,6 +26,7 @@ export type SalidaStorageDTO = {
 	taxilitro_final: string;   // 🆕 Guardará el valor escrito manual de fin
 	observaciones: string;
 	obsAdicional: string;
+	appte: string;
 	turnoCerrado: boolean;
 };
 

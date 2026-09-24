@@ -50,13 +50,14 @@ export type StackRoutesList = {
                 onMedicionFinal?: MedicionDTO[] | null;
           }
         | undefined;
-    cargaCombustible: { idBodega: string } | undefined;
+    cargaCombustible: { idBodega: string; entryId: string } | undefined;
     medicionAbastecimiento:
         | {
                 fromScreen?: string;
                 idBodega: string;
                 cargaZeta: number;
                 litrosRemision: number;
+                entryId: string;
           }
         | undefined;
     calibracion:

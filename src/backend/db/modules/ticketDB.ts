@@ -2,20 +2,71 @@
  * @module Playero/Backend/DB/Modules/Ticket
  * @category Database Modules
  */
-import { eq, or } from "drizzle-orm";
+import { eq, or, desc } from "drizzle-orm";
 import { db } from "../client";
 import { tickets } from "../schema";
 import { TicketDTO } from "@/dto/TicketDTO";
 import { crearLog } from "../logs/logModule";
+import { compararCamposClave } from "./duplicadosHelper";
+
+/**
+ * Verifica si un ticket es duplicado comparándolo con el último ticket de la misma bodega.
+ * Compara: fecha, hora (sin seg), id_pico, id_operador, litros, taxilitro_inicial, taxilitro_final
+ */
+export async function esTicketDuplicadoLocal(dto: TicketDTO): Promise<boolean> {
+  const ultimo = await db
+    .select()
+    .from(tickets)
+    .where(eq(tickets.id_bod, dto.id_bod))
+    .orderBy(desc(tickets.idTicket))
+    .limit(1);
+
+  if (ultimo.length === 0) return false;
+
+  const row = ultimo[0];
+  return compararCamposClave(
+    {
+      fecha: dto.fecha,
+      id_pico: dto.id_pico,
+      id_operador: dto.id_operador,
+      litros: dto.litros,
+      taxilitro_inicial: dto.taxilitro_inicial,
+      taxilitro_final: dto.taxilitro_final,
+    },
+    {
+      fecha: row.fecha,
+      id_pico: row.id_pico,
+      id_operador: row.id_operador,
+      litros: row.litros,
+      taxilitro_inicial: row.taxilitro_inicial,
+      taxilitro_final: row.taxilitro_final,
+    },
+    ["fecha", "id_pico", "id_operador", "litros", "taxilitro_inicial", "taxilitro_final"]
+  );
+}
 
 /**
  * Crear ticket local plano y fuertemente tipado
+ * Retorna -1 si el ticket es duplicado (no se insertó).
  */
 export async function crearTicketLocal(
   dto: TicketDTO,
   fechaRegistro?: number,
   horaRegistro?: number,
 ): Promise<number> {
+  const esDuplicado = await esTicketDuplicadoLocal(dto);
+  if (esDuplicado) {
+    console.log("⚠️ TICKET DUPLICADO detectado, no se inserta:", dto.fecha, dto.hora, dto.id_pico);
+    await crearLog({
+      tipo: "salida",
+      accion: "duplicado_detectado",
+      registroId: 0,
+      detalle: `${dto.litros}L, Tax: ${dto.taxilitro_inicial}-${dto.taxilitro_final}`,
+      payload: dto as any,
+    });
+    return -1;
+  }
+
   console.log(dto.observaciones_ticket)
   const result = await db.insert(tickets).values({
     ...dto, // Asignación directa gracias al tipado unificado (incluyendo los nuevos arreglos de fotos)

@@ -70,7 +70,7 @@ export interface ResumenTurnoBodega {
 }
 // ── Envíos ────────────────────────────────────────────────────────────────────
 
-export async function enviarTicket(fila: FilaTicket): Promise<void> {
+export async function enviarTicket(fila: FilaTicket): Promise<{ duplicado?: boolean }> {
   const datosTicket = {
     ...fila.dto,
     id_suc: fila.dto.id_suc ?? 69,
@@ -85,24 +85,27 @@ export async function enviarTicket(fila: FilaTicket): Promise<void> {
     tickets: [{ id_ticket: fila.dto.clave, json: datosTicket }]
   };
 
-  await httpClient.syncPost(SYNC_CONFIG.endpoints.tickets, payload);
+  const response = await httpClient.syncPost<{ duplicado?: boolean }>(SYNC_CONFIG.endpoints.tickets, payload);
+  return response.data ?? {};
 }
 
-export async function enviarTraspaso(fila: FilaTraspaso): Promise<void> {
+export async function enviarTraspaso(fila: FilaTraspaso): Promise<{ duplicado?: boolean }> {
   const payload = {
     trapasos: [{ id_trapaso: fila.dto.clave, json: fila.dto }]
   };
 
-  await httpClient.syncPost(SYNC_CONFIG.endpoints.traspasos, payload);
+  const response = await httpClient.syncPost<{ duplicado?: boolean }>(SYNC_CONFIG.endpoints.traspasos, payload);
+  return response.data ?? {};
 }
 
-export async function enviarCalibracion(fila: FilaCalibracion): Promise<void> {
+export async function enviarCalibracion(fila: FilaCalibracion): Promise<{ duplicado?: boolean }> {
   console.log(fila.dto.clave);
   const payload = {
     calibraciones: [{ id_calibracion: fila.dto.clave, json: fila.dto }]
   };
 
-  await httpClient.syncPost(SYNC_CONFIG.endpoints.calibraciones, payload);
+  const response = await httpClient.syncPost<{ duplicado?: boolean }>(SYNC_CONFIG.endpoints.calibraciones, payload);
+  return response.data ?? {};
 }
 
 /*export async function enviarAbastecimiento(dto: AbastecimientoDTO): Promise<void> {
@@ -113,7 +116,7 @@ export async function enviarCalibracion(fila: FilaCalibracion): Promise<void> {
   await httpClient.syncPost(SYNC_CONFIG.endpoints.abastecimientos, payloadBackend);
 }*/
 
-export async function enviarAbastecimiento(dto: AbastecimientoDTO): Promise<void> {
+export async function enviarAbastecimiento(dto: AbastecimientoDTO): Promise<{ duplicado?: boolean }> {
   
   const payloadBackend = {
     abastecimientos: [
@@ -126,7 +129,8 @@ export async function enviarAbastecimiento(dto: AbastecimientoDTO): Promise<void
   };
   console.log(payloadBackend.abastecimientos[0].id_abastecimiento)
 
-  await httpClient.syncPost(SYNC_CONFIG.endpoints.abastecimientos, payloadBackend);
+  const response = await httpClient.syncPost<{ duplicado?: boolean }>(SYNC_CONFIG.endpoints.abastecimientos, payloadBackend);
+  return response.data ?? {};
 }
 
 export async function enviarTurno(fila: FilaTurno): Promise<void> {
@@ -148,7 +152,7 @@ export async function enviarTurno(fila: FilaTurno): Promise<void> {
     ? SYNC_CONFIG.endpoints.turnosInicio
     : SYNC_CONFIG.endpoints.turnosFin;
 
-  await httpClient.post(endpoint, payload); 
+  await httpClient.post(endpoint, payload);
 }
 
 /**

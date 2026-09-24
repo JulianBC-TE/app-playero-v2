@@ -95,6 +95,7 @@ export function MedicionAbastecimiento({
   const [base64ImageInicial, setBase64ImageInicial] = useState<string>("");
   const [base64ImageFinal, setBase64ImageFinal] = useState<string>("");
   const idBodega = route.params?.idBodega || "0";
+  const entryId = route.params?.entryId || "0";
   const [isLoading, setIsLoading] = useState(false);
   const [tanques, setTanques] = useState<TanqueDTO[]>([]);
   const [selectedTanques, setSelectedTanques] = useState("");
@@ -173,22 +174,25 @@ export function MedicionAbastecimiento({
     if (!estadoRestaurado) return;
 
     try {
-      await saveMedicionAbastecimiento({
-        medicionInicial,
-        medicionFinal,
-        base64ImageInicial,
-        base64ImageFinal,
-        selectedTanques,
-        idBodega,
+      await saveMedicionAbastecimiento(
+        {
+          medicionInicial,
+          medicionFinal,
+          base64ImageInicial,
+          base64ImageFinal,
+          selectedTanques,
+          idBodega,
 
-        alturaInicial: alturaInicialWatch,
-        litrosInicial: litrosInicialWatch,
-        tempInicial: tempInicialWatch,
+          alturaInicial: alturaInicialWatch,
+          litrosInicial: litrosInicialWatch,
+          tempInicial: tempInicialWatch,
 
-        alturaFinal: alturaFinalWatch,
-        litrosFinal: litrosFinalWatch,
-        tempFinal: tempFinalWatch,
-      });
+          alturaFinal: alturaFinalWatch,
+          litrosFinal: litrosFinalWatch,
+          tempFinal: tempFinalWatch,
+        },
+        entryId
+      );
     } catch (error) {
       console.log("[MedicionAbastecimiento] Error al guardar estado:", error);
     }
@@ -200,6 +204,7 @@ export function MedicionAbastecimiento({
     base64ImageFinal,
     selectedTanques,
     idBodega,
+    entryId,
     alturaInicialWatch,
     litrosInicialWatch,
     tempInicialWatch,
@@ -215,7 +220,7 @@ export function MedicionAbastecimiento({
   useEffect(() => {
     async function restaurarEstado() {
       try {
-        const guardado = await getStorageMedicionAbastecimiento();
+        const guardado = await getStorageMedicionAbastecimiento(entryId);
         if (guardado && guardado.idBodega === idBodega) {
           setMedicionInicial(guardado.medicionInicial || []);
           setMedicionFinal(guardado.medicionFinal || []);
@@ -337,7 +342,7 @@ export function MedicionAbastecimiento({
       return;
     }
 
-    removeMedicionAbastecimiento().catch(() => {});
+    removeMedicionAbastecimiento(entryId).catch(() => {});
     navigation.popTo(fromScreen as any, {
       onMedicionInicial: updatedMedicionesIniciales,
       onMedicionFinal: updatedMedicionesFinales,

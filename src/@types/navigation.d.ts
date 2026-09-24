@@ -15,13 +15,14 @@ export type RootStackParamList = {
 				onMedicionFinal?: MedicionDTO[] | null;
 		  }
 		| undefined;
-	CargaCombustible: { idBodega: string } | undefined;
+	CargaCombustible: { idBodega: string; entryId: string } | undefined;
 	MedicionAbastecimiento:
 		| {
 				fromScreen?: string;
 				idBodega: string;
 				cargaZeta: number;
 				litrosRemision: number;
+				entryId: string;
 		  }
 		| undefined;
 	Cliente: { enabledSelect?: boolean } | undefined;

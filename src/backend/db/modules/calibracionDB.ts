@@ -14,18 +14,66 @@ import { eq, desc, or } from "drizzle-orm";
 import { CalibracionDTO } from "@/dto/CalibracionDTO";
 import { FilaCalibracion } from "@/backend/api/operacionesAPI";
 import { crearLog } from "../logs/logModule";
+import { compararCamposClave } from "./duplicadosHelper";
 
 const SYNC_KEY = "__last_sync_calibraciones__";
 
 /**
+ * Verifica si una calibración es duplicada comparándola con la última de la misma bodega.
+ * Compara: fecha_hora (sin seg), pico, taxilitro_inicial, taxilitro_final
+ */
+export async function esCalibracionDuplicadaLocal(
+  dto: Omit<CalibracionDTO, "id_calibracion">
+): Promise<boolean> {
+  const ultimo = await db
+    .select()
+    .from(calibraciones)
+    .where(eq(calibraciones.bodega, dto.bodega))
+    .orderBy(desc(calibraciones.idCalibracion))
+    .limit(1);
+
+  if (ultimo.length === 0) return false;
+
+  const row = ultimo[0];
+
+  return compararCamposClave(
+    {
+      pico: dto.pico,
+      taxilitro_inicial: dto.taxilitro_inicial,
+      taxilitro_final: dto.taxilitro_final,
+    },
+    {
+      pico: row.pico,
+      taxilitro_inicial: row.taxilitroInicial,
+      taxilitro_final: row.taxilitroFinal,
+    },
+    ["pico", "taxilitro_inicial", "taxilitro_final"]
+  );
+}
+
+/**
  * Inserta un registro de calibración plano omitiendo el ID para que SQLite lo autogenere.
+ * Retorna -1 si la calibración es duplicada (no se insertó).
  *
  * @param dto - Datos del formulario (sin id_calibracion).
- * @returns ID generado automáticamente por SQLite.
+ * @returns ID generado automáticamente por SQLite, o -1 si es duplicado.
  */
 export async function saveCalibracionLocal(
   dto: Omit<CalibracionDTO, "id_calibracion">
 ): Promise<number> {
+  const esDuplicado = await esCalibracionDuplicadaLocal(dto);
+  if (esDuplicado) {
+    console.log("⚠️ CALIBRACIÓN DUPLICADA detectada, no se inserta:", dto.fecha_hora, dto.pico);
+    await crearLog({
+      tipo: "calibracion",
+      accion: "duplicado_detectado",
+      registroId: 0,
+      detalle: `Tax: ${dto.taxilitro_inicial}-${dto.taxilitro_final}`,
+      payload: dto as any,
+    });
+    return -1;
+  }
+
   const result = await db.insert(calibraciones).values({
     fechaHora: dto.fecha_hora,
     hora: dto.hora,

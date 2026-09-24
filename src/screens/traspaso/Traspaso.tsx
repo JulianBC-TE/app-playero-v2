@@ -4,7 +4,7 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { TextSearch } from "@/components/TextSearch";
 import { PersonaDTO } from "@/dto/PersonaDTO";
 import { StackRoutesProps } from "@/route/app.routes";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   View,
@@ -16,11 +16,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  Image
+  Image,
+  FlatList,
 } from "react-native";
 import {
   CheckCheck,
   Pencil,
+  Plus,
   RulerDimensionLine,
   SaveAll,
 } from "lucide-react-native";
@@ -33,17 +35,22 @@ import { TraspasoDTO } from "@/dto/TraspasoDTO";
 import {
   getStorageTraspaso,
   removeTraspaso,
-  saveTraspaso,
 } from "@/storage/storageTraspaso";
 import {
   getStoragePersona,
   removePersona,
-  savePersona,
 } from "@/storage/storagePersona";
+import {
+  getTraspasoQueue,
+  addToTraspasoQueue,
+  updateTraspasoQueueEntry,
+  removeFromTraspasoQueue,
+  TraspasoQueueEntry,
+} from "@/storage/storageQueueTraspaso";
 import { Photo } from "@/components/Photo";
 // BD — reemplaza api
 import { getBodegasDelUsuario, getBodegasTraspaso } from "@DBmodules/bodegaDB";
-import { getPicosByBodega } from "@DBmodules/picoDB";
+import { getPicos, getPicosByBodega } from "@DBmodules/picoDB";
 import {
   anularUltimoFinTurnoPorBodega,
   getTipoByBodega,
@@ -53,8 +60,15 @@ import { saveTraspasoLocal } from "@DBmodules/traspasoDB";
 import { BodegaDTO } from "@/dto/BodegaDTO";
 import { MedicionDTO } from "@/dto/MedicionDTO";
 import { getTimestamp } from "@/services/timeService";
+import { EntryListItem } from "@/components/EntryListItem";
+import { EmptyList } from "@/components/EmptyList";
 
 export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
+  // ─── UI State ───────────────────────────────────────────────────────────────
+  const [viewMode, setViewMode] = useState<"list" | "form">("list");
+  const [queue, setQueue] = useState<TraspasoQueueEntry[]>([]);
+  const [currentEntryId, setCurrentEntryId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
   const [selectedBodegaOrigem, setSelectedBodegaOrigem] = useState<string>(" ");
   const [selectedBodegaDestino, setSelectedBodegaDestino] =
     useState<string>(" ");
@@ -67,6 +81,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   const [medicionInicial, setMedicionInicial] = useState<MedicionDTO[]>([]);
   const [medicionFinal, setMedicionFinal] = useState<MedicionDTO[]>([]);
   const [picos, setPicos] = useState<PicoDTO[]>([]);
+  const [picosLista, setPicosLista] = useState<PicoDTO[]>([]);
   const [persona, setPersona] = useState<PersonaDTO | null>(null);
   const [firma, setFirma] = useState<string | null>(null);
 
@@ -77,6 +92,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   const [base64Obs, setBase64Obs] = useState<string>("");
   const [obs, setObs] = useState<string>("");
   const [obsAdicional, setObsAdicional] = useState<string>("");
+  const [appte, setAppte] = useState<string>("");
 
   const [taxilitroInicial, setTaxilitroInicial] = useState<string>("");
   const [base64TaxilitroInicial, setBase64TaxilitroInicial] =
@@ -84,20 +100,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   const [taxilitroFinal, setTaxilitroFinal] = useState<string>("");
   const [base64TaxilitroFinal, setBase64TaxilitroFinal] = useState<string>("");
 
-  const [estadoRestaurado, setEstadoRestaurado] = useState(false);
-  const [estadoInicial, setEstadoInicial] = useState<{
-    persona: PersonaDTO | null;
-    selectedBodegaOrigem: string;
-    selectedBodegaDestino: string;
-    selectedPico: string;
-    obs: string;
-    obsAdicional: string;
-    cargaCombustible: string;
-    taxilitroInicial: string;
-    taxilitroFinal: string;
-    base64TaxilitroInicial: string;
-    base64TaxilitroFinal: string;
-  } | null>(null);
+  const autosaveBloqueadoRef = useRef(false);
   const insets = useSafeAreaInsets();
 
   const toNumber = (v: unknown) => {
@@ -119,8 +122,21 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       }
       const picosDB = await getPicosByBodega(Number(selectedBodegaOrigem));
       setPicos(picosDB);
-      setSelectedPico(picosDB[0]?.id_pico.toString() || "");
-      setEstadoRestaurado(true);
+      setSelectedPico((prev) => {
+        if (prev && prev.trim() && picosDB.some((p) => p.id_pico === Number(prev))) {
+          return prev;
+        }
+        const libres = picosDB.filter(
+          (p) =>
+            !queue.some(
+              (e) =>
+                Number(e.data.id_pico) === p.id_pico &&
+                e.id !== currentEntryId
+            )
+        );
+        const elegido = libres[0] ?? picosDB[0];
+        return elegido?.id_pico.toString() || "";
+      });
     } catch (error) {
       toastError("Error al buscar picos", "Intente nuevamente.");
     } finally {
@@ -167,14 +183,12 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     }
   }
 
-  async function saveState() {
+  function buildTraspasoData(): TraspasoDTO {
     const now = new Date();
     const fecha = now.toISOString().slice(0, 10);
     const hora = now.toTimeString().slice(0, 8);
 
-    const existing = await getStorageTraspaso();
-
-    const data: TraspasoDTO = { 
+    return {
       bod_origen: Number(selectedBodegaOrigem),
       bod_destino: Number(selectedBodegaDestino),
       id_tanque_destino: Number(medicionInicial[0]?.id_tanque ?? 0),
@@ -194,6 +208,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       last_id_salida: 0,
       obs_traspaso: obs,
       obs_adicional: obsAdicional,
+      appte: appte,
       foto_obs_traspaso: base64Obs ? [base64Obs] : [],
       foto_medicion_inicial: medicionInicial[0]?.foto_tanque
         ? [medicionInicial[0].foto_tanque]
@@ -206,103 +221,329 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
         : [],
       fecha: fecha,
       hora: hora,
-      firma_receptor: existing?.firma_receptor ?? [],
+      firma_receptor: firma ? [firma] : [],
       id_playero: Number(user.cedula),
       id_encargado_receptor: Number(persona?.cedula) || 0,
     };
-
-    await saveTraspaso(data);
-    await savePersona(persona);
-    return data;
   }
 
-  const huboCambios = useCallback(() => {
-    if (!estadoInicial || !estadoRestaurado) return false;
-    const actual = {
-      persona,
-      selectedBodegaOrigem,
-      selectedBodegaDestino,
-      selectedPico,
-      obs,
-      obsAdicional,
-      cargaCombustible,
-      taxilitroInicial,
-      taxilitroFinal,
-      base64TaxilitroInicial,
-      base64TaxilitroFinal,
-    };
-    return JSON.stringify(actual) !== JSON.stringify(estadoInicial);
+  async function loadQueue() {
+    const q = await getTraspasoQueue();
+    setQueue(q);
+  }
+
+  function clearForm() {
+    setPersona(null);
+    setFirma(null);
+    setSelectedBodegaOrigem(" ");
+    setSelectedBodegaDestino(" ");
+    setSelectedPico(" ");
+    setCargaCombustible("");
+    setTaxilitroInicial("");
+    setTaxilitroFinal("");
+    setBase64TaxilitroInicial("");
+    setBase64TaxilitroFinal("");
+    setBase64Obs("");
+    setObs("");
+    setObsAdicional("");
+    setMedicionInicial([]);
+    setMedicionFinal([]);
+    setMotivoConfirmado(false);
+  }
+
+  function tieneDatosRelevantes(d: TraspasoDTO): boolean {
+    return !!(
+      d.bod_origen ||
+      d.bod_destino ||
+      d.id_pico ||
+      d.id_tanque_destino ||
+      d.litros_pico ||
+      d.taxilitro_inicial ||
+      d.taxilitro_final ||
+      d.obs_traspaso ||
+      d.obs_adicional ||
+      d.foto_medicion_inicial?.length ||
+      d.foto_taxilitro?.length
+    );
+  }
+
+  function getTraspasoLabel(
+    data: TraspasoDTO,
+    origenes: BodegaDTO[],
+    destinos: BodegaDTO[],
+    listaPicos: PicoDTO[]
+  ): string {
+    const pico = listaPicos.find((p) => p.id_pico === Number(data.id_pico));
+    const origen = origenes.find(
+      (b) => b.id_bodega === String(data.bod_origen)
+    );
+    const destino = destinos.find(
+      (b) => b.id_bodega === String(data.bod_destino)
+    );
+    const picoName =
+      pico?.descripcion_pico || `Pico #${data.id_pico || "?"}`;
+    const origenName =
+      origen?.descripcion_bodega || `Bodega #${data.bod_origen || "?"}`;
+    const destinoName =
+      destino?.descripcion_bodega || `Bodega #${data.bod_destino || "?"}`;
+    return `${picoName} - ${origenName} → ${destinoName}`;
+  }
+
+  // ─── Persistencia a la cola (auto-save) ──────────────────────────────────
+  const guardarEstado = useCallback(async () => {
+    if (!currentEntryId || viewMode !== "form" || autosaveBloqueadoRef.current)
+      return;
+    try {
+      const data = buildTraspasoData();
+      await updateTraspasoQueueEntry(currentEntryId, data, persona, firma);
+    } catch (error) {
+      console.log("[Traspaso] Error al guardar en cola:", error);
+    }
   }, [
-    estadoInicial,
-    estadoRestaurado,
+    currentEntryId,
+    viewMode,
     persona,
+    firma,
     selectedBodegaOrigem,
     selectedBodegaDestino,
     selectedPico,
+    cargaCombustible,
     obs,
     obsAdicional,
-    cargaCombustible,
+    appte,
+    base64Obs,
     taxilitroInicial,
-    taxilitroFinal,
     base64TaxilitroInicial,
+    taxilitroFinal,
     base64TaxilitroFinal,
+    medicionInicial,
+    medicionFinal,
   ]);
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener("beforeRemove", (e) => {
-      if (isLoading || !estadoRestaurado) return;
+    guardarEstado();
+  }, [guardarEstado]);
 
-      e.preventDefault();
+  // ─── Nueva entrada ───────────────────────────────────────────────────────
+  async function handleNewEntry() {
+    autosaveBloqueadoRef.current = false;
+    clearForm();
 
+    const id = Date.now().toString();
+    const secureTime = await getTimestamp();
+    const now = new Date(secureTime.timestampMs);
+    const appteStr = `appte ${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+    setAppte(appteStr);
+
+    const primeraOrigen = bodegaOrigem[0];
+    const primerDestino = bodygaDestino[0];
+    if (primeraOrigen) setSelectedBodegaOrigem(primeraOrigen.id_bodega);
+    if (primerDestino) setSelectedBodegaDestino(primerDestino.id_bodega);
+
+    const data: TraspasoDTO = {
+      bod_origen: Number(primeraOrigen?.id_bodega ?? 0),
+      bod_destino: Number(primerDestino?.id_bodega ?? 0),
+      id_tanque_destino: 0,
+      regla_altura_inicial: "",
+      litros_tanque_inicial: 0,
+      temp_inicial: 0,
+      regla_altura_final: "",
+      litros_tanque_final: 0,
+      temp_final: 0,
+      foto_medicion_final: [],
+      id_pico: 0,
+      taxilitro_inicial: 0,
+      taxilitro_final: 0,
+      litros_pico: 0,
+      last_id_salida: 0,
+      obs_traspaso: "",
+      obs_adicional: "",
+      appte: appteStr,
+      foto_obs_traspaso: [],
+      foto_medicion_inicial: [],
+      foto_taxilitro: [],
+      foto_taxilitro_fin: [],
+      fecha: now.toISOString().slice(0, 10),
+      hora: now.toTimeString().slice(0, 8),
+      firma_receptor: [],
+      id_playero: Number(user.cedula),
+      id_encargado_receptor: 0,
+    };
+
+    await addToTraspasoQueue({
+      id,
+      data,
+      persona: null,
+      firma: null,
+      fechaCreacion: Date.now(),
+    });
+    setCurrentEntryId(id);
+    setIsCreating(true);
+    setViewMode("form");
+    await loadQueue();
+  }
+
+  // ─── Editar entrada ──────────────────────────────────────────────────────
+  async function handleEditEntry(entry: TraspasoQueueEntry) {
+    autosaveBloqueadoRef.current = false;
+    setCurrentEntryId(entry.id);
+    setIsCreating(false);
+
+    const d = entry.data;
+    setPersona(entry.persona);
+    setFirma(entry.firma);
+    setSelectedBodegaOrigem(d.bod_origen.toString());
+    setSelectedBodegaDestino(d.bod_destino.toString());
+    setSelectedPico(d.id_pico.toString());
+    setCargaCombustible(
+      d.litros_pico ? d.litros_pico.toString() : ""
+    );
+    setBase64Obs(d.foto_obs_traspaso?.[0] ?? "");
+    setObs(d.obs_traspaso ?? "");
+    setObsAdicional(d.obs_adicional ?? "");
+    setMotivoConfirmado(!!d.obs_adicional?.trim());
+    setAppte(d.appte ?? "");
+    setTaxilitroInicial(
+      d.taxilitro_inicial ? d.taxilitro_inicial.toString() : ""
+    );
+    setBase64TaxilitroInicial(d.foto_taxilitro?.[0] ?? "");
+    setTaxilitroFinal(
+      d.taxilitro_final ? d.taxilitro_final.toString() : ""
+    );
+    setBase64TaxilitroFinal(d.foto_taxilitro_fin?.[0] ?? "");
+
+    if (d.id_tanque_destino) {
+      setMedicionInicial([
+        {
+          id_tanque: d.id_tanque_destino.toString(),
+          regla: Number(d.regla_altura_inicial),
+          litros: d.litros_tanque_inicial,
+          temperatura: d.temp_inicial,
+          foto_tanque: d.foto_medicion_inicial?.[0] || "",
+        },
+      ]);
+    } else {
+      setMedicionInicial([]);
+    }
+
+    if (d.regla_altura_final && d.litros_tanque_final > 0) {
+      setMedicionFinal([
+        {
+          id_tanque: d.id_tanque_destino.toString(),
+          regla: Number(d.regla_altura_final),
+          litros: d.litros_tanque_final,
+          temperatura: d.temp_final,
+          foto_tanque: d.foto_medicion_final?.[0] || "",
+        },
+      ]);
+    } else {
+      setMedicionFinal([]);
+    }
+
+    setViewMode("form");
+  }
+
+  // ─── Salir sin guardar (elimina entrada de la cola) ──────────────────────
+  async function handleSalirSinGuardar() {
+    if (currentEntryId) {
+      autosaveBloqueadoRef.current = true;
+      await removeFromTraspasoQueue(currentEntryId);
+    }
+    clearForm();
+    setCurrentEntryId(null);
+    setIsCreating(false);
+    setViewMode("list");
+    await loadQueue();
+  }
+
+  // ─── Guardar y salir (deja el borrador en la cola) ───────────────────────
+  async function handleGuardarYSalir() {
+    if (!selectedBodegaOrigem || selectedBodegaOrigem.trim() === "") {
       Alert.alert(
-        "Salir de traspaso",
-        "Hay cambios sin confirmar. ¿Qué desea hacer?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Salir sin guardar",
-            style: "destructive",
-            onPress: () => {
-              Alert.alert(
-                "¿Estás seguro?",
-                "Se perderán todos los datos de este Traspaso. Esta acción no se puede deshacer.",
-                [
-                  { text: "Cancelar", style: "cancel" },
-                  {
-                    text: "Sí, salir sin guardar",
-                    style: "destructive",
-                    onPress: async () => {
-                      await removeTraspaso();
-                      await removePersona();
-                      setEstadoInicial(null);
-                      navigation.dispatch(e.data.action);
-                    },
-                  },
-                ],
-              );
-            },
-          },
-          {
-            text: "Guardar y salir",
-            onPress: async () => {
-              if (medicionInicial && medicionInicial?.length > 0) {
-                saveState();
-              }
-              navigation.dispatch(e.data.action);
-            },
-          },
-        ],
+        "Bodega requerida",
+        "Debe seleccionar una bodega origen para guardar.",
       );
+      return;
+    }
+    // La actualizacion ya se hizo via auto-save
+    autosaveBloqueadoRef.current = true;
+    clearForm();
+    setCurrentEntryId(null);
+    setIsCreating(false);
+    setViewMode("list");
+    await loadQueue();
+  }
+
+  // ─── Eliminar entrada ────────────────────────────────────────────────────
+  async function handleEliminarEntrada(entry: TraspasoQueueEntry) {
+    Alert.alert("Eliminar", "¿Desea eliminar esta entrada de la lista?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          await removeFromTraspasoQueue(entry.id);
+          await loadQueue();
+        },
+      },
+    ]);
+  }
+
+  // ─── Guardar/Salir (beforeRemove listener) ──────────────────────────────
+  const handleGuardarYSalirRef = useRef(handleGuardarYSalir);
+  const handleSalirSinGuardarRef = useRef(handleSalirSinGuardar);
+  handleGuardarYSalirRef.current = handleGuardarYSalir;
+  handleSalirSinGuardarRef.current = handleSalirSinGuardar;
+
+  useEffect(() => {
+    if (viewMode !== "form") return;
+
+    const unsubscribe = navigation.addListener("beforeRemove", (e) => {
+      if (isLoading) return;
+      e.preventDefault();
+      Alert.alert("Salir de traspaso", "¿Qué desea hacer?", [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Salir sin guardar",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "¿Estás seguro?",
+              "Se eliminará esta entrada de la lista.",
+              [
+                { text: "Cancelar", style: "cancel" },
+                {
+                  text: "Sí, salir sin guardar",
+                  style: "destructive",
+                  onPress: async () => {
+                    await handleSalirSinGuardarRef.current();
+                    navigation.dispatch(e.data.action);
+                  },
+                },
+              ],
+            );
+          },
+        },
+        {
+          text: "Guardar y salir",
+          onPress: async () => {
+            await handleGuardarYSalirRef.current();
+            navigation.dispatch(e.data.action);
+          },
+        },
+      ]);
     });
 
     return unsubscribe;
-  }, [navigation, huboCambios, isLoading, estadoRestaurado, medicionInicial]);
+  }, [navigation, viewMode, isLoading]);
 
   async function handleSaveAll() {
     if (isSaving) return;
+    setIsLoading(true);
 
     if (!persona) {
       Alert.alert("Persona requerida", "Debe seleccionar un chofer/operador.");
+      setIsLoading(false);
       return;
     }
     if (!selectedBodegaOrigem) {
@@ -310,6 +551,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
         "Bodega de origen requerida",
         "Debe seleccionar una bodega origen.",
       );
+      setIsLoading(false);
       return;
     }
     if (!selectedBodegaDestino) {
@@ -317,6 +559,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
         "Bodega de destino requerida",
         "Debe seleccionar una bodega destino.",
       );
+      setIsLoading(false);
       return;
     }
     if (!taxilitroInicial || toNumber(taxilitroInicial) <= 0) {
@@ -324,6 +567,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
         "Taxilitro inicial requerido",
         "Debe ingresar el valor numérico del taxilitro inicial.",
       );
+      setIsLoading(false);
       return;
     }
     if (!base64TaxilitroInicial) {
@@ -331,6 +575,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
         "Foto requerida",
         "Debe capturar la foto del taxilitro inicial.",
       );
+      setIsLoading(false);
       return;
     }
     if (medicionInicial.length === 0) {
@@ -338,6 +583,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
         "Medición Inicial requerida",
         "Debe registrar la medición inicial.",
       );
+      setIsLoading(false);
       return;
     }
     if (!cargaCombustible || toNumber(cargaCombustible) <= 0) {
@@ -345,6 +591,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
         "Litros requeridos",
         "Debe ingresar una cantidad válida de litros cargados.",
       );
+      setIsLoading(false);
       return;
     }
     if (!taxilitroFinal || toNumber(taxilitroFinal) <= 0) {
@@ -352,6 +599,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
         "Taxilitro final requerido",
         "Debe ingresar el valor numérico del taxilitro final.",
       );
+      setIsLoading(false);
       return;
     }
     if (!base64TaxilitroFinal) {
@@ -359,6 +607,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
         "Foto requerida",
         "Debe capturar la foto del taxilitro final.",
       );
+      setIsLoading(false);
       return;
     }
     if (medicionFinal.length === 0) {
@@ -366,10 +615,12 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
         "Medición final es requerida",
         "Debe registrar la medición final del tanque receptor.",
       );
+      setIsLoading(false);
       return;
     }
     if (!firma) {
       Alert.alert("Firma requerida", "Debe registrar la firma del receptor.");
+      setIsLoading(false);
       return;
     }
     const tipoTurno = await getTipoByBodega(Number(selectedBodegaOrigem));
@@ -380,7 +631,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     }
 
     try {
-      const data: TraspasoDTO = await getStorageTraspaso();
+      const data = buildTraspasoData();
 
       data.firma_receptor = firma ? [firma] : [];
       data.regla_altura_final = medicionFinal[0].regla.toString();
@@ -389,7 +640,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       data.foto_medicion_final = medicionFinal[0].foto_tanque
         ? [medicionFinal[0].foto_tanque]
         : [];
-      data.obs_traspaso = [data.obs_traspaso, obsAdicional]
+      data.obs_traspaso = [obs, obsAdicional, appte]
         .filter((s) => s?.trim())
         .join(" >> ");
       data.litros_pico = toNumber(cargaCombustible);
@@ -407,16 +658,21 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
       delete (payload as any).obs_adicional;
 
       setIsSaving(true);
-      setIsLoading(true);
 
       const secureTime = await getTimestamp();
       await saveTraspasoLocal(payload, secureTime.timestampMs);
       await anularUltimoFinTurnoPorBodega(payload.bod_origen, obsAdicional);
 
       toastSuccess("Traspaso", "Traspaso guardado exitosamente.");
-      await removeTraspaso();
-      await removePersona();
-      navigation.navigate("home");
+      autosaveBloqueadoRef.current = true;
+      if (currentEntryId) {
+        await removeFromTraspasoQueue(currentEntryId);
+      }
+      clearForm();
+      setCurrentEntryId(null);
+      setIsCreating(false);
+      setViewMode("list");
+      await loadQueue();
     } catch (error) {
       console.log(error);
       toastError("Traspaso", "Ocurrió un error al guardar el traspaso.");
@@ -427,121 +683,51 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   }
 
   useEffect(() => {
-    if (sucursal) {
-      fetchBodegas();
+    async function init() {
+      setIsLoading(true);
+      try {
+        // 1. Cargar cola
+        const q = await getTraspasoQueue();
+        setQueue(q);
 
-      (async () => {
-        const storedTraspaso = await getStorageTraspaso();
-        let foto_obs_traspaso = storedTraspaso?.foto_obs_traspaso
-          ? storedTraspaso.foto_obs_traspaso[0]
-          : "";
-        let foto_medicion_inicial = storedTraspaso?.foto_medicion_inicial
-          ? storedTraspaso.foto_medicion_inicial[0]
-          : "";
-
-        let fotoTaxilitroInit = storedTraspaso?.foto_taxilitro
-          ? storedTraspaso.foto_taxilitro[0]
-          : "";
-        let fotoTaxilitroEnd = storedTraspaso?.foto_taxilitro_fin
-          ? storedTraspaso.foto_taxilitro_fin[0]
-          : "";
-
-        if (storedTraspaso) {
-          const personaStorage = await getStoragePersona();
-
-          setSelectedBodegaOrigem(storedTraspaso.bod_origen.toString());
-          setSelectedBodegaDestino(storedTraspaso.bod_destino.toString());
-          setSelectedPico(storedTraspaso.id_pico.toString());
-          setCargaCombustible(
-            storedTraspaso.litros_pico
-              ? storedTraspaso.litros_pico.toString()
-              : "",
-          );
-          setBase64Obs(foto_obs_traspaso);
-          setObs(storedTraspaso.obs_traspaso ?? "");
-          setObsAdicional(storedTraspaso.obs_adicional ?? "");
-          setMotivoConfirmado(!!storedTraspaso.obs_adicional?.trim());
-
-          setTaxilitroInicial(
-            storedTraspaso.taxilitro_inicial
-              ? storedTraspaso.taxilitro_inicial.toString()
-              : "",
-          );
-          setBase64TaxilitroInicial(fotoTaxilitroInit);
-          setTaxilitroFinal(
-            storedTraspaso.taxilitro_final
-              ? storedTraspaso.taxilitro_final.toString()
-              : "",
-          );
-          setBase64TaxilitroFinal(fotoTaxilitroEnd);
-
-          if (storedTraspaso.id_tanque_destino) {
-            setMedicionInicial([
-              {
-                id_tanque: storedTraspaso.id_tanque_destino.toString(),
-                regla: Number(storedTraspaso.regla_altura_inicial),
-                litros: storedTraspaso.litros_tanque_inicial,
-                temperatura: storedTraspaso.temp_inicial,
-                foto_tanque: foto_medicion_inicial,
-              },
-            ]);
-          } else {
-            setMedicionInicial([]);
-          }
-          if (
-            storedTraspaso.regla_altura_final &&
-            storedTraspaso.litros_tanque_final > 0
-          ) {
-            setMedicionFinal([
-              {
-                id_tanque: storedTraspaso.id_tanque_destino.toString(),
-                regla: Number(storedTraspaso.regla_altura_final),
-                litros: storedTraspaso.litros_tanque_final,
-                temperatura: storedTraspaso.temp_final,
-                foto_tanque: storedTraspaso.foto_medicion_final?.[0] || "",
-              },
-            ]);
-          }
-
-          setPersona(personaStorage);
-          setIsLoading(false);
-
-          setEstadoInicial({
-            persona: personaStorage,
-            selectedBodegaOrigem: storedTraspaso.bod_origen.toString(),
-            selectedBodegaDestino: storedTraspaso.bod_destino.toString(),
-            selectedPico: storedTraspaso.id_pico.toString(),
-            obs: storedTraspaso.obs_traspaso ?? "",
-            obsAdicional: storedTraspaso.obs_adicional ?? "",
-            cargaCombustible: storedTraspaso.litros_pico
-              ? storedTraspaso.litros_pico.toString()
-              : "",
-            taxilitroInicial: storedTraspaso.taxilitro_inicial
-              ? storedTraspaso.taxilitro_inicial.toString()
-              : "",
-            taxilitroFinal: storedTraspaso.taxilitro_final
-              ? storedTraspaso.taxilitro_final.toString()
-              : "",
-            base64TaxilitroInicial: fotoTaxilitroInit,
-            base64TaxilitroFinal: fotoTaxilitroEnd,
+        // 2. Verificar draft legado → mover a la cola
+        const draft = await getStorageTraspaso();
+        if (draft && tieneDatosRelevantes(draft)) {
+          const legacyPersona = await getStoragePersona();
+          const personaLegacy =
+            legacyPersona && legacyPersona.cedula ? legacyPersona : null;
+          await addToTraspasoQueue({
+            id: Date.now().toString(),
+            data: draft,
+            persona: personaLegacy,
+            firma: draft.firma_receptor?.[0] ?? null,
+            fechaCreacion: Date.now(),
           });
-        } else {
-          setEstadoInicial({
-            persona: null,
-            selectedBodegaOrigem: "",
-            selectedBodegaDestino: "",
-            selectedPico: "",
-            obs: "",
-            obsAdicional: "",
-            cargaCombustible: "",
-            taxilitroInicial: "",
-            taxilitroFinal: "",
-            base64TaxilitroInicial: "",
-            base64TaxilitroFinal: "",
-          });
-          setSelectedBodegaOrigem("");
+          await removeTraspaso();
+          await removePersona();
+          setQueue(await getTraspasoQueue());
         }
-      })();
+
+        // 3. Cargar bodegas y picos (para labels de la lista)
+        await fetchBodegas();
+        const picosAll = await getPicos();
+        setPicosLista(picosAll);
+
+        // 4. Init appte
+        const secureTime = await getTimestamp();
+        const now = new Date(secureTime.timestampMs);
+        const appteStr = `appte ${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+        setAppte(appteStr);
+      } catch (err) {
+        console.error("[Traspaso] Error al inicializar:", err);
+        toastError("Error", "No se pudieron cargar los datos.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    if (sucursal) {
+      init();
     }
   }, []);
 
@@ -566,128 +752,103 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   ]);
 
   useEffect(() => {
-    if (medicionInicial.length > 0) {
-      saveState();
-    }
-  }, [medicionInicial]);
-
-  useEffect(() => {
-    if (cargaCombustible !== undefined) {
-      saveState();
-    }
-  }, [
-    cargaCombustible,
-    selectedBodegaOrigem,
-    selectedBodegaDestino,
-    selectedPico,
-    obs,
-    obsAdicional,
-    taxilitroInicial,
-    base64TaxilitroInicial,
-    taxilitroFinal,
-    base64TaxilitroFinal,
-    medicionFinal,
-  ]);
-
-  useEffect(() => {
-    if (selectedBodegaOrigem) {
+    if (viewMode === "form" && selectedBodegaOrigem) {
       fetchPicos();
     }
-  }, [selectedBodegaOrigem]);
+  }, [selectedBodegaOrigem, viewMode]);
 
-  return turnoCerrado && !motivoConfirmado ? (
-    <View className="flex-1">
-      <ScreenHeader title="Traspaso Excepcional" />
-
-      <View style={styles.overlay}>
-        <View style={styles.modalContent}>
-          <Text className="font-bold text-red-500 text-center text-2xl underline mb-4">
-            Importante!!!
-          </Text>
-          <Text className="font-medium text-justify text-xl mb-4">
-            Está intentando registrar un traspaso y el turno se encuentra
-            cerrado. Una vez finalizada se deberá realizar el cierre
-            correspondiente en el apartado “Cierre Extra”, para las bodegas que
-            hayan sufrido movimientos.
-          </Text>
-          <InputCard className="min-h-40" title="Indique el motivo" required>
-            <Input
-              value={obsAdicional}
-              placeholder="Describa el motivo"
-              multiline
-              numberOfLines={4}
-              onChangeText={setObsAdicional}
-            />
-          </InputCard>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={async () => {
-              if (obsAdicional.trim() === "") {
-                Alert.alert(
-                  "Motivo requerido",
-                  "Por favor describa el motivo.",
-                );
-                return;
-              }
-              let stored = await getStorageTraspaso();
-              const secureTime = await getTimestamp();
-              const now = new Date(secureTime.timestampMs);
-              const fecha = now.toISOString().slice(0, 10);
-              const hora = now.toTimeString().slice(0, 8);
-              if (stored) {
-                stored.obs_traspaso = obs;
-                stored.obs_adicional = obsAdicional;
-                stored.fecha = fecha;
-                stored.hora = hora;
-                await saveTraspaso(stored);
-              } else {
-
-                const minimalData: TraspasoDTO = {
-                  bod_origen: Number(selectedBodegaOrigem),
-                  bod_destino: Number(selectedBodegaDestino),
-                  id_tanque_destino: 0,
-                  regla_altura_inicial: "",
-                  litros_tanque_inicial: 0,
-                  temp_inicial: 0,
-                  regla_altura_final: "",
-                  litros_tanque_final: 0,
-                  temp_final: 0,
-                  foto_medicion_final: [],
-                  id_pico: Number(selectedPico),
-                  taxilitro_inicial: toNumber(taxilitroInicial),
-                  taxilitro_final: toNumber(taxilitroFinal),
-                  foto_taxilitro: base64TaxilitroInicial
-                    ? [base64TaxilitroInicial]
-                    : [],
-                  foto_taxilitro_fin: base64TaxilitroFinal
-                    ? [base64TaxilitroFinal]
-                    : [],
-                  litros_pico: toNumber(cargaCombustible),
-                  last_id_salida: 0,
-                  obs_traspaso: obs,
-                  obs_adicional: obsAdicional,
-                  foto_obs_traspaso: base64Obs ? [base64Obs] : [],
-                  foto_medicion_inicial: [],
-                  fecha,
-                  hora,
-                  firma_receptor: [],
-                  id_playero: Number(user.cedula),
-                  id_encargado_receptor: Number(persona?.cedula) || 0,
-                };
-                await saveTraspaso(minimalData);
-                await savePersona(persona);
-              }
-
-              setMotivoConfirmado(true);
-              setTurnoCerrado(false);
+  // ─── Render: modo Lista ──────────────────────────────────────────────────
+  if (viewMode === "list") {
+    return (
+      <View className="flex-1">
+        <ScreenHeader
+          title="Traspaso"
+          actions={
+            <TouchableOpacity onPress={handleNewEntry} className="p-1">
+              <Plus color="#fff" size={30} />
+            </TouchableOpacity>
+          }
+        />
+        {queue.length === 0 ? (
+          <EmptyList />
+        ) : (
+          <FlatList
+            data={queue}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{
+              paddingVertical: 16,
+              paddingBottom: insets.bottom + 80,
             }}
-          >
-            <Text style={styles.buttonText}>Guardar</Text>
-          </TouchableOpacity>
+            renderItem={({ item }) => (
+              <EntryListItem
+                id={item.id}
+                label={getTraspasoLabel(
+                  item.data,
+                  bodegaOrigem,
+                  bodygaDestino,
+                  picosLista
+                )}
+                fechaCreacion={item.fechaCreacion}
+                onEditar={() => handleEditEntry(item)}
+                onEliminar={() => handleEliminarEntrada(item)}
+              />
+            )}
+          />
+        )}
+      </View>
+    );
+  }
+
+  // ─── Render: turno cerrado ────────────────────────────────────────────────
+  if (turnoCerrado && !motivoConfirmado) {
+    return (
+      <View className="flex-1">
+        <ScreenHeader title="Traspaso Excepcional" />
+
+        <View style={styles.overlay}>
+          <View style={styles.modalContent}>
+            <Text className="font-bold text-red-500 text-center text-2xl underline mb-4">
+              Importante!!!
+            </Text>
+            <Text className="font-medium text-justify text-xl mb-4">
+              Está intentando registrar un traspaso y el turno se encuentra
+              cerrado. Una vez finalizada se deberá realizar el cierre
+              correspondiente en el apartado “Cierre Extra”, para las bodegas
+              que hayan sufrido movimientos.
+            </Text>
+            <InputCard className="min-h-40" title="Indique el motivo" required>
+              <Input
+                value={obsAdicional}
+                placeholder="Describa el motivo"
+                multiline
+                numberOfLines={4}
+                onChangeText={setObsAdicional}
+              />
+            </InputCard>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={async () => {
+                if (obsAdicional.trim() === "") {
+                  Alert.alert(
+                    "Motivo requerido",
+                    "Por favor describa el motivo.",
+                  );
+                  return;
+                }
+                await guardarEstado();
+                setMotivoConfirmado(true);
+                setTurnoCerrado(false);
+              }}
+            >
+              <Text style={styles.buttonText}>Guardar</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
-  ) : (
+    );
+  }
+
+  return (
     <View className="flex-1">
       <ScreenHeader title="Traspaso" />
       <KeyboardAvoidingView
@@ -722,7 +883,22 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                 <View className="flex-row items-center p-2 gap-2">
                   <Select
                     enabled={true}
-                    data={bodegaOrigem}
+                    data={bodegaOrigem.filter((b) => {
+                      if (!isCreating && b.id_bodega === selectedBodegaOrigem)
+                        return true;
+                      const picosDeBodega = picos.filter(
+                        (p) => p.id_bodega === Number(b.id_bodega)
+                      );
+                      if (picosDeBodega.length === 0) return true;
+                      return picosDeBodega.some(
+                        (p) =>
+                          !queue.some(
+                            (e) =>
+                              Number(e.data.id_pico) === p.id_pico &&
+                              e.id !== currentEntryId
+                          )
+                      );
+                    })}
                     isLoading={isLoading}
                     selectedValue={selectedBodegaOrigem}
                     setSelectedValue={setSelectedBodegaOrigem}
@@ -750,7 +926,15 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
             <InputCard title="Pico expendedor:" required={true}>
               <Select
                 enabled={true}
-                data={picos}
+                data={picos.filter((p) => {
+                  if (!isCreating && p.id_pico === Number(selectedPico))
+                    return true;
+                  return !queue.some(
+                    (e) =>
+                      Number(e.data.id_pico) === p.id_pico &&
+                      e.id !== currentEntryId
+                  );
+                })}
                 isLoading={isLoading}
                 selectedValue={selectedPico}
                 setSelectedValue={setSelectedPico}
@@ -944,6 +1128,26 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                   onChangeText={setTaxilitroFinal}
                 />
               </View>
+            </InputCard>
+
+            <InputCard title="Foto Taxilitro Final" required>
+                <View className="flex-row items-center p-2 gap-2">
+                  {base64TaxilitroFinal && base64TaxilitroFinal.length > 0 ? (
+                    <Pressable
+                      onPress={() =>
+                        confirmarEliminacion(() => setBase64TaxilitroFinal(""))
+                      }
+                    >
+                      <Image
+                        source={{
+                          uri: `data:image/jpeg;base64,${base64TaxilitroFinal}`,
+                        }}
+                        className="w-56 h-36 rounded-lg border border-gray-300"
+                        resizeMode="cover"
+                      />
+                    </Pressable>
+                  ) : null}
+                </View>
               <View className="flex-row items-center p-2 gap-2">
                 <Photo
                   form="button"
@@ -979,40 +1183,6 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                     base64Obs && base64Obs.length > 0 ? "#05a722" : "#000"
                   }
                   setImage={(base64) => setBase64Obs(base64)}
-                  disabled={isLoading}
-                />
-              </View>
-            </InputCard>
-
-            
-            <InputCard title="Foto Taxilitro Final" required>
-                <View className="flex-row items-center p-2 gap-2">
-                  {base64TaxilitroFinal && base64TaxilitroFinal.length > 0 ? (
-                    <Pressable
-                      onPress={() =>
-                        confirmarEliminacion(() => setBase64TaxilitroFinal(""))
-                      }
-                    >
-                      <Image
-                        source={{
-                          uri: `data:image/jpeg;base64,${base64TaxilitroFinal}`,
-                        }}
-                        className="w-56 h-36 rounded-lg border border-gray-300"
-                        resizeMode="cover"
-                      />
-                    </Pressable>
-                  ) : null}
-                </View>
-              <View className="flex-row items-center p-2 gap-2">
-                <Photo
-                  form="button"
-                  iconSize="lg"
-                  iconColor={
-                    base64TaxilitroFinal && base64TaxilitroFinal.length > 0
-                      ? "#05a722"
-                      : "#000"
-                  }
-                  setImage={(base64) => setBase64TaxilitroFinal(base64)}
                   disabled={isLoading}
                 />
               </View>

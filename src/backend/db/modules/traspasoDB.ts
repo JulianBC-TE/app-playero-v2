@@ -16,6 +16,7 @@ import { trapasos, type Traspaso, type TraspasoInsert } from "@/backend/db/schem
 import { eq, desc, or } from "drizzle-orm";
 import { TraspasoDTO } from "@/dto/TraspasoDTO";
 import { crearLog } from "../logs/logModule";
+import { compararCamposClave } from "./duplicadosHelper";
 
 const SYNC_KEY = "__last_sync_traspasos__";
 
@@ -117,16 +118,71 @@ export function traspasoToDTO(row: Traspaso): TraspasoDTO {
 }
 
 // ---------------------------------------------------------------------------
+// esTraspasoDuplicadoLocal
+// Verifica si un traspaso es duplicado comparándolo con el último de la misma bodega origen.
+// ---------------------------------------------------------------------------
+
+/**
+ * Verifica si un traspaso es duplicado comparándolo con el último traspaso de la misma bodega origen.
+ * Compara: fecha, hora (sin seg), id_pico, bod_destino, litros_pico, taxilitro_inicial, taxilitro_final
+ */
+export async function esTraspasoDuplicadoLocal(dto: TraspasoDTO): Promise<boolean> {
+  const ultimo = await db
+    .select()
+    .from(trapasos)
+    .where(eq(trapasos.bodOrigen, dto.bod_origen))
+    .orderBy(desc(trapasos.idTrapaso))
+    .limit(1);
+
+  if (ultimo.length === 0) return false;
+
+  const row = ultimo[0];
+  return compararCamposClave(
+    {
+      fecha: dto.fecha,
+      id_pico: dto.id_pico,
+      bod_destino: dto.bod_destino,
+      litros_pico: dto.litros_pico,
+      taxilitro_inicial: dto.taxilitro_inicial,
+      taxilitro_final: dto.taxilitro_final,
+    },
+    {
+      fecha: row.fecha,
+      id_pico: row.idPico,
+      bod_destino: row.bodDestino,
+      litros_pico: row.litrosPico,
+      taxilitro_inicial: row.taxilitroInicial,
+      taxilitro_final: row.taxilitroFinal,
+    },
+    ["fecha", "id_pico", "bod_destino", "litros_pico", "taxilitro_inicial", "taxilitro_final"]
+  );
+}
+
+// ---------------------------------------------------------------------------
 // saveTraspasoLocal
 // Inserta un traspaso pendiente de sincronización.
+// Retorna -1 si el traspaso es duplicado (no se insertó).
 // ---------------------------------------------------------------------------
 
 /**
  * Guarda un nuevo traspaso localmente con estado pendiente de sincronización.
  * @param dto El DTO del traspaso a guardar
- * @returns El ID generado en SQLite
+ * @returns El ID generado en SQLite, o -1 si es duplicado
  */
 export async function saveTraspasoLocal(dto: TraspasoDTO, timestampMs?: number): Promise<number> {
+  const esDuplicado = await esTraspasoDuplicadoLocal(dto);
+  if (esDuplicado) {
+    console.log("⚠️ TRASPASO DUPLICADO detectado, no se inserta:", dto.fecha, dto.hora, dto.id_pico);
+    await crearLog({
+      tipo: "traspaso",
+      accion: "duplicado_detectado",
+      registroId: 0,
+      detalle: `${dto.litros_pico}L, Tax: ${dto.taxilitro_inicial}-${dto.taxilitro_final}`,
+      payload: dto as any,
+    });
+    return -1;
+  }
+
   const values = dtoToTraspasoInsert(dto, timestampMs);
   
   const result = await db.insert(trapasos).values(values);

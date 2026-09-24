@@ -1,6 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const STORAGE_CARGA_COMBUSTIBLE = "@app:carga_combustible";
+const LEGACY_STORAGE_CARGA_COMBUSTIBLE = "@app:carga_combustible";
+
+const cargaKey = (entryId: string) =>
+  `@app:carga_combustible:${entryId || "0"}`;
 
 export type CargaCombustibleStorageDTO = {
   selectedPico: string;
@@ -20,18 +23,14 @@ export type CargaCombustibleStorageDTO = {
 };
 
 export async function saveCargaCombustible(
-  data: CargaCombustibleStorageDTO
+  data: CargaCombustibleStorageDTO,
+  entryId: string
 ) {
-  await AsyncStorage.setItem(
-    STORAGE_CARGA_COMBUSTIBLE,
-    JSON.stringify(data)
-  );
+  await AsyncStorage.setItem(cargaKey(entryId), JSON.stringify(data));
 }
 
-export async function getStorageCargaCombustible() {
-  const storage = await AsyncStorage.getItem(
-    STORAGE_CARGA_COMBUSTIBLE
-  );
+export async function getStorageCargaCombustible(entryId: string) {
+  const storage = await AsyncStorage.getItem(cargaKey(entryId));
 
   if (!storage) {
     return null;
@@ -40,8 +39,22 @@ export async function getStorageCargaCombustible() {
   return JSON.parse(storage) as CargaCombustibleStorageDTO;
 }
 
-export async function removeCargaCombustible() {
-  await AsyncStorage.removeItem(
-    STORAGE_CARGA_COMBUSTIBLE
-  );
+export async function removeCargaCombustible(entryId: string) {
+  await AsyncStorage.removeItem(cargaKey(entryId));
+}
+
+/** Migra el borrador legacy (sin entryId) a la entrada indicada. */
+export async function migrarCargaCombustibleLegacy(
+  entryId: string
+): Promise<void> {
+  const raw = await AsyncStorage.getItem(LEGACY_STORAGE_CARGA_COMBUSTIBLE);
+  if (raw) {
+    await AsyncStorage.setItem(cargaKey(entryId), raw);
+    await AsyncStorage.removeItem(LEGACY_STORAGE_CARGA_COMBUSTIBLE);
+  }
+}
+
+/** Elimina el borrador legacy huérfano (sin entrada asociada). */
+export async function limpiarCargaCombustibleLegacy(): Promise<void> {
+  await AsyncStorage.removeItem(LEGACY_STORAGE_CARGA_COMBUSTIBLE);
 }
