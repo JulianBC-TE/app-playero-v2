@@ -5,5 +5,4 @@
 
 export * from './useAppContext';
 export * from './useCliente';
-export * from './useInitialSync';
 export * from './useServerConfig';

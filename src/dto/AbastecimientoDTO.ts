@@ -38,6 +38,7 @@ export type AbastecimientoDTO = {
   obs_repos: string;
   foto_obs_repos: string[]; // Array de Base64
   litros_total_repos: string;
+  appte?: string; // CORRECCIÓN: El backend acepta undefined implícitamente
   
   // Sub-colección de mediciones
   mediciones_tanque: MedicionTanqueDTO[];

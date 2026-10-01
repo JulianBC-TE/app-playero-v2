@@ -103,6 +103,7 @@ export async function saveAbastecimientoLocal(
         taxilitroFinal: dto.taxilitro_final,
         litrosZeta: dto.litros_zeta,
         obsRepos: dto.obs_repos,
+        appte: dto.appte,
         fotoObsRepos: dto.foto_obs_repos,
         litrosTotalRepos: dto.litros_total_repos,
         fotoTaxilitro: dto.foto_taxilitro || "",
@@ -251,6 +252,7 @@ export async function getAbastecimientosPendientes(incluirErrores: boolean = fal
       taxilitro_final: r.taxilitroFinal,
       litros_zeta: r.litrosZeta,
       obs_repos: r.obsRepos,
+      appte: r.appte ?? undefined,
 
       // CORRECCIÓN AQUÍ: Garantizar un array legítimo de strings
       foto_obs_repos: normalizarArrayFotos(r.fotoObsRepos),

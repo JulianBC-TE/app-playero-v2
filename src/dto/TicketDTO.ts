@@ -18,6 +18,7 @@ export type TicketDTO = {
   ruc_cliente?: string;
   id_vehiculo?: string;
   obs?: string;
+  appte?: string;
   kilometraje?: number;
   horometro?: number;
   foto_chapa?: string[];

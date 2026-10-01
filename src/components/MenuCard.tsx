@@ -17,6 +17,7 @@ type Props = TouchableOpacityProps & {
 	enabled?: boolean;
 	turno?: "abierto" | "cerrado" | "pendiente" | "iniciar" | "falta_cerrar";
 	syncErrorCount?: number;
+	syncPendingCount?: number;
 };
 
 /**
@@ -30,6 +31,7 @@ type Props = TouchableOpacityProps & {
  * @param enabled - Si es `true`, habilita la tarjeta cuando no hay estado de turno. Por defecto `false`.
  * @param turno - Estado del turno: `"abierto"` | `"cerrado"` | `"pendiente"` | `"iniciar"` | `"falta_cerrar"`.
  * @param syncErrorCount - Cantidad de registros con error de sincronización (se muestra como badge rojo).
+ * @param syncPendingCount - Cantidad de registros creados localmente y aún no subidos (badge naranja).
  */
 export function MenuCard({
 	name,
@@ -37,7 +39,8 @@ export function MenuCard({
 	route,
 	enabled = false,
 	turno,
-	syncErrorCount,
+	syncErrorCount = 0,
+	syncPendingCount = 0,
 	...rest
 }: Props) {
 	// Define color de fondo basado en el turno o en enabled
@@ -64,6 +67,36 @@ export function MenuCard({
 
 	const isActive = turno !== undefined || enabled;
 
+	// Badge circular: rojo para errores de subida, naranja para pendientes.
+	const renderBadge = (valor: number, color: string, right: number) =>
+		valor > 0 ? (
+			<View
+				style={{
+					position: "absolute",
+					top: 8,
+					right,
+					backgroundColor: color,
+					width: 20,
+					height: 20,
+					borderRadius: 10,
+					alignItems: "center",
+					justifyContent: "center",
+					minWidth: 20,
+					padding: 0,
+				}}
+			>
+				<Text
+					style={{
+						color: "#ffffff",
+						fontSize: 12,
+						fontWeight: "bold",
+					}}
+				>
+					{valor}
+				</Text>
+			</View>
+		) : null;
+
 	return (
 		<TouchableOpacity
 			disabled={!isActive}
@@ -85,30 +118,8 @@ export function MenuCard({
 					color={isActive ? "#000" : "#c9c0c0"}
 				/>
 
-				{syncErrorCount > 0 && (
-					<View style={{
-						position: "absolute",
-						top: 8,
-						right: 8,
-						backgroundColor: "#dc2626",
-						width: 20,
-						height: 20,
-						borderRadius: 10,
-						alignItems: "center",
-						justifyContent: "center",
-						minWidth: 20,
-						padding: 0,
-					}}>
-						<Text
-							style={{
-								color: "#ffffff",
-								fontSize: 12,
-								fontWeight: "bold",
-							}}>
-							{syncErrorCount}
-						</Text>
-					</View>
-				)}
+				{renderBadge(syncPendingCount, "#f59e0b", 8)}
+				{renderBadge(syncErrorCount, "#dc2626", syncPendingCount > 0 ? 32 : 8)}
 
 				<Text
 					className='text-lg mt-2'

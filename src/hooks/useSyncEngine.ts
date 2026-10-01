@@ -4,7 +4,17 @@ import { useAuth } from "./useAuth";
 import { syncTodo } from "@/backend/db/services/syncService";
 
 export function useSyncEngine(intervaloMs: number = 120000) {
-  const { user, updateUserProfile, syncStatus, setSyncStatus, setSyncMessage, setIsManualSync } = useAuth();
+  const {
+    user,
+    sucursal,
+    aplicarResultadoSync,
+    syncStatus,
+    setSyncStatus,
+    setSyncMessage,
+    setIsManualSync,
+    setSyncErrorCount,
+    setSyncPendingCount,
+  } = useAuth();
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const syncStatusRef = useRef(syncStatus);
 
@@ -27,18 +37,17 @@ export function useSyncEngine(intervaloMs: number = 120000) {
         setSyncStatus("syncing");
         setIsManualSync(false);
 
-        const estaBloqueado = await syncTodo(
+        const resultado = await syncTodo(
           user.idUser!,
-          (msg) => setSyncMessage(msg)
+          (msg) => setSyncMessage(msg),
+          undefined,
+          (count) => setSyncErrorCount(count),
+          false,
+          (count) => setSyncPendingCount(count)
         );
 
-        if (user.bloqueado !== estaBloqueado) {
-          console.log(`🔒 [SINCRO BACKGROUND] El estado de bloqueo cambió. Servidor: ${estaBloqueado}, App React: ${user.bloqueado}`);
-          await updateUserProfile({ ...user, bloqueado: estaBloqueado });
-          if (estaBloqueado) {
-            console.warn("⚠️ El usuario activo ha sido bloqueado remotamente.");
-          }
-        }
+        // Refresca la sesión (sucursal + bloqueo) si el servidor cambió algo
+        await aplicarResultadoSync(resultado);
       } catch (error) {
         console.error("⚠️ Error en el ciclo periódico de sincronización:", error);
       } finally {
@@ -63,5 +72,5 @@ export function useSyncEngine(intervaloMs: number = 120000) {
         intervalRef.current = null;
       }
     };
-  }, [user, intervaloMs]);
+  }, [user, sucursal, intervaloMs]);
 }

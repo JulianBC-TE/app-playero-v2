@@ -22,9 +22,11 @@ import { httpClient } from "@/backend/api/httpClient";
 import { login } from "@/backend/api/authAPI";
 import { saveUserLocally, loginOffline, clearSession } from "@DBmodules/authDB";
 import { sincronizarModulos } from "@/backend/db/modules/moduleDB";
+import { getSucursalUsuarioActivoLocal } from "@/backend/db/modules/sucursalDB";
 import { reintentarSyncFallidas } from "@/backend/db/modules/reintentarSyncDB";
 import { sync as syncSecureTime } from "@/services/timeService";
-import { useInitialSync } from "@/hooks/useInitialSync";
+import { runInitialSync } from "@/backend/db/services/initialSync";
+import { contarRegistrosSync } from "@/backend/db/services/syncService";
 
 // ---------------------------------------------------------------------------
 // Tipos del contexto
@@ -39,7 +41,7 @@ export type AuthContextDataProps = {
   updateUserProfile: (userUpdated: UserDTO) => Promise<void>;
   // Devuelve true si el login fue online, false si fue offline.
   // SignIn usa este valor para saber si debe llamar al hook de sync.
-  signIn: (cedula: number, password: string, onSyncInitialData?: () => Promise<void>,) => Promise<boolean>;
+  signIn: (cedula: number, password: string) => Promise<boolean>;
   signOut: (wipeDatabase?: boolean) => Promise<void>; // ◄ Parámetro opcional añadido aquí
   isLoadingUserData: boolean;
   isOffline: boolean;
@@ -49,7 +51,12 @@ export type AuthContextDataProps = {
   setServerIP: (ip: string | null) => Promise<void>;
   isLoadingServerIP: boolean;
   sucursal: SucursalDTO;
-  setSucursal: (sucursal: SucursalDTO | null) => void;
+  setSucursal: (sucursal: SucursalDTO | null) => Promise<void>;
+  aplicarResultadoSync: (resultado: {
+    estaBloqueado: boolean;
+    sucursalCambio?: boolean;
+    sucursal?: SucursalDTO;
+  }) => Promise<void>;
   syncStatus: SyncStatus;
   setSyncStatus: (status: SyncStatus) => void;
   syncMessage: string;
@@ -60,6 +67,9 @@ export type AuthContextDataProps = {
   incrementSyncComplete: () => void;
   syncErrorCount: SyncErrorCount;
   setSyncErrorCount: (count: SyncErrorCount) => void;
+  /** Registros con sync = 0 (creados localmente y todavía no subidos). */
+  syncPendingCount: number;
+  setSyncPendingCount: (count: number) => void;
 };
 
 type AuthContextProviderProps = { children: React.ReactNode };
@@ -85,18 +95,25 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
   const [isManualSync, setIsManualSync] = useState(false);
   const [syncCompleteCounter, setSyncCompleteCounter] = useState(0);
   const [syncErrorCount, setSyncErrorCount] = useState(0);
+  const [syncPendingCount, setSyncPendingCount] = useState(0);
 
   const incrementSyncComplete = useCallback(() => {
     setSyncCompleteCounter((c) => c + 1);
   }, []);
   
-  async function signIn(cedula: number, password: string, onSyncInitialData?: () => Promise<void>): Promise<boolean> {
-    setIsLoadingUserData(true);
+  async function signIn(cedula: number, password: string): Promise<boolean> {
+    // NO se marca isLoadingUserData aquí: si lo hacemos, Routes desmonta
+    // AuthRoutes y SignIn (que es quien muestra el progreso del sync) nunca
+    // llega a renderizarse, dejando solo el spinner centrado de arranque.
+    // Limpia el mensaje del ciclo automático anterior para que la pantalla de
+    // inicio de sesión arranque sin texto residual.
+    setSyncMessage("");
     try {
       const online = await httpClient.isOnline();
 
       if (online) {
         // ── Login online ──────────────────────────────────────────────────
+        setSyncMessage("Validando credenciales...");
         const loginData = await login(cedula, password);
         // ✨ Ahora guardamos TODOS los datos recibidos
         const userData: UserDTO = {
@@ -123,17 +140,22 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
           descripcion_sucursal: loginData.sucursal.descripcionSucursal,
         };
         await setSucursal(sucursalData);
+        setSyncMessage("Cargando módulos del usuario...");
         await sincronizarModulos(cedula);
+        setSyncMessage("Preparando datos locales...");
         await saveUserLocally(loginData, password);
-        
-        if(userData.idUser){
-          const { syncInitialData } = useInitialSync(cedula, userData.idUser);
-        if (onSyncInitialData) {
-          await syncInitialData();
-        }
-        }
 
+        // Resetea los fallidos (sync = -1 → 0) ANTES de subir, para que el
+        // envío inicial de pendientes los incluya.
+        setSyncMessage("Reintentando registros fallidos...");
         await reintentarSyncFallidas(cedula);
+
+        if (userData.idUser) {
+          await runInitialSync(cedula, userData.idUser, setSyncMessage);
+          // Avisa a las pantallas que los catálogos se recargaron.
+          incrementSyncComplete();
+          await actualizarConteoRegistrosSync();
+        }
 
         httpClient.setToken(loginData.token);
 
@@ -164,8 +186,21 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
         const userData: UserDTO = {
           cedula: Number(result.user.cedula),
           name: result.user.name,
+          idUser: result.idUser,
+          idSucursal: result.idSucursal,
+          bloqueado: result.bloqueado,
         };
         await saveUser(userData);
+
+        // Deja el contexto de sucursal alineado con lo que hay en la BD local
+        const datosSesion = await getSucursalUsuarioActivoLocal();
+        if (datosSesion?.idSucursal) {
+          await setSucursal({
+            id_sucursal: Number(datosSesion.idSucursal),
+            descripcion_sucursal: datosSesion.descripcionSucursal,
+          });
+        }
+
         await reintentarSyncFallidas(Number(result.user.cedula));
         setUser(userData);
         setIsOffline(true);
@@ -173,7 +208,9 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
         return false; // ← offline
       }
     } finally {
-      setIsLoadingUserData(false);
+      // No deja mensajes del sync pegados en el contexto (si el login falla o
+      // termina, la pantalla de login vuelve al formulario limpio).
+      setSyncMessage("");
     }
   }
 
@@ -207,6 +244,67 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
   async function updateUserProfile(userUpdated: UserDTO): Promise<void> {
     setUser(userUpdated);
     await saveUser(userUpdated);
+  }
+
+  /**
+   * Refresca los contadores del badge de "Sincronizar":
+   * rojo = registros con error (sync = -1), naranja = pendientes (sync = 0).
+   */
+  async function actualizarConteoRegistrosSync(): Promise<void> {
+    const conteo = await contarRegistrosSync();
+    setSyncErrorCount(conteo.errores);
+    setSyncPendingCount(conteo.pendientes);
+  }
+
+  /**
+   * Aplica a la sesión (estado React + AsyncStorage) los datos de usuario que
+   * bajó la última sincronización: bloqueo y/o sucursal.
+   * Evita que `@playero:user` y `@playero:sucursal` queden con el valor del
+   * último login cuando el servidor cambió la sucursal del usuario.
+   */
+  async function aplicarResultadoSync(resultado: {
+    estaBloqueado: boolean;
+    sucursalCambio?: boolean;
+    sucursal?: SucursalDTO;
+  }): Promise<void> {
+    const cambios: Partial<UserDTO> = {};
+
+    if (user.bloqueado !== resultado.estaBloqueado) {
+      cambios.bloqueado = resultado.estaBloqueado;
+      console.log(
+        `🔒 [SYNC] Estado de bloqueo: ${user.bloqueado} -> ${resultado.estaBloqueado}`,
+      );
+      if (resultado.estaBloqueado) {
+        console.warn("⚠️ El usuario activo ha sido bloqueado remotamente.");
+      }
+    }
+
+    const suc = resultado.sucursal;
+    if (suc && suc.id_sucursal) {
+      // Si el servidor no mandó la descripción, la tomamos de la BD local
+      // (recién sincronizada en este ciclo).
+      if (!suc.descripcion_sucursal) {
+        const local = await getSucursalUsuarioActivoLocal();
+        if (local?.idSucursal) {
+          suc.descripcion_sucursal = local.descripcionSucursal;
+        }
+      }
+
+      const desactualizada =
+        resultado.sucursalCambio === true ||
+        user.idSucursal !== suc.id_sucursal ||
+        sucursal.id_sucursal !== suc.id_sucursal;
+
+      if (desactualizada) {
+        cambios.idSucursal = suc.id_sucursal;
+        await setSucursal(suc);
+        console.log(`🔄 [SYNC] Sucursal de sesión actualizada -> ${suc.id_sucursal} (${suc.descripcion_sucursal})`);
+      }
+    }
+
+    if (Object.keys(cambios).length > 0) {
+      await updateUserProfile({ ...user, ...cambios });
+    }
   }
 
   // ── Carga inicial ─────────────────────────────────────────────────────────
@@ -244,7 +342,7 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
     const ip = await getStorageServerUrl();
     const sucursal = await getStorageSucursal();
     setServerIPState(ip);
-    setSucursal(sucursal);
+    await setSucursal(sucursal);
     setIsLoadingServerIP(false);
   }
 
@@ -259,13 +357,29 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
     setClienteState(cliente ?? ({} as ClienteDTO));
   }
 
-  async function setSucursal(sucursal: SucursalDTO | null): Promise<void> {
-    if (sucursal !== null) {
-      await saveSucursal(sucursal);
-      setSucursalState(sucursal);
-    } else {
+  async function setSucursal(nuevaSucursal: SucursalDTO | null): Promise<void> {
+    if (nuevaSucursal === null) {
       setSucursalState({} as SucursalDTO);
+      return;
     }
+
+    const yaPersistida =
+      !!nuevaSucursal.id_sucursal &&
+      nuevaSucursal.id_sucursal === sucursal.id_sucursal &&
+      nuevaSucursal.descripcion_sucursal === sucursal.descripcion_sucursal;
+
+    // El update funcional evita identidades nuevas (y por lo tanto renders/
+    // reinicios de timer) cuando el valor no cambió.
+    setSucursalState((prev) =>
+      prev &&
+      prev.id_sucursal === nuevaSucursal.id_sucursal &&
+      prev.descripcion_sucursal === nuevaSucursal.descripcion_sucursal
+        ? prev
+        : nuevaSucursal,
+    );
+
+    if (yaPersistida) return;
+    await saveSucursal(nuevaSucursal);
   }
 
   // ── Efectos ───────────────────────────────────────────────────────────────
@@ -296,6 +410,7 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
         setCliente,
         sucursal,
         setSucursal,
+        aplicarResultadoSync,
 syncStatus,
         setSyncStatus,
         syncMessage,
@@ -305,7 +420,9 @@ syncStatus,
         syncCompleteCounter,
         incrementSyncComplete,
         syncErrorCount,
-        setSyncErrorCount
+        setSyncErrorCount,
+        syncPendingCount,
+        setSyncPendingCount
       }}
     >
       {children}

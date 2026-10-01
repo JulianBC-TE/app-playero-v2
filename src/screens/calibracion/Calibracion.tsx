@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { InputCard } from "@/components/InputCard";
@@ -28,6 +29,8 @@ import { TextSearch } from "@/components/TextSearch";
 import { PersonaDTO } from "@/dto/PersonaDTO";
 import { Fuel, Pencil, SaveAll } from "lucide-react-native";
 import { Button } from "@/components/Button";
+import { SavingModal } from "@/components/SavingModal";
+import { useSavingModal } from "@/hooks/useSavingModal";
 import {
   removeCalibracion,
   getStorageCalibracion,
@@ -74,10 +77,11 @@ export function Calibracion({
     useState("");
   const insets = useSafeAreaInsets();
   const [turnoCerrado, setTurnoCerrado] = useState(false);
-  const { sucursal } = useAppContext();
+  const { sucursal, user, syncCompleteCounter } = useAppContext();
   const [picos, setPicos] = useState<PicoDTO[]>([]);
   const [selectedPico, setSelectedPico] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const savingModal = useSavingModal();
   const [obs, setObs] = useState("");
   const [appte, setAppte] = useState("");
   const [photoObs, setPhotoObs] = useState<string | null>(null);
@@ -320,10 +324,24 @@ export function Calibracion({
     route.params?.onSequencia,
   ]);
 
-  // ─── Carga inicial de picos desde BD ──────────────────────────────────────
+  // ─── Carga/refresco de picos desde BD ──────────────────────────────────────
+  // Se re-ejecuta al ganar foco, cuando cambia la sucursal de la sesión y cuando
+  // termina un sync de catálogos, para no quedar con las bodegas/picos anteriores.
+  useFocusEffect(
+    useCallback(() => {
+      fetchPicos();
+    }, [sucursal?.id_sucursal, syncCompleteCounter]),
+  );
+
+  // Si el pico seleccionado ya no está en la lista recargada (cambió la
+  // sucursal o las bodegas asignadas), se limpia la selección.
   useEffect(() => {
-    fetchPicos();
-  }, []);
+    if (!selectedPico || picos.length === 0) return;
+    const sigueAsignado = picos.some(
+      (p) => Number(p.id_pico_surtidor) === Number(selectedPico),
+    );
+    if (!sigueAsignado) setSelectedPico("");
+  }, [picos, selectedPico]);
 
   function handlePhotoObs(image: string) {
     setPhotoObs(image);
@@ -383,12 +401,12 @@ export function Calibracion({
   async function fetchPicos() {
     setIsLoading(true);
     try {
-      const turnoStatus = await getTurnoStatusLocal(sucursal.id_sucursal);
-      if (
-        turnoStatus.status === "cerrado" ||
-        turnoStatus.status === "falta_cerrar"
-      ) {
-        setTurnoCerrado(true);
+      if (user?.cedula) {
+        const turnoStatus = await getTurnoStatusLocal(user.cedula);
+        setTurnoCerrado(
+          turnoStatus.status === "cerrado" ||
+            turnoStatus.status === "falta_cerrar",
+        );
       }
 
       const bodegas = await getBodegasByIdSucursal(sucursal.id_sucursal);
@@ -461,6 +479,7 @@ export function Calibracion({
         hora,
         bodega: id_bodega,
         obs_gral: [obs, obsAdicional, appte].filter(Boolean).join(" | "),
+        appte: appte,
         ci_encargado: persona?.cedula,
         nombre_encargado: persona?.nombre_apellido,
         pico: id_pico,
@@ -528,6 +547,10 @@ export function Calibracion({
 
   return turnoCerrado && !motivoConfirmado ? (
     <View className="flex-1">
+      <SavingModal
+        visible={savingModal.visible}
+        message="Grabando calibración..."
+      />
       <ScreenHeader title="Turno Cerrado" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -587,6 +610,10 @@ export function Calibracion({
     </View>
   ) : (
     <View className="flex-1">
+      <SavingModal
+        visible={savingModal.visible}
+        message="Grabando calibración..."
+      />
       <ScreenHeader
         title="Calibración"
         disableBackButton={mediciones.totalMediciones > 0}
@@ -836,7 +863,7 @@ export function Calibracion({
                   {firma && (
                     <Button
                       title="Grabar"
-                      onPress={() => saveAllData()}
+                      onPress={() => savingModal.run(saveAllData)}
                       isLoading={isLoading}
                       icon={SaveAll}
                       iconSize="md"

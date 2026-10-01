@@ -42,7 +42,6 @@ import {
   sincronizarUltimosTurnosDesdeBackend,
 } from "../modules/turnoBD";
 import { enviarAbastecimiento, enviarCalibracion, enviarTicket, enviarTraspaso, enviarTurno } from "@/backend/api/operacionesAPI";
-import { useAppContext } from "@/hooks/useAppContext";
 import { checkUserStatusServer } from "@/backend/api/authAPI";
 import { updateLocalUserBlockStatus, updateLocalUserSucursal } from "../modules/authDB";
 import { saveSucursales } from "../modules/sucursalDB";
@@ -50,32 +49,63 @@ import { httpClient } from "@/backend/api/httpClient";
 import { toastError, toastInfo } from "@/utils/toastMessage";
 import { sync as syncSecureTime } from "@/services/timeService";
 import type { SyncStatus, SyncErrorCount } from "@/contexts/AuthContext";
+import type { SucursalDTO } from "@/dto/sucursalDTO";
 import { db } from "@/backend/db/client";
-import { tickets, abastecimientos, trapasos, calibraciones, turnos } from "@/backend/db/schema";
+import { tickets, abastecimientos, trapasos, calibraciones, turnos, personas, vehiculos } from "@/backend/db/schema";
 import { count, eq } from "drizzle-orm";
 import { crearLog, limpiarLogsAntiguos } from "../logs/logModule";
 
-// Contador de registros con error de sincronización (sync = -1)
-async function contarRegistrosSyncError(): Promise<number> {
+// Resultado de un ciclo de sincronización: estado del usuario + sucursal recién bajada
+export type SyncResult = {
+  estaBloqueado: boolean;
+  sucursalCambio: boolean;
+  sucursal?: SucursalDTO;
+};
+
+// Conteo de registros locales según su estado de sincronización:
+//   - errores    → sync = -1 (la subida falló)
+//   - pendientes → sync = 0  (todavía no se subió)
+// Solo tablas que la app SUBE: cubicacion_tanque y despachos son de solo
+// lectura (su sync = 0 no significa "falta subir") y clientes queda fuera
+// del sistema de envío.
+export type ConteoRegistrosSync = {
+  errores: number;
+  pendientes: number;
+};
+
+async function contarPorEstado(estado: number): Promise<number> {
+  const [p, v, t, tk, tr, c, a] = await Promise.all([
+    db.select({ n: count() }).from(personas).where(eq(personas.sync, estado)),
+    db.select({ n: count() }).from(vehiculos).where(eq(vehiculos.sync, estado)),
+    db.select({ n: count() }).from(turnos).where(eq(turnos.sync, estado)),
+    db.select({ n: count() }).from(tickets).where(eq(tickets.sync, estado)),
+    db.select({ n: count() }).from(trapasos).where(eq(trapasos.sync, estado)),
+    db.select({ n: count() }).from(calibraciones).where(eq(calibraciones.sync, estado)),
+    db.select({ n: count() }).from(abastecimientos).where(eq(abastecimientos.sync, estado)),
+  ]);
+
+  return (
+    (p[0]?.n ?? 0) +
+    (v[0]?.n ?? 0) +
+    (t[0]?.n ?? 0) +
+    (tk[0]?.n ?? 0) +
+    (tr[0]?.n ?? 0) +
+    (c[0]?.n ?? 0) +
+    (a[0]?.n ?? 0)
+  );
+}
+
+export async function contarRegistrosSync(): Promise<ConteoRegistrosSync> {
   try {
-    const [ticketsCount, abastecimientosCount, trapasosCount, calibracionesCount, turnosCount] = await Promise.all([
-      db.select({ count: count() }).from(tickets).where(eq(tickets.sync, -1)),
-      db.select({ count: count() }).from(abastecimientos).where(eq(abastecimientos.sync, -1)),
-      db.select({ count: count() }).from(trapasos).where(eq(trapasos.sync, -1)),
-      db.select({ count: count() }).from(calibraciones).where(eq(calibraciones.sync, -1)),
-      db.select({ count: count() }).from(turnos).where(eq(turnos.sync, -1)),
+    const [errores, pendientes] = await Promise.all([
+      contarPorEstado(-1),
+      contarPorEstado(0),
     ]);
 
-    const total = (ticketsCount[0]?.count ?? 0) +
-                  (abastecimientosCount[0]?.count ?? 0) +
-                  (trapasosCount[0]?.count ?? 0) +
-                  (calibracionesCount[0]?.count ?? 0) +
-                  (turnosCount[0]?.count ?? 0);
-
-    return total;
+    return { errores, pendientes };
   } catch (error) {
-    console.error("Error contando registros con sync = -1:", error);
-    return 0;
+    console.error("Error contando registros de sincronización:", error);
+    return { errores: 0, pendientes: 0 };
   }
 }
 
@@ -230,8 +260,23 @@ export async function syncPendingData(onStatus?: (msg: string) => void, isManual
 
 // ── BAJADA: syncCatalogosFromCentral ──────────────────────────────────────────
 
-export async function syncCatalogosFromCentral(idUser: number, onStatus?: (msg: string) => void): Promise<boolean> {
+/**
+ * Descarga catálogos desde el servidor central.
+ *
+ * @param idUser - ID del usuario activo.
+ * @param onStatus - Callback opcional con el mensaje de progreso.
+ * @param incluyeAsignacion - Cuando es `false` (ciclo automático) **no** se
+ * descarga la asignación del usuario (sucursal, bodegas, picos, tanques):
+ * eso solo ocurre con la sincronización manual del Home o al iniciar sesión.
+ */
+export async function syncCatalogosFromCentral(
+  idUser: number,
+  onStatus?: (msg: string) => void,
+  incluyeAsignacion: boolean = true,
+): Promise<SyncResult> {
   let estaBloqueado = false;
+  let sucursalCambio = false;
+  let sucursal: SyncResult["sucursal"];
   try {
     const usuarioLocal = await getDatosUsuarioLogueadoLocal();
     const cedula = usuarioLocal?.cedula ?? 0;
@@ -244,8 +289,16 @@ export async function syncCatalogosFromCentral(idUser: number, onStatus?: (msg: 
       estaBloqueado = remoto.bloqueado;
       if(remoto.bloqueado)console.log(`📤 BAJADA -> Estado de bloqueo guardado localmente: ${remoto.bloqueado}`);
 
+      if (remoto.idSucursal) {
+        sucursal = {
+          id_sucursal: remoto.idSucursal,
+          descripcion_sucursal: remoto.descripcionSucursal ?? "",
+        };
+      }
+
       if (remoto.idSucursal && usuarioLocal && usuarioLocal.idSucursal !== remoto.idSucursal) {
         await updateLocalUserSucursal(usuarioLocal.cedula, remoto.idSucursal);
+        sucursalCambio = true;
         console.log(`📤 BAJADA -> Sucursal actualizada: ${usuarioLocal.idSucursal} → ${remoto.idSucursal}`);
       }
       if (remoto.idSucursal && remoto.descripcionSucursal) {
@@ -260,18 +313,23 @@ export async function syncCatalogosFromCentral(idUser: number, onStatus?: (msg: 
 
     onStatus?.("Descargando turnos...");
     await sincronizarUltimosTurnosDesdeBackend(idUser);
-    
-    onStatus?.("Descargando sucursales...");
-    await syncSucursalesFromCentral();
 
-    onStatus?.("Descargando bodegas...");
-    await syncCatalogoYTraspasosBodega();
+    // La asignación del usuario (sucursal + bodegas de control/traspaso + picos
+    // y tanques derivados) solo se descarga en la sincronización manual del Home
+    // o al iniciar sesión. El ciclo automático no debe tocarla.
+    if (incluyeAsignacion) {
+      onStatus?.("Descargando sucursales...");
+      await syncSucursalesFromCentral();
 
-    onStatus?.("Descargando picos...");
-    await syncPicosDelOperario(cedula);
+      onStatus?.("Descargando bodegas...");
+      await syncCatalogoYTraspasosBodega();
 
-    onStatus?.("Descargando tanques...");
-    await syncTanquesDelOperario(cedula);
+      onStatus?.("Descargando picos...");
+      await syncPicosDelOperario(cedula);
+
+      onStatus?.("Descargando tanques...");
+      await syncTanquesDelOperario(cedula);
+    }
     
     onStatus?.("Descargando personas...");
     await syncPersonasFromCentral();
@@ -286,7 +344,7 @@ export async function syncCatalogosFromCentral(idUser: number, onStatus?: (msg: 
     await sincronizarCubicacionesMasivas();
     
     console.log("📤 BAJADA -> Finalizada");
-    return estaBloqueado;
+    return { estaBloqueado, sucursalCambio, sucursal };
   } catch (error) {
     throw error;
   }
@@ -299,8 +357,9 @@ export async function syncTodo(
   onStatus?: (msg: string) => void,
   onSyncStatus?: (status: SyncStatus) => void,
   onSyncErrorCount?: (count: number) => void,
-  isManual: boolean = false
-): Promise<boolean> {
+  isManual: boolean = false,
+  onSyncPendingCount?: (count: number) => void
+): Promise<SyncResult> {
   // Verificar conectividad ANTES de intentar sincronizar
   const online = await httpClient.isOnline();
   if (!online) {
@@ -308,7 +367,7 @@ export async function syncTodo(
     if (isManual) {
       toastError("Intentá de nuevo más tarde", "No se pudo conectar con el servidor");
     }
-    return false;
+    return { estaBloqueado: false, sucursalCambio: false };
   }
 
   onSyncStatus?.("syncing");
@@ -332,14 +391,15 @@ export async function syncTodo(
     }
     console.log("🔄 ORQUESTADOR -> Iniciando ciclo completo");
     await syncPendingData(onStatus, isManual);
-    const usuarioBloqueado = await syncCatalogosFromCentral(idUser, onStatus);
+    const resultado = await syncCatalogosFromCentral(idUser, onStatus, isManual);
 
-    // Actualizar contador de registros con error de sincronización
-    const errorCount = await contarRegistrosSyncError();
-    onSyncErrorCount?.(errorCount);
+    // Actualizar contadores del badge (errores = sync -1, pendientes = sync 0)
+    const conteo = await contarRegistrosSync();
+    onSyncErrorCount?.(conteo.errores);
+    onSyncPendingCount?.(conteo.pendientes);
 
     console.log("🏁 ORQUESTADOR -> Ciclo completo terminado");
-    return usuarioBloqueado;
+    return resultado;
   } finally {
     onSyncStatus?.("idle");
   }

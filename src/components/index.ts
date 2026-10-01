@@ -14,6 +14,7 @@ export * from './MenuCard';
 export * from './MedicionesCard';
 export * from './PersonaCard';
 export * from './Photo';
+export * from './SavingModal';
 export * from './ScreenHeader';
 export * from './Select';
 export * from './SignatureCapture';

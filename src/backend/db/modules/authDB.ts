@@ -15,6 +15,7 @@ import { sucursales } from "@/backend/db/schema";
 import { LoginResponse } from "@/backend/api/authAPI";
 import { savePersonas } from "./personaDB";
 import { saveSucursales } from "./sucursalDB";
+import { LAST_USER_KEY, getCedulaUsuarioActivo } from "./usuarioSesionDB";
 
 // ---------------------------------------------------------------------------
 // Tipos públicos
@@ -44,14 +45,21 @@ export type LoginResult =
       refreshToken: null;
       offline: true;
       idSucursal: number;
+      idUser: number;
+      bloqueado: boolean;
     }
   | {
       ok: false;
       reason: "wrong_password" | "not_last_user" | "no_local_user" | "error";
     };
 
-// Clave en tabla syncs para recordar la última cédula autenticada online.
-const LAST_USER_KEY = "__last_online_user__";
+/** Resultado del login sin conexión (siempre `offline: true` si `ok`). */
+export type LoginOfflineResult =
+  | Extract<LoginResult, { ok: true; offline: true }>
+  | Extract<LoginResult, { ok: false }>;
+
+// Clave en tabla syncs para recordar la última cédula autenticada online
+// (ver `usuarioSesionDB.ts`).
 
 // ---------------------------------------------------------------------------
 // Utilidades de hash
@@ -76,18 +84,7 @@ async function generateSalt(): Promise<string> {
  * @returns Cédula como number, o `null` si nunca hubo login online.
  */ 
 export async function getLastOnlineUser(): Promise<number | null> {
-  try {
-    const result = await db
-      .select({ fecha: syncs.fecha })
-      .from(syncs)
-      .where(eq(syncs.tipo, LAST_USER_KEY))
-      .limit(1);
-
-    // ✅ Retorna directamente como número, asumiendo que syncs.fecha guarda datos numéricos válidos
-    return result[0] ? Number(result[0].fecha) : null;
-  } catch {
-    return null;
-  }
+  return getCedulaUsuarioActivo();
 }
 
 /**
@@ -151,7 +148,7 @@ export async function saveUserLocally(loginData: LoginResponse, passwordClearTex
  * Intenta autenticar al usuario sin conexión a internet.
  * @param cedula - Cédula ingresada por el usuario (recibida como number).
  */
-export async function loginOffline(cedula: number, password: string): Promise<LoginResult> {
+export async function loginOffline(cedula: number, password: string): Promise<LoginOfflineResult> {
   
   try {
     const cedulaNumerica = Number(cedula);
@@ -159,12 +156,14 @@ export async function loginOffline(cedula: number, password: string): Promise<Lo
     if (!lastCedula) return { ok: false, reason: "no_local_user" };
     if (lastCedula !== cedulaNumerica) return { ok: false, reason: "not_last_user" }; // ✅ Comparación numérica directa
 
-    // Traer clave, salt e idSucursal juntos
+    // Traer clave, salt, sucursal, idUser y bloqueo juntos
     const localData = await db
       .select({
         clave:      usuariosApp.clave,
         salt:       usuariosApp.salt,
         idSucursal: usuariosApp.idSucursal,
+        idUser:     usuariosApp.idUser,
+        bloqueado:  usuariosApp.bloqueado,
       })
       .from(usuariosApp)
       .where(eq(usuariosApp.cedula, cedula)) // ✅ Removido el casteo Number() innecesario
@@ -192,6 +191,8 @@ export async function loginOffline(cedula: number, password: string): Promise<Lo
       refreshToken: null,
       offline:      true,
       idSucursal:   localData[0].idSucursal,
+      idUser:       localData[0].idUser,
+      bloqueado:    localData[0].bloqueado,
     };
   } catch {
     console.log("error desconocido");
@@ -235,14 +236,14 @@ export async function getSucursalByUsuario(cedula: number): Promise<{ id_sucursa
 /**
  * Actualiza el estado de bloqueo de un usuario directamente en la base de datos local.
  * Útil para impactar los cambios devueltos por el servidor durante la sincronización.
- * * @param cedula - Cédula del usuario
+ * * @param idUser - id_user del usuario app (columna `usuarios_app.id_user`)
  * @param bloqueado - Nuevo estado de bloqueo (true / false)
  */
-export async function updateLocalUserBlockStatus(cedula: number, bloqueado: boolean): Promise<void> {
+export async function updateLocalUserBlockStatus(idUser: number, bloqueado: boolean): Promise<void> {
   await db
     .update(usuariosApp)
     .set({ bloqueado: bloqueado })
-    .where(eq(usuariosApp.idUser, cedula));
+    .where(eq(usuariosApp.idUser, idUser));
 }
 
 /**

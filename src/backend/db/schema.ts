@@ -142,6 +142,7 @@ export const tickets = sqliteTable("tickets", {
   horometro: real("horometro"),
   obs: text("obs"),
   observaciones_ticket: text("observaciones_ticket"),
+  appte: text("appte"),
   ubicacion_carga: text("ubicacion_carga"),
   foto_chapa: text("foto_chapa", { mode: "json" }).$type<string[]>(),
   firma_conductor: text("firma_conductor", { mode: "json" }).$type<string[]>(),
@@ -189,6 +190,7 @@ export const trapasos = sqliteTable("trapasos", {
   // Observaciones
   obsTraspaso: text("obs_traspaso").notNull(),
   obsAdicional: text("obs_adicional"),
+  appte: text("appte"),
 
   // Fecha y hora
   fecha: text("fecha").notNull(), // YYYY-MM-DD
@@ -240,6 +242,7 @@ export const calibraciones = sqliteTable("calibraciones", {
   fotoFinalTaxilitro: text("foto_final_taxilitro"),
 
   obsGral: text("obs_gral"),
+  appte: text("appte"),
   nroPrecintoRetirado: text("nro_precinto_retirado"),
   nroPrecintoColocado: text("nro_precinto_colocado"),
   
@@ -286,6 +289,7 @@ export const abastecimientos = sqliteTable("abastecimientos", {
   taxilitroFinal: integer("taxilitro_final").notNull(),
   litrosZeta: integer("litros_zeta").notNull(),
   obsRepos: text("obs_repos").notNull(),
+  appte: text("appte"),
   
   fotoObsRepos: text("foto_obs_repos", { mode: "json" }).$type<string[]>().notNull(),  
   litrosTotalRepos: text("litros_total_repos").notNull(),
@@ -494,15 +498,10 @@ export const bodegasRelations = relations(bodegas, ({ one, many }) => ({
   usuariosControladores: many(usuariosBodegas), 
 }));
 
-/** Relaciones de habilitadosTrapaso → sucursales y bodegas. */
+/** Relaciones de habilitadosTrapaso → bodegas. */
 export const habilitadosTrapasoRelations = relations(
   habilitadosTrapaso,
   ({ one }) => ({
-    sucursal: one(sucursales, {
-      fields: [habilitadosTrapaso.idSucursal],
-      references: [sucursales.idSucursal],
-    }),
-
     bodega: one(bodegas, {
       fields: [habilitadosTrapaso.idBodega],
       references: [bodegas.idBodega],

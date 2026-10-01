@@ -10,6 +10,7 @@ import { VehiculoDTO } from "@/dto/VehiculoDTO";
 import { BodegaDTO } from "@/dto/BodegaDTO";
 import { StackRoutesProps } from "@/route/app.routes";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   View,
@@ -34,6 +35,8 @@ import { PicoDTO } from "@/dto/PicosDTO";
 import { Select } from "@/components/Select";
 import { Button } from "@/components/Button";
 import { Photo } from "@/components/Photo";
+import { SavingModal } from "@/components/SavingModal";
+import { useSavingModal } from "@/hooks/useSavingModal";
 import {
   getStorageSalida,
   removeSalida,
@@ -48,7 +51,7 @@ import {
 } from "@/storage/storageQueueSalida";
 import { crearTicketLocal } from "@DBmodules/ticketDB";
 import { normalizarFecha } from "@/backend/db/services/turnoStatusService";
-import { getPicosByBodega, getPicos } from "@DBmodules/picoDB";
+import { getPicos, getPicosByBodega } from "@DBmodules/picoDB";
 import { getBodegasDelUsuario } from "@DBmodules/bodegaDB";
 import {
   anularUltimoFinTurnoPorBodega,
@@ -136,7 +139,7 @@ function emptyStorageData(appte: string): SalidaStorageDTO {
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
-  const { sucursal, user } = useAppContext();
+  const { sucursal, user, syncCompleteCounter } = useAppContext();
 
   // ─── UI State ───────────────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState<"list" | "form">("list");
@@ -150,10 +153,12 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
     null
   );
   const autosaveBloqueadoRef = useRef(false);
+  const savingModal = useSavingModal();
 
   // ─── Datos ──────────────────────────────────────────────────────────────────
   const [bodegas, setBodegas] = useState<BodegaDTO[]>([]);
   const [picos, setPicos] = useState<PicoDTO[]>([]);
+  const [picosLista, setPicosLista] = useState<PicoDTO[]>([]);
   const [persona, setPersona] = useState<PersonaDTO | null>(null);
   const [vehiculo, setVehiculo] = useState<VehiculoDTO | null>(null);
   const [firma, setFirma] = useState<string | null>(null);
@@ -197,7 +202,37 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 
   const watchedValues = watch();
 
-  // ─── Init: cola + bodegas + draft pendiente ──────────────────────────────
+  // ─── Catálogo de bodegas (se refresca al ganar foco) ───────────────────────
+  // Los picos siguen gestionándolos el efecto de "Picos según bodega";
+  // picosLista guarda todos los picos para resolver nombres en la lista.
+  const cargarCatalogos = useCallback(async () => {
+    if (!user?.cedula) return;
+    try {
+      const bodegasLocales = await getBodegasDelUsuario(user.cedula);
+      setBodegas(bodegasLocales);
+      const picosAll = await getPicos();
+      setPicosLista(picosAll);
+    } catch (err) {
+      console.error("[Salida] Error al cargar bodegas:", err);
+    }
+  }, [user?.cedula, syncCompleteCounter]);
+
+  useFocusEffect(
+    useCallback(() => {
+      cargarCatalogos();
+    }, [cargarCatalogos]),
+  );
+
+  // Si la bodega seleccionada ya no está en la lista recargada, se limpia.
+  useEffect(() => {
+    if (!selectedBodega || bodegas.length === 0) return;
+    const sigueAsignada = bodegas.some(
+      (b) => Number(b.id_bodega) === Number(selectedBodega),
+    );
+    if (!sigueAsignada) setSelectedBodega("");
+  }, [bodegas, selectedBodega]);
+
+  // ─── Init: cola + draft pendiente ──────────────────────────────────────
   useEffect(() => {
     async function init() {
       setIsLoading(true);
@@ -219,13 +254,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
           setQueue(updatedQueue);
         }
 
-        // 3. Cargar bodegas y picos
-        const bodegasLocales = await getBodegasDelUsuario(user.cedula);
-        setBodegas(bodegasLocales);
-        const picosLocales = await getPicos();
-        setPicos(picosLocales);
-
-        // 4. Init appte
+        // 3. Init appte
         const secureTime = await getTimestamp();
         const now = new Date(secureTime.timestampMs);
         const appteStr = `appte ${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
@@ -260,7 +289,11 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       try {
         const picosLocales = await getPicosByBodega(Number(selectedBodega));
         setPicos(picosLocales);
-        setSelectedPico("");
+        setSelectedPico((prev) =>
+          prev && picosLocales.some((p) => p.id_pico === Number(prev))
+            ? prev
+            : ""
+        );
       } catch (err) {
         console.error("[Salida] Error al obtener picos:", err);
         toastError("Error", "No se pudieron cargar los picos.");
@@ -387,6 +420,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 
     const data = emptyStorageData(appteStr);
     await addToSalidaQueue({ id, data, fechaCreacion: Date.now() });
+    autosaveBloqueadoRef.current = false;
     setCurrentEntryId(id);
     setIsCreating(true);
     setViewMode("form");
@@ -395,6 +429,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 
   // ─── Editar entrada ──────────────────────────────────────────────────────
   async function handleEditEntry(entry: SalidaQueueEntry) {
+    autosaveBloqueadoRef.current = false;
     setCurrentEntryId(entry.id);
     setIsCreating(false);
 
@@ -595,6 +630,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
         observaciones_ticket: motivoConfirmado
           ? `${[observaciones, appte].filter(Boolean).join(" | ")} >> MOTIVO EXCEPCIONAL: ${obsAdicional}`
           : [observaciones, appte].filter(Boolean).join(" | "),
+        appte,
         foto_observaciones: base64Obs ? [base64Obs] : [],
       };
 
@@ -606,6 +642,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       await anularUltimoFinTurnoPorBodega(ticket.id_bod, obsAdicional);
 
       // Si habia una entrada en la cola, eliminarla
+      autosaveBloqueadoRef.current = true;
       if (currentEntryId) {
         await removeFromSalidaQueue(currentEntryId);
       }
@@ -619,6 +656,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
       await loadQueue();
     } catch (error) {
       console.error("[Salida] Error al guardar salida:", error);
+      await loadQueue();
       toastError("Registro de Salida", "No se pudo guardar la salida.");
     } finally {
       setIsLoading(false);
@@ -690,6 +728,10 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   if (viewMode === "list") {
     return (
       <View className="flex-1">
+        <SavingModal
+          visible={savingModal.visible}
+          message="Grabando salida..."
+        />
         <ScreenHeader
           title="Salida Combustible"
           actions={
@@ -715,7 +757,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
               renderItem={({ item }) => (
                 <EntryListItem
                   id={item.id}
-                  label={getSalidaLabel(item.data, bodegas, picos)}
+                  label={getSalidaLabel(item.data, bodegas, picosLista)}
                   fechaCreacion={item.fechaCreacion}
                   onEditar={() => handleEditEntry(item)}
                   onEliminar={() => handleEliminarEntrada(item)}
@@ -732,6 +774,10 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   if (turnoCerrado && !motivoConfirmado) {
     return (
       <View className="flex-1">
+        <SavingModal
+          visible={savingModal.visible}
+          message="Grabando salida..."
+        />
         <ScreenHeader title="Salida Excepcional" />
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -782,7 +828,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
 
                     if (valoresTemporales) {
                       setTimeout(() => {
-                        handleSaveAll(valoresTemporales);
+                        savingModal.run(() => handleSaveAll(valoresTemporales));
                       }, 100);
                     }
                   }}
@@ -802,6 +848,10 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
   // ─── Render: modo Formulario ─────────────────────────────────────────────
   return (
     <View className="flex-1">
+      <SavingModal
+        visible={savingModal.visible}
+        message="Grabando salida..."
+      />
       <ScreenHeader title="Salida Combustible" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -1166,7 +1216,9 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
               {firma && (
                 <Button
                   title="Enviar"
-                  onPress={handleSubmit(handleSaveAll)}
+                  onPress={handleSubmit((data) =>
+                    savingModal.run(() => handleSaveAll(data))
+                  )}
                   isLoading={isLoading}
                   icon={SaveAll}
                   iconSize="md"

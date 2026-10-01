@@ -12,59 +12,15 @@
  */
 
 import { db } from "@/backend/db/client";
-import { bodegas, picos, tanques, syncs, usuariosBodegas, habilitadosTrapaso, usuariosApp } from "@/backend/db/schema";
+import { bodegas, picos, tanques, syncs, usuariosBodegas, habilitadosTrapaso } from "@/backend/db/schema";
 import { eq, and, inArray, not } from "drizzle-orm";
 import { BodegaDTO } from "@/dto/BodegaDTO";
 import { getCurrentUserAppIdSucursal } from "./sucursalDB"; // Importamos la función de sucursalDB
+import { getUsuarioSesionLocal } from "./usuarioSesionDB";
 import { getFullDataSincronizacionBodegasV2 } from "@/backend/api/bodegaAPI";
+import { getBodegasRetenidas } from "./retencionPendientes";
 // Clave en tabla syncs para registrar la última sincronización de bodegas.
 const SYNC_KEY = "__last_sync_bodegas__";
-
-/** Fila interna extendida con `idSucursal` y `trapaso` para filtrado. */
-export type BodegaRow = {
-  id_bodega: string;
-  descripcion_bodega: string;
-  id_sucursal: number;
-  trapaso: boolean;
-};
-
-/**
- * Upsert masivo de bodegas recibidas del servidor.
- * Registra el timestamp de sincronización en la tabla `syncs`.
- *
- * @param items - Array de bodegas a insertar o actualizar.
- */
-export async function saveBodegas(items: BodegaRow[]): Promise<void> {
-  if (items.length === 0) return;
-
-  for (const item of items) {
-    await db
-      .insert(bodegas)
-      .values({
-        idBodega: Number(item.id_bodega),
-        descripcionBodega: item.descripcion_bodega,
-        idSucursal: item.id_sucursal,
-        trapaso: item.trapaso ?? false,
-      })
-      .onConflictDoUpdate({
-        target: bodegas.idBodega,
-        set: {
-          descripcionBodega: item.descripcion_bodega,
-          idSucursal: item.id_sucursal,
-          trapaso: item.trapaso ?? false,
-        },
-      });
-  }
-
-  // Registrar timestamp de sincronización
-  await db
-    .insert(syncs)
-    .values({ tipo: SYNC_KEY, fecha: Date.now() })
-    .onConflictDoUpdate({
-      target: syncs.tipo,
-      set: { fecha: Date.now() },
-    });
-}
 
 /**
  * Devuelve todas las bodegas del catálogo local.
@@ -275,15 +231,10 @@ export async function getBodegasDestinoTraspaso(
 
 export async function getDatosUsuarioLogueadoLocal(): Promise<{ cedula: number; idSucursal: number } | null> {
   try {
-    const res = await db
-      .select({
-        cedula: usuariosApp.cedula,
-        idSucursal: usuariosApp.idSucursal,
-      })
-      .from(usuariosApp)
-      .limit(1);
+    const usuario = await getUsuarioSesionLocal();
+    if (!usuario) return null;
 
-    return res[0] || null;
+    return { cedula: usuario.cedula, idSucursal: usuario.idSucursal };
   } catch (error) {
     console.error("[DB] Error al buscar usuario logueado local:", error);
     return null;
@@ -316,15 +267,19 @@ export async function syncCatalogoYTraspasosBodega(): Promise<number> {
       ...bodegas_traspaso.map((b) => b.id_bodega),
     ];
 
+    // Bodegas a conservar: las del servidor + las que tienen registros
+    // pendientes de subir (sync = 0) o fallidos (sync = -1).
+    const bodegasRetenidas = await getBodegasRetenidas(remoteBodegaIds);
+
     await db.transaction(async (tx) => {
       // Limpiar relaciones por CEDULA (ya no por idSucursal)
       await tx.delete(usuariosBodegas).where(eq(usuariosBodegas.cedula, cedula));
       await tx.delete(habilitadosTrapaso).where(eq(habilitadosTrapaso.cedula, cedula));
 
-      if (remoteBodegaIds.length > 0) {
-        await tx.delete(picos).where(not(inArray(picos.idBodega, remoteBodegaIds)));
-        await tx.delete(tanques).where(not(inArray(tanques.idBodega, remoteBodegaIds)));
-        await tx.delete(bodegas).where(not(inArray(bodegas.idBodega, remoteBodegaIds)));
+      if (bodegasRetenidas.length > 0) {
+        await tx.delete(picos).where(not(inArray(picos.idBodega, bodegasRetenidas)));
+        await tx.delete(tanques).where(not(inArray(tanques.idBodega, bodegasRetenidas)));
+        await tx.delete(bodegas).where(not(inArray(bodegas.idBodega, bodegasRetenidas)));
       } else {
         await tx.delete(picos);
         await tx.delete(tanques);

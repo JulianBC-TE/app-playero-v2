@@ -12,6 +12,7 @@ import {
   FlatList,
 } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Edit,
@@ -29,6 +30,8 @@ import { Input } from "@/components/Input";
 import { BodegaDTO } from "@/dto/BodegaDTO";
 import { Photo } from "@/components/Photo";
 import { Button } from "@/components/Button";
+import { SavingModal } from "@/components/SavingModal";
+import { useSavingModal } from "@/hooks/useSavingModal";
 import { StackRoutesProps } from "@/route/app.routes";
 import { CargaZetaDTO } from "@/dto/CargaZetaDTO";
 import { MedicionDTO } from "@/dto/MedicionDTO";
@@ -126,8 +129,9 @@ export function Abastecimiento({
   const [tipoOperacionSeleccionado, setTipoOperacionSeleccionado] =
     useState("");
   const [turnoCerrado, setTurnoCerrado] = useState(false);
-  const { sucursal, user } = useAppContext();
+  const { sucursal, user, syncCompleteCounter } = useAppContext();
   const [isLoading, setIsLoading] = useState(false);
+  const savingModal = useSavingModal();
   const insets = useSafeAreaInsets();
 
   // ─── Cola de pendientes (lista / formulario) ───────────────────────────────
@@ -206,12 +210,12 @@ export function Abastecimiento({
   async function fetchBodegas() {
     try {
       setIsLoading(true);
-      const turnoStatus = await getTurnoStatusLocal(sucursal.id_sucursal);
-      if (
-        turnoStatus.status === "cerrado" ||
-        turnoStatus.status === "falta_cerrar"
-      ) {
-        setTurnoCerrado(true);
+      if (user?.cedula) {
+        const turnoStatus = await getTurnoStatusLocal(user.cedula);
+        setTurnoCerrado(
+          turnoStatus.status === "cerrado" ||
+            turnoStatus.status === "falta_cerrar",
+        );
       }
       const bodegasDB = await getBodegasByIdSucursal(sucursal.id_sucursal);
       setBodegas(bodegasDB);
@@ -222,9 +226,22 @@ export function Abastecimiento({
     }
   }
 
+  // Se re-ejecuta al ganar foco, cuando cambia la sucursal de la sesión y cuando
+  // termina un sync de catálogos, para no quedar con las bodegas anteriores.
+  useFocusEffect(
+    useCallback(() => {
+      fetchBodegas();
+    }, [sucursal?.id_sucursal, syncCompleteCounter]),
+  );
+
+  // Si la bodega seleccionada ya no está en la lista recargada, se limpia.
   useEffect(() => {
-    fetchBodegas();
-  }, []);
+    if (!selectedBodega || bodegas.length === 0) return;
+    const sigueAsignada = bodegas.some(
+      (b) => Number(b.id_bodega) === Number(selectedBodega),
+    );
+    if (!sigueAsignada) setSelectedBodega("");
+  }, [bodegas, selectedBodega]);
 
   // ─── Init: cola + migración de borrador legacy + appte ─────────────────────
   useEffect(() => {
@@ -534,6 +551,7 @@ export function Abastecimiento({
       taxilitro_final: Number(cargaZeta?.taxilitro_final) || 0,
       litros_zeta: Number(cargaZeta?.litros_zeta) || 0,
       obs_repos: [obs, obsAdicional, appte].filter(Boolean).join("|"),
+      appte: appte,
       foto_obs_repos: base64FotoObs,
       litros_total_repos: String(
         litrosTotalMedicionFinal -
@@ -584,6 +602,10 @@ export function Abastecimiento({
   if (viewMode === "list") {
     return (
       <View className="flex-1">
+        <SavingModal
+          visible={savingModal.visible}
+          message="Grabando abastecimiento..."
+        />
         <ScreenHeader
           title="Abastecimiento"
           actions={
@@ -619,6 +641,10 @@ export function Abastecimiento({
 
   return turnoCerrado && !motivoConfirmado ? (
     <View className="flex-1">
+      <SavingModal
+        visible={savingModal.visible}
+        message="Grabando abastecimiento..."
+      />
       <ScreenHeader title="Turno Cerrado" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -676,6 +702,10 @@ export function Abastecimiento({
     </View>
   ) : (
     <View className="flex-1">
+      <SavingModal
+        visible={savingModal.visible}
+        message="Grabando abastecimiento..."
+      />
       <ScreenHeader title="Abastecimiento" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -924,7 +954,7 @@ export function Abastecimiento({
                     <Button
                       disabled={isLoading}
                       title="Grabar"
-                      onPress={saveAll}
+                      onPress={() => savingModal.run(saveAll)}
                       isLoading={isLoading}
                       icon={SaveAll}
                       iconSize="md"

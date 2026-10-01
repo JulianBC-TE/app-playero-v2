@@ -12,10 +12,11 @@
  * @category Database Modules
  */
 import { db } from "@/backend/db/client";
-import { sucursales, syncs, usuariosApp } from "@/backend/db/schema";
-import { eq } from "drizzle-orm";
+import { sucursales, syncs, usuariosApp, bodegas } from "@/backend/db/schema";
+import { eq, inArray } from "drizzle-orm";
 import { SucursalDTO } from "@/dto/sucursalDTO";
 import { getSucursalesDestinoTraspasoPorUsuario } from "@/backend/api/sucursalAPI";
+import { getUsuarioSesionLocal } from "./usuarioSesionDB";
 
 // Clave en tabla syncs para registrar la última sincronización de sucursales.
 const SYNC_KEY = "__last_sync_sucursales__";
@@ -116,19 +117,16 @@ export async function getLastSyncDate(): Promise<number | null> {
 }
 
 /**
- * Obtiene el idSucursal del usuario app actualmente guardado.
- * Como solo hay un usuario app en cada momento, devuelve el primero.
+ * Obtiene el idSucursal del usuario app con sesión activa.
+ * Se apoya en el último login online para no leer la fila de otro usuario
+ * que haya iniciado sesión en el mismo dispositivo.
  *
  * @returns `idSucursal` del usuario actual, o `null` si no hay usuario guardado.
  */
 export async function getCurrentUserAppIdSucursal(): Promise<number | null> {
   try {
-    const result = await db
-      .select({ idSucursal: usuariosApp.idSucursal })
-      .from(usuariosApp)
-      .limit(1);
-
-    return result[0] ? result[0].idSucursal : null;
+    const usuario = await getUsuarioSesionLocal();
+    return usuario ? usuario.idSucursal : null;
   } catch (error) {
     console.error("Error obtener idSucursal del usuario actual:", error);
     return null;
@@ -143,6 +141,9 @@ export async function getCurrentUserAppIdSucursal(): Promise<number | null> {
  */
 export async function getSucursalUsuarioActivoLocal() {
   try {
+    const usuario = await getUsuarioSesionLocal();
+    if (!usuario) return null;
+
     const resultado = await db
       .select({
         cedula: usuariosApp.cedula,
@@ -154,6 +155,7 @@ export async function getSucursalUsuarioActivoLocal() {
         sucursales,
         eq(usuariosApp.idSucursal, sucursales.idSucursal),
       )
+      .where(eq(usuariosApp.cedula, usuario.cedula))
       .limit(1);
 
     return resultado[0] || null;
@@ -168,6 +170,7 @@ export async function getSucursalUsuarioActivoLocal() {
 /**
  * Descarga las sucursales disponibles para el usuario actual desde el servidor central.
  * Usa la V2 del endpoint: filtra por USUARIO (cedula) en vez de por sucursal.
+ * Después depura las sucursales locales que el servidor ya no devuelve.
  *
  * @returns Número de sucursales sincronizadas.
  * @throws Error si la petición HTTP falla o no hay usuario guardado.
@@ -188,10 +191,48 @@ export async function syncSucursalesFromCentral(): Promise<number> {
       await saveSucursales(items);
     }
 
+    const eliminadas = await depurarSucursales(items.map((s) => s.id_sucursal));
+
     if(items.length > 0)console.log(`✅ SUCURSALES -> ok (+${items.length})`);
+    if (eliminadas > 0)console.log(`🧹 SUCURSALES -> depuradas (${eliminadas})`);
     return items.length;
   } catch (error) {
     console.error("❌ SUCURSALES -> Error:", error.message || error);
     throw error;
   }
+}
+
+/**
+ * Elimina del catálogo local las sucursales que el servidor ya no devuelve.
+ *
+ * Se conservan siempre:
+ *  - la sucursal activa del usuario (sin ella la sesión pierde su descripción);
+ *  - las sucursales de las bodegas que siguen en la BD local, incluidas las
+ *    retenidas por tener registros pendientes de subir.
+ *
+ * @param idsRemotos - IDs devueltos por el servidor para el usuario.
+ * @returns Cantidad de sucursales eliminadas.
+ */
+async function depurarSucursales(idsRemotos: number[]): Promise<number> {
+  const [usuario, sucursalesDeBodegas, locales] = await Promise.all([
+    db
+      .select({ idSucursal: usuariosApp.idSucursal })
+      .from(usuariosApp)
+      .limit(1),
+    db.selectDistinct({ id: bodegas.idSucursal }).from(bodegas),
+    db.select({ id: sucursales.idSucursal }).from(sucursales),
+  ]);
+
+  const conservar = new Set<number>(idsRemotos);
+  for (const fila of sucursalesDeBodegas) conservar.add(fila.id);
+  if (usuario[0]?.idSucursal) conservar.add(usuario[0].idSucursal);
+
+  const aBorrar = locales
+    .map((fila) => fila.id)
+    .filter((id) => !conservar.has(id));
+
+  if (aBorrar.length === 0) return 0;
+
+  await db.delete(sucursales).where(inArray(sucursales.idSucursal, aBorrar));
+  return aBorrar.length;
 }

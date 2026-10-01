@@ -90,14 +90,11 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
   const [isLoading, setIsLoading] = useState(true);
   const [menuItems, setMenuItems] = useState<menuItemType[]>(baseMenuItems);
   
-  const { user, signOut, syncStatus, syncMessage, setSyncStatus, setSyncMessage, isManualSync, setIsManualSync, syncCompleteCounter, incrementSyncComplete, syncErrorCount, setSyncErrorCount } = useAuth();
+  const { user, signOut, sucursal, setSucursal, aplicarResultadoSync, syncStatus, syncMessage, setSyncStatus, setSyncMessage, isManualSync, setIsManualSync, syncCompleteCounter, incrementSyncComplete, syncErrorCount, setSyncErrorCount, syncPendingCount, setSyncPendingCount } = useAuth();
   const cedula = user?.cedula; 
   const estaBloqueado = !!user?.bloqueado;
 
-  const [sucursal, setSucursal] = useState<{
-    id_sucursal: number;
-    descripcion_sucursal: string;
-  } | null>(null);
+  const haySucursal = !!sucursal?.id_sucursal;
 
   // ── CONTROL DE USUARIO BLOQUEADO (30 Segundos) ─────────────────────────────
   useEffect(() => {
@@ -138,13 +135,16 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
     }
     try {
       setIsManualSync(true);
-      await syncTodo(
+      const resultado = await syncTodo(
         user.idUser,
         (msg) => setSyncMessage(msg),
         (status) => setSyncStatus(status),
         setSyncErrorCount,
-        true
+        true,
+        setSyncPendingCount
       );
+      // Aplica a la sesión los cambios de bloqueo/sucursal que bajó el sync
+      await aplicarResultadoSync(resultado);
       // Forzar refresco del Home después del sync
       incrementSyncComplete();
     } catch (error: any) {
@@ -165,13 +165,11 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
           // 1. Sucursal activa del usuario logueado (Lectura local)
           const data = await getSucursalUsuarioActivoLocal();
       
-          if (data) {
-            setSucursal({
+          if (data && data.idSucursal) {
+            await setSucursal({
               id_sucursal: data.idSucursal,
-              descripcion_sucursal: data.descripcionSucursal
+              descripcion_sucursal: data.descripcionSucursal,
             });
-          } else {
-            setSucursal(null);
           }
 
           // 2. Estado del turno (offline-first)
@@ -292,7 +290,8 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
                   }
                   enabled={item.enabled}
                   turno={item.turno}
-                  syncErrorCount={syncErrorCount}
+                  syncErrorCount={item.route === "sync" ? syncErrorCount : 0}
+                  syncPendingCount={item.route === "sync" ? syncPendingCount : 0}
                 />
                 )}
               />
@@ -302,7 +301,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
           <View className="mb-20">
             <Text className="text-center text-lg font-bold">
               {sucursal?.descripcion_sucursal || "Ninguna Sucursal Seleccionada"}
-              {sucursal ? ` (${sucursal.id_sucursal})` : ""}
+              {haySucursal ? ` (${sucursal.id_sucursal})` : ""}
             </Text>
           </View>
         </View>

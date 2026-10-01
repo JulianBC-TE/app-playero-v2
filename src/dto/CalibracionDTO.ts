@@ -30,6 +30,7 @@ export type CalibracionDTO = {
 
   // Campos que el backend tolera como vacíos o tienen default:
   obs_gral?: string; 
+  appte?: string;
   nro_precinto_retirado?: string;
   nro_precinto_colocado?: string;
   tipo_operacion?: "VERIFICACION" | "CALIBRACION"; 

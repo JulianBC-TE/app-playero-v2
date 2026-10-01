@@ -13,10 +13,10 @@
 
 import { db } from "@/backend/db/client";
 import { tanques, syncs } from "@/backend/db/schema";
-import { bodegas } from "../schema";   // ← Agregar esta línea
-import { eq, inArray, not } from "drizzle-orm";
+import { eq, and, inArray, not } from "drizzle-orm";
 import { TanqueDTO } from "@/dto/TanqueDTO";
 import { getIdsBodegasDelUsuario } from "./bodegaDB";
+import { getIdsBodegasConPendientes } from "./retencionPendientes";
 import { fetchTanquesPorBodegas } from "@/backend/api/tanqueAPI";
 
 
@@ -167,13 +167,9 @@ export async function getLastSyncDate(): Promise<number | null> {
 // Envía los IDs de bodegas autorizadas como filtro a la API.
 // ---------------------------------------------------------------------------
 
-// Asegúrate de importar la instancia de tu bd y la tabla bodegas si no lo están ya
-// import { db } from "./tu-archivo-db";
-// import { bodegas } from "./tu-archivo-schema";
-
 /**
- * Descarga y sincroniza los tanques de TODAS las bodegas registradas
- * en el sistema.
+ * Descarga y sincroniza los tanques de las bodegas asignadas al operario,
+ * más las retenidas por tener registros pendientes de subir.
  *
  * @param cedula - Cédula del operario que dispara la acción.
  * @returns Cantidad de tanques sincronizados.
@@ -181,19 +177,32 @@ export async function getLastSyncDate(): Promise<number | null> {
  */
 export async function syncTanquesDelOperario(cedula: number): Promise<number> {
   try {
-    const todasLasBodegas = await db.select({ idBodega: bodegas.idBodega }).from(bodegas);
-    const idsBodegas = todasLasBodegas.map((b) => b.idBodega);
-   
+    const bodegasAsignadas = await getIdsBodegasDelUsuario(cedula);
+    const bodegasPendientes = await getIdsBodegasConPendientes();
+    const idsBodegas = Array.from(
+      new Set([...bodegasAsignadas, ...bodegasPendientes]),
+    );
+
     if (idsBodegas.length === 0) {
       console.log("⚠️ TANQUES -> Omitido (no hay bodegas)");
       return 0;
     }
-   
+
     const tanquesRemotos = await fetchTanquesPorBodegas(idsBodegas);
     const remoteTanqueIds = tanquesRemotos.map((t) => t.id_tanque);
 
+    const conservaPendientes =
+      bodegasPendientes.length > 0
+        ? not(inArray(tanques.idBodega, bodegasPendientes))
+        : undefined;
+
     if (remoteTanqueIds.length > 0) {
-      await db.delete(tanques).where(not(inArray(tanques.idTanque, remoteTanqueIds)));
+      const sinTanqueRemoto = not(inArray(tanques.idTanque, remoteTanqueIds));
+      await db
+        .delete(tanques)
+        .where(conservaPendientes ? and(sinTanqueRemoto, conservaPendientes) : sinTanqueRemoto);
+    } else if (conservaPendientes) {
+      await db.delete(tanques).where(conservaPendientes);
     } else {
       await db.delete(tanques);
     }

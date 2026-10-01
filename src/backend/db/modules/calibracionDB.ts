@@ -92,6 +92,7 @@ export async function saveCalibracionLocal(
     fotoFinalTaxilitro: dto.foto_final_taxilitro,
 
     obsGral: dto.obs_gral ?? null,
+    appte: dto.appte ?? null,
     nroPrecintoRetirado: dto.nro_precinto_retirado ?? null,
     nroPrecintoColocado: dto.nro_precinto_colocado ?? null,
     tipoOperacion: dto.tipo_operacion ?? "CALIBRACION",
@@ -155,6 +156,7 @@ export async function getCalibracionesPendientes(incluirErrores: boolean = false
         foto_final_taxilitro: r.fotoFinalTaxilitro,
 
         obs_gral: r.obsGral ?? undefined,
+        appte: r.appte ?? undefined,
         nro_precinto_retirado: r.nroPrecintoRetirado ?? undefined,
         nro_precinto_colocado: r.nroPrecintoColocado ?? undefined,
         tipo_operacion: r.tipoOperacion,

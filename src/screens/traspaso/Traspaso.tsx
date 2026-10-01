@@ -5,6 +5,7 @@ import { TextSearch } from "@/components/TextSearch";
 import { PersonaDTO } from "@/dto/PersonaDTO";
 import { StackRoutesProps } from "@/route/app.routes";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   View,
@@ -48,6 +49,8 @@ import {
   TraspasoQueueEntry,
 } from "@/storage/storageQueueTraspaso";
 import { Photo } from "@/components/Photo";
+import { SavingModal } from "@/components/SavingModal";
+import { useSavingModal } from "@/hooks/useSavingModal";
 // BD — reemplaza api
 import { getBodegasDelUsuario, getBodegasTraspaso } from "@DBmodules/bodegaDB";
 import { getPicos, getPicosByBodega } from "@DBmodules/picoDB";
@@ -74,9 +77,10 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     useState<string>(" ");
   const [bodegaOrigem, setBodegaOrigem] = useState<BodegaDTO[]>([]);
   const [bodygaDestino, setBodegaDestino] = useState<BodegaDTO[]>([]);
-  const { sucursal, user } = useAppContext();
+  const { sucursal, user, syncCompleteCounter } = useAppContext();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const savingModal = useSavingModal();
   const [turnoCerrado, setTurnoCerrado] = useState(false);
   const [medicionInicial, setMedicionInicial] = useState<MedicionDTO[]>([]);
   const [medicionFinal, setMedicionFinal] = useState<MedicionDTO[]>([]);
@@ -113,12 +117,12 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   async function fetchPicos() {
     setIsLoading(true);
     try {
-      const turnoStatus = await getTurnoStatusLocal(sucursal.id_sucursal);
-      if (
-        turnoStatus.status === "cerrado" ||
-        turnoStatus.status === "falta_cerrar"
-      ) {
-        setTurnoCerrado(true);
+      if (user?.cedula) {
+        const turnoStatus = await getTurnoStatusLocal(user.cedula);
+        setTurnoCerrado(
+          turnoStatus.status === "cerrado" ||
+            turnoStatus.status === "falta_cerrar",
+        );
       }
       const picosDB = await getPicosByBodega(Number(selectedBodegaOrigem));
       setPicos(picosDB);
@@ -171,17 +175,51 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
     try {
       setIsLoading(true);
       const bodegasOrigen = await getBodegasDelUsuario(user.cedula);
-      await setBodegaOrigem(bodegasOrigen);
-      await setSelectedBodegaOrigem(bodegasOrigen[0].id_bodega);
+      setBodegaOrigem(bodegasOrigen);
       const bodegasDestino = await getBodegasTraspaso(user.cedula);
-      await setBodegaDestino(bodegasDestino);
-      await setSelectedBodegaDestino(bodegasDestino[0].id_bodega);
+      setBodegaDestino(bodegasDestino);
     } catch (error) {
       toastError("Error al buscar bodega", "Intente nuevamente más tarde.");
     } finally {
       setIsLoading(false);
     }
   }
+
+  // Refresca las listas de bodegas al ganar foco y cuando el sync de catálogos
+  // termina (para no quedar con las bodegas anteriores si cambió la asignación).
+  useFocusEffect(
+    useCallback(() => {
+      fetchBodegas();
+    }, [user?.cedula, syncCompleteCounter]),
+  );
+
+  // Si la bodega origen/destino seleccionada ya no está en la lista
+  // recargada, se limpia (o se toma la primera disponible).
+  useEffect(() => {
+    if (bodegaOrigem.length === 0) {
+      setSelectedBodegaOrigem("");
+      return;
+    }
+    const sigueAsignada = bodegaOrigem.some(
+      (b) => Number(b.id_bodega) === Number(selectedBodegaOrigem),
+    );
+    if (!sigueAsignada) {
+      setSelectedBodegaOrigem(String(bodegaOrigem[0].id_bodega));
+    }
+  }, [bodegaOrigem]);
+
+  useEffect(() => {
+    if (bodygaDestino.length === 0) {
+      setSelectedBodegaDestino("");
+      return;
+    }
+    const sigueAsignada = bodygaDestino.some(
+      (b) => Number(b.id_bodega) === Number(selectedBodegaDestino),
+    );
+    if (!sigueAsignada) {
+      setSelectedBodegaDestino(String(bodygaDestino[0].id_bodega));
+    }
+  }, [bodygaDestino]);
 
   function buildTraspasoData(): TraspasoDTO {
     const now = new Date();
@@ -761,6 +799,10 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   if (viewMode === "list") {
     return (
       <View className="flex-1">
+        <SavingModal
+          visible={savingModal.visible}
+          message="Grabando traspaso..."
+        />
         <ScreenHeader
           title="Traspaso"
           actions={
@@ -803,6 +845,10 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   if (turnoCerrado && !motivoConfirmado) {
     return (
       <View className="flex-1">
+        <SavingModal
+          visible={savingModal.visible}
+          message="Grabando traspaso..."
+        />
         <ScreenHeader title="Traspaso Excepcional" />
 
         <View style={styles.overlay}>
@@ -850,6 +896,10 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 
   return (
     <View className="flex-1">
+      <SavingModal
+        visible={savingModal.visible}
+        message="Grabando traspaso..."
+      />
       <ScreenHeader title="Traspaso" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -1205,7 +1255,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
               {firma && (
                 <Button
                   title="Grabar"
-                  onPress={() => handleSaveAll()}
+                  onPress={() => savingModal.run(() => handleSaveAll())}
                   isLoading={isLoading}
                   icon={SaveAll}
                   iconSize="md"

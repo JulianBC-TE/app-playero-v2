@@ -46,6 +46,7 @@ export function dtoToTraspasoInsert(dto: TraspasoDTO, timestampMs?: number): Tra
     litrosPico: dto.litros_pico,
     obsTraspaso: dto.obs_traspaso,
     obsAdicional: dto.obs_adicional,
+    appte: dto.appte,
     fecha: dto.fecha,
     hora: dto.hora,
     idPlayero: dto.id_playero,
@@ -97,6 +98,7 @@ export function traspasoToDTO(row: Traspaso): TraspasoDTO {
     litros_pico: row.litrosPico,
     obs_traspaso: row.obsTraspaso,
     obs_adicional: row.obsAdicional,
+    appte: row.appte ?? "",
     fecha: row.fecha,
     hora: row.hora,
     id_playero: row.idPlayero,
@@ -356,6 +358,7 @@ export async function updateTraspasoDTO(id: number, dto: Partial<TraspasoDTO>): 
   if (dto.litros_pico !== undefined) updates.litrosPico = dto.litros_pico;
   if (dto.obs_traspaso !== undefined) updates.obsTraspaso = dto.obs_traspaso;
   if (dto.obs_adicional !== undefined) updates.obsAdicional = dto.obs_adicional;
+  if (dto.appte !== undefined) updates.appte = dto.appte;
   if (dto.fecha !== undefined) updates.fecha = dto.fecha;
   if (dto.hora !== undefined) updates.hora = dto.hora;
   if (dto.id_playero !== undefined) updates.idPlayero = dto.id_playero;

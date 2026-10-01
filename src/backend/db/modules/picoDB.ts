@@ -15,10 +15,10 @@
 
 import { db } from "@/backend/db/client";
 import { picos, syncs } from "@/backend/db/schema";
-import { eq, inArray, not } from "drizzle-orm";
+import { eq, and, inArray, not } from "drizzle-orm";
 import { PicoDTO } from "@/dto/PicosDTO";
-import { bodegas } from "../schema";   // ← Agregar esta línea
 import { getIdsBodegasDelUsuario } from "./bodegaDB";
+import { getIdsBodegasConPendientes } from "./retencionPendientes";
 import { fetchPicosPorBodegas } from "@/backend/api/picoAPI";
 
 
@@ -177,25 +177,36 @@ export async function getLastSyncDate(): Promise<number | null> {
  * @returns Cantidad de picos sincronizados.
  * @throws Si la llamada al servidor falla o hay error en persistencia.
  */
-// Asegúrate de importar la instancia de tu bd y la tabla bodegas
-// import { db } from "./tu-archivo-db";
-// import { bodegas } from "./tu-archivo-schema";
-
 export async function syncPicosDelOperario(cedula: number): Promise<number> {
   try {
-    const todasLasBodegas = await db.select({ idBodega: bodegas.idBodega }).from(bodegas);
-    const idsBodegas = todasLasBodegas.map((b) => b.idBodega);
-   
+    // Solo las bodegas asignadas al operario, más las retenidas por tener
+    // registros pendientes de subir (para no perder sus nombres en el Resumen).
+    const bodegasAsignadas = await getIdsBodegasDelUsuario(cedula);
+    const bodegasPendientes = await getIdsBodegasConPendientes();
+    const idsBodegas = Array.from(
+      new Set([...bodegasAsignadas, ...bodegasPendientes]),
+    );
+
     if (idsBodegas.length === 0) {
       console.log("⚠️ PICOS -> Omitido (no hay bodegas)");
       return 0;
     }
-   
+
     const picosRemotos = await fetchPicosPorBodegas(idsBodegas);
     const remotePicoIds = picosRemotos.map((p) => p.id_pico);
 
+    const conservaPendientes =
+      bodegasPendientes.length > 0
+        ? not(inArray(picos.idBodega, bodegasPendientes))
+        : undefined;
+
     if (remotePicoIds.length > 0) {
-      await db.delete(picos).where(not(inArray(picos.idPico, remotePicoIds)));
+      const sinPicoRemoto = not(inArray(picos.idPico, remotePicoIds));
+      await db
+        .delete(picos)
+        .where(conservaPendientes ? and(sinPicoRemoto, conservaPendientes) : sinPicoRemoto);
+    } else if (conservaPendientes) {
+      await db.delete(picos).where(conservaPendientes);
     } else {
       await db.delete(picos);
     }

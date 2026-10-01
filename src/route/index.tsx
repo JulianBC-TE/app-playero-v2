@@ -13,7 +13,9 @@ export function Routes() {
 
   // 2. Invocas el motor de sincronización aquí.
   // El hook internamente se encargará de validar si 'user.cedula' existe antes de iniciar el timer.
-  useSyncEngine(12000); // Intervalo de 2 minutos (120000 ms)
+  // Sube pendientes y baja maestros; NO toca la asignación del usuario
+  // (sucursal/bodegas/picos/tanques), eso es solo manual o al iniciar sesión.
+  useSyncEngine(12000);
 
   if (isLoadingUserData || isLoadingServerIP) {
     console.log("loading");

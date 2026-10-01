@@ -10,12 +10,16 @@ import {
   Modal,
 } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { StackRoutesProps } from "@/route/app.routes";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAppContext } from "@/hooks/useAppContext";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { InputCard } from "@/components/InputCard";
 import { Button } from "@/components/Button";
+import { SavingModal } from "@/components/SavingModal";
+import { useSavingModal } from "@/hooks/useSavingModal";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { Input } from "@/components/Input";
 import { Select } from "@/components/Select";
@@ -57,6 +61,7 @@ interface SesionLocalType {
 
 export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
   const [isLoading, setIsLoading] = useState(false);
+  const savingModal = useSavingModal();
   const [faltaAnterior, setFaltaAnterior] = useState(false);
   const [imagenPrevisualizada, setImagenPrevisualizada] = useState<{
     idPico: number;
@@ -88,6 +93,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
   const [blockHeader, setBlockHeader] = useState(false);
   const [taxilitros, setTaxilitros] = useState<Record<number, string>>({});
   const insets = useSafeAreaInsets();
+  const { syncCompleteCounter } = useAppContext();
 
   // ◄ NUEVO: Almacena un array de fotos Base64 indexado por el id_pico
   const [fotosPicos, setFotosPicos] = useState<Record<number, string[]>>({});
@@ -396,6 +402,77 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
     inicializarPantalla();
   }, []);
 
+  // ─── Refresco al ganar foco: sesión (sucursal) + bodegas ───────────────────
+  // La sesión siempre se relee de la BD local (ahí queda la sucursal que bajó
+  // el sync). El listado de bodegas solo se recalcula si el formulario está en
+  // reposo, para no pisar una selección en curso; salvo que un sync de catálogos
+  // haya terminado, en cuyo caso se recarga siempre (la selección inválida la
+  // limpia el useEffect de más abajo).
+  const primerRefreshRef = useRef(true);
+  const syncCounterAnteriorRef = useRef(syncCompleteCounter);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelado = false;
+
+      async function refrescar() {
+        try {
+          const datosSesion = await getSucursalUsuarioActivoLocal();
+          if (cancelado || !datosSesion || !datosSesion.idSucursal) return;
+
+          const nuevaSesion: SesionLocalType = {
+            cedula: Number((datosSesion as any).cedula ?? 0),
+            id_sucursal: Number(datosSesion.idSucursal),
+            descripcion_sucursal: datosSesion.descripcionSucursal,
+          };
+
+          setSesionLocal((prev) =>
+            prev &&
+            prev.id_sucursal === nuevaSesion.id_sucursal &&
+            prev.cedula === nuevaSesion.cedula
+              ? prev
+              : nuevaSesion,
+          );
+
+          const esPrimerFoco = primerRefreshRef.current;
+          primerRefreshRef.current = false;
+          if (esPrimerFoco) return; // ya lo cargó el init
+
+          const syncNuevo =
+            syncCounterAnteriorRef.current !== syncCompleteCounter;
+          syncCounterAnteriorRef.current = syncCompleteCounter;
+
+          if (
+            syncNuevo ||
+            (!selectedBodega && !faltaAnterior && !bloqueoListas)
+          ) {
+            await cargarDatosTurno(
+              nuevaSesion.id_sucursal,
+              nuevaSesion.cedula,
+            );
+          }
+        } catch (error) {
+          console.error("[Turno] Error al refrescar sesión/bodegas:", error);
+        }
+      }
+
+      refrescar();
+
+      return () => {
+        cancelado = true;
+      };
+    }, [selectedBodega, faltaAnterior, bloqueoListas, syncCompleteCounter]),
+  );
+
+  // Si la bodega seleccionada ya no está en la lista del turno, se limpia.
+  useEffect(() => {
+    if (!selectedBodega || bodegas.length === 0) return;
+    const sigueAsignada = bodegas.some(
+      (b) => Number(b.id_bodega) === Number(selectedBodega),
+    );
+    if (!sigueAsignada) setSelectedBodega("");
+  }, [bodegas, selectedBodega]);
+
   async function cargarDatosTurno(idSucursal: number, cedula: number) {
     try {
       const data = await getTurnoStatusLocal(cedula);
@@ -488,6 +565,10 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
   if (!faltaAnterior && bloqueoListas) {
     return (
       <View className="flex-1">
+        <SavingModal
+          visible={savingModal.visible}
+          message="Procesando turno..."
+        />
         <ScreenHeader title="Listas Pendientes" />
         <View style={styles.overlay}>
           <ScrollView
@@ -540,6 +621,10 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 
   return faltaAnterior ? (
     <View className="flex-1">
+      <SavingModal
+        visible={savingModal.visible}
+        message="Procesando turno..."
+      />
       <ScreenHeader title="Turno no Cerrado" />
       <View style={styles.overlay}>
         <ScrollView
@@ -627,6 +712,10 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
     </View>
   ) : (
     <View className="flex-1">
+      <SavingModal
+        visible={savingModal.visible}
+        message="Procesando turno..."
+      />
       <ScreenHeader
         title={`${inicioTurno === true ? "Iniciar Turno" : "Cerrar Turno"}`}
         disableBackButton={blockHeader}
@@ -869,7 +958,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
 
         <Button
           isLoading={isLoading}
-          onPress={procesarTurno}
+          onPress={() => savingModal.run(procesarTurno)}
           title={`${inicioTurno === true ? "Iniciar Turno" : "Cerrar Turno"}`}
         />
       </ScrollView>

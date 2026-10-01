@@ -8,7 +8,6 @@ import { Controller, useForm } from "react-hook-form";
 
 import { authNavigatorRoutesProps } from "@route/auth.routes";
 import { useAuth } from "@hooks/useAuth";
-import { useInitialSync } from "@/hooks/useInitialSync";
 import { AppError } from "@utils/AppError";
 import { toastError } from "@/utils/toastMessage";
 
@@ -28,30 +27,20 @@ type FormData = {
 export function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
   const navigation = useNavigation<authNavigatorRoutesProps>();
-  const { signIn } = useAuth();
+  const { signIn, syncMessage } = useAuth();
 
   const {
     control,
     handleSubmit,
-    watch,
     formState: { errors },
   } = useForm<FormData>();
-
-  // 1. Obtenemos los valores actuales del formulario
-  const cedulaForm = watch("cedula");
-  const passwordForm = watch("password");
-
-  // 2. Inicializamos el hook en la raíz del componente
-  const { syncInitialData } = useInitialSync(cedulaForm, Number(passwordForm));
 
   async function handleSignIn({ cedula, password }: FormData) {
     try {
       setIsLoading(true);
 
-      // ◄ Le pasamos syncInitialData al signIn.
-      // Así el contexto esperará a sincronizar todo ANTES de cambiar de pantalla.
-      await signIn(cedula, password, syncInitialData);
-      //syncInitialData();
+      // El contexto se encarga de bajar y subir todo antes de cambiar de pantalla.
+      await signIn(cedula, password);
     } catch (error) {
       const isAppError = error instanceof AppError;
       const title = isAppError
@@ -64,13 +53,18 @@ export function SignIn() {
   }
 
   // ── Vista de Carga a pantalla completa ──────────────────────────────────────
-  // Al ejecutarse el signIn, la pantalla se queda aquí hasta que todo termina
+  // Al ejecutarse el signIn, la pantalla se queda aquí hasta que todo termina.
+  // syncMessage muestra el mismo texto que el modal de sincronización del Home:
+  // qué se está subiendo o descargando en este momento.
   if (isLoading) {
     return (
       <View className="flex-1 bg-teColorSecundarioMedio items-center justify-center">
         <Loading />
-        <Text className="mt-4 text-black font-medium text-base text-center px-6">
-          Iniciando sesión y sincronizando datos por primera vez...
+        <Text className="mt-4 text-lg font-semibold text-black text-center px-6">
+          {syncMessage || "Iniciando sesión y sincronizando datos por primera vez..."}
+        </Text>
+        <Text className="mt-2 text-sm text-gray-500 text-center px-6">
+          Por favor espere...
         </Text>
       </View>
     );
