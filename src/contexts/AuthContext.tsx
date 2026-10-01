@@ -27,6 +27,12 @@ import { reintentarSyncFallidas } from "@/backend/db/modules/reintentarSyncDB";
 import { sync as syncSecureTime } from "@/services/timeService";
 import { runInitialSync } from "@/backend/db/services/initialSync";
 import { contarRegistrosSync } from "@/backend/db/services/syncService";
+import type { UpdateSyncInfo } from "@/backend/api/versionAPI";
+import {
+  getUpdatePendiente,
+  saveUpdatePendiente,
+  type UpdatePendiente,
+} from "@/storage/storageUpdate";
 
 // ---------------------------------------------------------------------------
 // Tipos del contexto
@@ -70,6 +76,12 @@ export type AuthContextDataProps = {
   /** Registros con sync = 0 (creados localmente y todavía no subidos). */
   syncPendingCount: number;
   setSyncPendingCount: (count: number) => void;
+  /**
+   * Actualización disponible devuelta por la última sincronización.
+   * Cuando existe, el Home muestra la card verde "Actualizar".
+   */
+  updatePendiente: UpdatePendiente | null;
+  setUpdatePendiente: (update: UpdatePendiente | null) => Promise<void>;
 };
 
 type AuthContextProviderProps = { children: React.ReactNode };
@@ -96,6 +108,32 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
   const [syncCompleteCounter, setSyncCompleteCounter] = useState(0);
   const [syncErrorCount, setSyncErrorCount] = useState(0);
   const [syncPendingCount, setSyncPendingCount] = useState(0);
+  const [updatePendiente, setUpdatePendienteState] =
+    useState<UpdatePendiente | null>(null);
+
+  /**
+   * Guarda (o limpia con null) el aviso de actualización pendiente en
+   * React + AsyncStorage. Evita renders innecesarios si no cambió nada.
+   */
+  const setUpdatePendiente = useCallback(
+    async (update: UpdatePendiente | null): Promise<void> => {
+      setUpdatePendienteState((prev) => {
+        if (!update && !prev) return prev;
+        if (
+          update &&
+          prev &&
+          prev.url === update.url &&
+          prev.latestVersion === update.latestVersion &&
+          prev.tamano === update.tamano
+        ) {
+          return prev;
+        }
+        return update;
+      });
+      await saveUpdatePendiente(update);
+    },
+    [],
+  );
 
   const incrementSyncComplete = useCallback(() => {
     setSyncCompleteCounter((c) => c + 1);
@@ -266,7 +304,31 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
     estaBloqueado: boolean;
     sucursalCambio?: boolean;
     sucursal?: SucursalDTO;
+    update?: UpdateSyncInfo;
   }): Promise<void> {
+    // ── Actualización de la app ──────────────────────────────────────────
+    // El servidor avisa en cada sync si la versión instalada no es la
+    // última. `disponible: false` limpia el aviso; si el chequeo no corrió
+    // (resultado.update undefined) se conserva el aviso anterior.
+    if (resultado.update) {
+      if (
+        resultado.update.disponible &&
+        resultado.update.url &&
+        resultado.update.latestVersion
+      ) {
+        await setUpdatePendiente({
+          url: resultado.update.url,
+          latestVersion: resultado.update.latestVersion,
+          tamano: resultado.update.tamano,
+        });
+        console.log(
+          `⬆️ [SYNC] Actualización disponible: ${resultado.update.latestVersion}`,
+        );
+      } else {
+        await setUpdatePendiente(null);
+      }
+    }
+
     const cambios: Partial<UserDTO> = {};
 
     if (user.bloqueado !== resultado.estaBloqueado) {
@@ -317,6 +379,9 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 
       if (userLogged?.cedula) {
         setUser(userLogged);
+        // Restaura el aviso de actualización pendiente (si sigue vigente).
+        const updateGuardada = await getUpdatePendiente();
+        if (updateGuardada) setUpdatePendienteState(updateGuardada);
         if (token) {
           httpClient.setToken(token);
           setIsOffline(false);
@@ -422,7 +487,9 @@ syncStatus,
         syncErrorCount,
         setSyncErrorCount,
         syncPendingCount,
-        setSyncPendingCount
+        setSyncPendingCount,
+        updatePendiente,
+        setUpdatePendiente
       }}
     >
       {children}

@@ -16,7 +16,7 @@ import {
 export type menuItemType = {
   name: string;
   icon: LucideIcon;
-  route: keyof StackRoutesList | "sync";
+  route: keyof StackRoutesList | "sync" | "update";
   enabled?: boolean;
   turno?: "abierto" | "cerrado" | "pendiente" | "iniciar" | "falta_cerrar";
   params: object;

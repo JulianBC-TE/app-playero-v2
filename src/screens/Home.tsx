@@ -14,7 +14,7 @@
 //   - Resto: solo controlado por permisos de módulo.
 
 import { HomeHeader } from "@/components/HomeHeader";
-import { ActivityIndicator, FlatList, Modal, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Modal, View } from "react-native";
 import { Text } from "@/components";
 import { MenuCard } from "@/components/MenuCard";
 import { StackRoutesList, StackRoutesProps } from "@/route/app.routes";
@@ -28,7 +28,12 @@ import { getSucursalUsuarioActivoLocal } from "@DBmodules/sucursalDB";
 import { getModulosDelUsuario } from "@DBmodules/moduleDB";
 import { useAuth } from "@hooks/useAuth";
 import type { TurnoStatus } from "@/backend/db/services/turnoStatusService";
-import { syncTodo } from "@/backend/db/services/syncService";
+import { contarRegistrosSync, syncTodo } from "@/backend/db/services/syncService";
+import { hayListasPendientes } from "@/services/listasPendientesService";
+import { descargarEInstalar } from "@/services/updateService";
+import { registrarIntentoActualizacion } from "@/storage/storageUpdate";
+import { getStorageServerUrl } from "@/storage/storageServer";
+import { Download } from "lucide-react-native";
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -90,11 +95,23 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
   const [isLoading, setIsLoading] = useState(true);
   const [menuItems, setMenuItems] = useState<menuItemType[]>(baseMenuItems);
   
-  const { user, signOut, sucursal, setSucursal, aplicarResultadoSync, syncStatus, syncMessage, setSyncStatus, setSyncMessage, isManualSync, setIsManualSync, syncCompleteCounter, incrementSyncComplete, syncErrorCount, setSyncErrorCount, syncPendingCount, setSyncPendingCount } = useAuth();
+  const { user, signOut, sucursal, setSucursal, aplicarResultadoSync, syncStatus, syncMessage, setSyncStatus, setSyncMessage, isManualSync, setIsManualSync, syncCompleteCounter, incrementSyncComplete, syncErrorCount, setSyncErrorCount, syncPendingCount, setSyncPendingCount, updatePendiente } = useAuth();
   const cedula = user?.cedula; 
   const estaBloqueado = !!user?.bloqueado;
 
   const haySucursal = !!sucursal?.id_sucursal;
+
+  // Porcentaje de descarga de la actualización (null = sin descarga activa)
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null);
+
+  // Card verde "Actualizar": solo aparece cuando el servidor envió el
+  // enlace de actualización junto con la respuesta de la sincronización.
+  const menuConUpdate: menuItemType[] = updatePendiente
+    ? [
+        ...menuItems,
+        { name: "Actualizar", icon: Download, route: "update", enabled: true, params: {} },
+      ]
+    : menuItems;
 
   // ── CONTROL DE USUARIO BLOQUEADO (30 Segundos) ─────────────────────────────
   useEffect(() => {
@@ -119,9 +136,13 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
     };
   }, [estaBloqueado, signOut]);
 
-  function handleOpenMenu(route: keyof StackRoutesList | "sync", params?: any) {
+  function handleOpenMenu(route: keyof StackRoutesList | "sync" | "update", params?: any) {
     if (route === "sync") {
       handleSync();
+      return;
+    }
+    if (route === "update") {
+      handleActualizar();
       return;
     }
     navigation.navigate(route as keyof StackRoutesList, params);
@@ -150,6 +171,86 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
     } catch (error: any) {
       console.error("[Home] Error en sincronización:", error);
       toastError("No se pudo completar la sincronización", error?.message ?? "Error desconocido");
+    }
+  }
+
+  /**
+   * Valida que la app esté lista para actualizarse y, si lo está,
+   * descarga e instala la última versión publicada en el servidor.
+   *
+   * Reglas:
+   *  - No puede haber registros con sync == 0 ni entradas en las listas de
+   *    salidas / traspasos / abastecimientos → bloquea la actualización.
+   *  - Si hay registros con sync == -1 avisa, pero permite actualizar.
+   */
+  async function handleActualizar() {
+    if (!updatePendiente?.url) return;
+    if (updateProgress !== null) return;
+
+    try {
+      const conteo = await contarRegistrosSync();
+      const hayListas = await hayListasPendientes();
+
+      if (conteo.pendientes > 0 || hayListas) {
+        const motivos: string[] = [];
+        if (conteo.pendientes > 0) {
+          motivos.push(`${conteo.pendientes} registro(s) sin sincronizar`);
+        }
+        if (hayListas) {
+          motivos.push("entradas en las listas de salidas, traspasos o abastecimientos");
+        }
+        Alert.alert(
+          "No está listo para actualizar",
+          `Debe sincronizar todo y limpiar las listas antes de actualizar.\n\nPendientes:\n• ${motivos.join("\n• ")}`,
+        );
+        return;
+      }
+
+      const tieneErrores = conteo.errores > 0;
+
+      // Detecta el bucle de actualización: ya se lanzó el instalador para
+      // esta misma versión y la app sigue reportando la misma versión.
+      const intentos = updatePendiente.intentos ?? 0;
+      const avisoBucle =
+        intentos >= 1 && updatePendiente.versionInstalada
+          ? `Atención: este es el intento n.º ${intentos + 1} de instalar la versión ${updatePendiente.latestVersion} y la app sigue en la versión ${updatePendiente.versionInstalada}.\n\n` +
+            "• Si acabás de instalarla, reiniciá la aplicación para que tome la nueva versión.\n" +
+            `• Si ya reiniciaste y el botón volvió a aparecer, el número registrado en el Sistema Playero (${updatePendiente.latestVersion}) no coincide con la versión interna del APK: hay que publicarlo como ${updatePendiente.versionInstalada}.\n\n`
+          : "";
+
+      const mensaje = avisoBucle + (tieneErrores
+        ? `Atención: hay ${conteo.errores} registro(s) con error de sincronización (sync = -1).\n\nPuede actualizar igualmente, pero revise esos registros después.\n\nSe instalará la versión ${updatePendiente.latestVersion}.`
+        : `Se descargará e instalará la versión ${updatePendiente.latestVersion}.\n\n¿Desea continuar?`);
+
+      Alert.alert("Actualizar aplicación", mensaje, [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Actualizar", onPress: () => descargarActualizacion() },
+      ]);
+    } catch (error: any) {
+      console.error("[Home] Error validando la actualización:", error);
+      toastError("No se pudo verificar la actualización", error?.message ?? "Error desconocido");
+    }
+  }
+
+  /** Descarga el APK con el enlace que dio el servidor y lanza el instalador. */
+  async function descargarActualizacion() {
+    if (!updatePendiente?.url) return;
+
+    setUpdateProgress(0);
+    try {
+      const serverUrl = await getStorageServerUrl();
+      await descargarEInstalar(updatePendiente.url, serverUrl, setUpdateProgress);
+      // El instalador terminó: si al reabrir la app la versión no cambió,
+      // handleActualizar() mostrará el aviso de bucle.
+      await registrarIntentoActualizacion();
+    } catch (error: any) {
+      console.error("[Home] Error al actualizar:", error);
+      toastError(
+        "No se pudo actualizar",
+        error?.message ?? "Error desconocido",
+      );
+    } finally {
+      setUpdateProgress(null);
     }
   }
 
@@ -269,7 +370,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
             <HomeHeader />
             <View className="px-12">
               <FlatList
-                data={menuItems}
+                data={menuConUpdate}
                 keyExtractor={(item) => item.name}
                 numColumns={2}
                 columnWrapperStyle={{
@@ -290,6 +391,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
                   }
                   enabled={item.enabled}
                   turno={item.turno}
+                  variant={item.route === "update" ? "update" : undefined}
                   syncErrorCount={item.route === "sync" ? syncErrorCount : 0}
                   syncPendingCount={item.route === "sync" ? syncPendingCount : 0}
                 />
@@ -321,6 +423,29 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
             </Text>
             <Text className="text-sm text-gray-500 mt-2 text-center">
               Por favor espere...
+            </Text>
+          </View>
+        </View>
+      </Modal>
+      {/* Modal de descarga de la actualización */}
+      <Modal visible={updateProgress !== null} transparent animationType="fade">
+        <View className="flex-1 bg-black/50 items-center justify-center">
+          <View className="bg-white rounded-2xl p-8 items-center mx-8 w-80">
+            <ActivityIndicator size="large" color="#16a34a" />
+            <Text className="text-lg font-semibold mt-4 text-center">
+              Descargando actualización...
+            </Text>
+            <View className="h-2 w-full bg-gray-200 rounded-full mt-4 overflow-hidden">
+              <View
+                className="h-2 bg-green-600 rounded-full"
+                style={{ width: `${updateProgress ?? 0}%` }}
+              />
+            </View>
+            <Text className="text-sm text-gray-500 mt-2 text-center">
+              {updateProgress ?? 0}%
+            </Text>
+            <Text className="text-sm text-gray-500 mt-1 text-center">
+              Al finalizar se abrirá el instalador
             </Text>
           </View>
         </View>

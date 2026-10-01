@@ -18,6 +18,8 @@ type Props = TouchableOpacityProps & {
 	turno?: "abierto" | "cerrado" | "pendiente" | "iniciar" | "falta_cerrar";
 	syncErrorCount?: number;
 	syncPendingCount?: number;
+	/** "update" pinta la tarjeta de verde (card de actualización de la app). */
+	variant?: "update";
 };
 
 /**
@@ -32,6 +34,7 @@ type Props = TouchableOpacityProps & {
  * @param turno - Estado del turno: `"abierto"` | `"cerrado"` | `"pendiente"` | `"iniciar"` | `"falta_cerrar"`.
  * @param syncErrorCount - Cantidad de registros con error de sincronización (se muestra como badge rojo).
  * @param syncPendingCount - Cantidad de registros creados localmente y aún no subidos (badge naranja).
+ * @param variant - `"update"` dibuja la tarjeta en verde (actualización de la app disponible).
  */
 export function MenuCard({
 	name,
@@ -41,10 +44,18 @@ export function MenuCard({
 	turno,
 	syncErrorCount = 0,
 	syncPendingCount = 0,
+	variant,
 	...rest
 }: Props) {
+	// La card de actualización siempre se muestra activa y en verde.
+	const esActualizacion = variant === "update";
+
 	// Define color de fondo basado en el turno o en enabled
 	const getBackgroundClass = () => {
+		if (esActualizacion) {
+			return "bg-green-600";
+		}
+
 		if (turno) {
 			switch (turno) {
 				case "abierto":
@@ -65,7 +76,8 @@ export function MenuCard({
 		}
 	};
 
-	const isActive = turno !== undefined || enabled;
+	const isActive = esActualizacion || turno !== undefined || enabled;
+	const colorContenido = esActualizacion ? "#ffffff" : isActive ? "#000" : "#c9c0c0";
 
 	// Badge circular: rojo para errores de subida, naranja para pendientes.
 	const renderBadge = (valor: number, color: string, right: number) =>
@@ -115,7 +127,7 @@ export function MenuCard({
 				<IconComponent
 					width={64}
 					height={64}
-					color={isActive ? "#000" : "#c9c0c0"}
+					color={colorContenido}
 				/>
 
 				{renderBadge(syncPendingCount, "#f59e0b", 8)}
@@ -123,7 +135,7 @@ export function MenuCard({
 
 				<Text
 					className='text-lg mt-2'
-					style={{ color: isActive ? "#000" : "#c9c0c0" }}
+					style={{ color: colorContenido }}
 				>
 					{name}
 				</Text>

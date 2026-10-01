@@ -43,6 +43,8 @@ import {
 } from "../modules/turnoBD";
 import { enviarAbastecimiento, enviarCalibracion, enviarTicket, enviarTraspaso, enviarTurno } from "@/backend/api/operacionesAPI";
 import { checkUserStatusServer } from "@/backend/api/authAPI";
+import { checkAppVersion } from "@/backend/api/versionAPI";
+import type { UpdateSyncInfo } from "@/backend/api/versionAPI";
 import { updateLocalUserBlockStatus, updateLocalUserSucursal } from "../modules/authDB";
 import { saveSucursales } from "../modules/sucursalDB";
 import { httpClient } from "@/backend/api/httpClient";
@@ -55,11 +57,14 @@ import { tickets, abastecimientos, trapasos, calibraciones, turnos, personas, ve
 import { count, eq } from "drizzle-orm";
 import { crearLog, limpiarLogsAntiguos } from "../logs/logModule";
 
-// Resultado de un ciclo de sincronización: estado del usuario + sucursal recién bajada
+// Resultado de un ciclo de sincronización: estado del usuario + sucursal
+// recién bajada + (opcional) aviso de actualización de la app.
 export type SyncResult = {
   estaBloqueado: boolean;
   sucursalCambio: boolean;
   sucursal?: SucursalDTO;
+  /** Presente cuando el servidor respondió el chequeo de versión. */
+  update?: UpdateSyncInfo;
 };
 
 // Conteo de registros locales según su estado de sincronización:
@@ -311,6 +316,33 @@ export async function syncCatalogosFromCentral(
       console.warn("📤 BAJADA -> ⚠️ No se pudo validar el estado de bloqueo con el servidor:", errorBlock);
     }
 
+    // ── Chequeo de versión de la app ────────────────────────────────────────
+    // Se envía la versión instalada en cada sincronización. Si el servidor
+    // detecta que no es la última, devuelve el enlace de actualización junto
+    // con la respuesta y el Home muestra la card verde "Actualizar".
+    onStatus?.("Verificando versión de la app...");
+    let update: UpdateSyncInfo | undefined;
+    try {
+      const chequeo = await checkAppVersion();
+      update =
+        chequeo.updateAvailable && chequeo.url && chequeo.latestVersion
+          ? {
+              disponible: true,
+              url: chequeo.url,
+              latestVersion: chequeo.latestVersion,
+              tamano: chequeo.tamano,
+            }
+          : { disponible: false };
+
+      if (update.disponible) {
+        console.log(`📤 BAJADA -> Nueva versión disponible: ${update.latestVersion}`);
+      }
+    } catch (errorVersion) {
+      // No corta la sincronización por esto; se conserva el aviso anterior.
+      console.warn("📤 BAJADA -> ⚠️ No se pudo verificar la versión de la app:", errorVersion);
+      update = undefined;
+    }
+
     onStatus?.("Descargando turnos...");
     await sincronizarUltimosTurnosDesdeBackend(idUser);
 
@@ -344,7 +376,7 @@ export async function syncCatalogosFromCentral(
     await sincronizarCubicacionesMasivas();
     
     console.log("📤 BAJADA -> Finalizada");
-    return { estaBloqueado, sucursalCambio, sucursal };
+    return { estaBloqueado, sucursalCambio, sucursal, update };
   } catch (error) {
     throw error;
   }
