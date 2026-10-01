@@ -8,6 +8,7 @@ import { Input } from "@components/Input";
 import { Button } from "@components/Button";
 import { Controller, useForm } from "react-hook-form";
 import { AppError } from "@utils/AppError";
+import { esUrlServidor, normalizarServerUrl } from "@utils/serverUrl";
 import { toastError, toastSuccess } from "@/utils/toastMessage";
 import { Image, View } from "react-native";
 import { Text } from "@/components";
@@ -16,7 +17,7 @@ import axios from "axios";
 import { seedLocalDB } from "@/backend/db/seeds/seedLocalDB";
 
 type FormData = {
-  ip: string;
+  url: string;
 };
 
 const axiosApi = axios.create({
@@ -37,18 +38,19 @@ export function Setup() {
     formState: { errors },
   } = useForm<FormData>();
 
-  async function handleSetup({ ip }: FormData) {
+  async function handleSetup({ url }: FormData) {
     try {
       setIsLoading(true);
       setErrorText(undefined);
 
-      const response = await axiosApi.get(`http://${ip}/ping`);
+      const serverUrl = normalizarServerUrl(url);
+      const response = await axiosApi.get(`${serverUrl}/ping`);
 
       if (response.status !== 200) {
         throw new Error(`Sin respuesta del servidor: ${response.status}`);
       }
 
-      await setServerIP(ip);
+      await setServerIP(serverUrl);
       console.log("Conexión exitosa", "Servidor encontrado correctamente");
       toastSuccess("Conexión exitosa", "Servidor encontrado correctamente");
     } catch (error) {
@@ -75,16 +77,22 @@ export function Setup() {
         <InputCard title="Configurar conexión" required>
           <Controller
             control={control}
-            name="ip"
-            rules={{ required: "La IP del servidor es obligatoria" }}
+            name="url"
+            rules={{
+              required: "La URL del servidor es obligatoria",
+              validate: (value) =>
+                esUrlServidor(value) || "Ingresá una URL válida (ej: https://playero.tecnoedilsa.com.py)",
+            }}
             render={({ field: { onChange, value } }) => (
               <Input
-                placeholder="IP del servidor"
-                keyboardType="numbers-and-punctuation"
+                placeholder="https://playero.tecnoedilsa.com.py"
                 autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="default"
+                textContentType="URL"
                 onChangeText={onChange}
                 value={value}
-                errorMessage={errors.ip?.message}
+                errorMessage={errors.url?.message}
               />
             )}
           />

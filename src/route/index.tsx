@@ -2,14 +2,13 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { StackRoutes } from "./app.routes";
 import { AuthRoutes } from "./auth.routes";
-import { SetupRoutes } from "./config.routes";
 import { useAuth } from "@/hooks/useAuth";
 import { useSyncEngine } from "@/hooks/useSyncEngine"; // 1. Importas tu hook
 import { Loading } from "@/components/Loading";
 //import { ThemeProvider } from "@/contexts/ThemeContext";
 
 export function Routes() {
-  const { user, isLoadingUserData, serverIP, isLoadingServerIP } = useAuth();
+  const { user, isLoadingUserData, isLoadingServerIP } = useAuth();
 
   // 2. Invocas el motor de sincronización aquí.
   // El hook internamente se encargará de validar si 'user.cedula' existe antes de iniciar el timer.
@@ -24,13 +23,9 @@ export function Routes() {
 
   return (
     <NavigationContainer>
-      {!serverIP ? (
-        <SetupRoutes />
-      ) : user.cedula ? (
-        <StackRoutes />
-      ) : (
-        <AuthRoutes />
-      )}
+      {/* Setup desactivado: la URL del servidor está hardcodeada (SERVER_URL_FIJA).
+          Para reactivarlo, restaurar: {!serverIP ? <SetupRoutes /> : user.cedula ? ... } */}
+      {user.cedula ? <StackRoutes /> : <AuthRoutes />}
     </NavigationContainer>
   );
 }

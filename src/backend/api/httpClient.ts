@@ -14,6 +14,7 @@
 import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AUTH_TOKEN_STORAGE, SERVER_URL } from "@storage/storageConfig";
+import { normalizarServerUrl, SERVER_URL_FIJA } from "@utils/serverUrl";
 
 // ---------------------------------------------------------------------------
 // Tipos internos
@@ -35,9 +36,15 @@ async function writeTokens(tokens: TokenStorage): Promise<void> {
   await AsyncStorage.setItem(AUTH_TOKEN_STORAGE, JSON.stringify(tokens));
 }
 
-async function readServerUrl(): Promise<string | null> {
-  const raw = await AsyncStorage.getItem(SERVER_URL);
-  return raw ? JSON.parse(raw) : null;
+async function readServerUrl(): Promise<string> {
+  try {
+    const raw = await AsyncStorage.getItem(SERVER_URL);
+    const guardada = raw ? JSON.parse(raw) : null;
+    if (typeof guardada === "string" && guardada) return guardada;
+  } catch {
+    // storage vacío o corrupto: se ignora y se usa la URL hardcodeada
+  }
+  return SERVER_URL_FIJA;
 }
 
 // ---------------------------------------------------------------------------
@@ -62,10 +69,7 @@ function rejectQueue(err: AxiosError) {
 
 // ── Interceptor de REQUEST: inyecta baseURL y token ─────────────────────────
 axiosInstance.interceptors.request.use(async (config) => {
-  const serverIP = await readServerUrl();
-  if (serverIP) {
-    config.baseURL = serverIP.startsWith("http://") ? serverIP : `http://${serverIP}`;
-  }
+  config.baseURL = normalizarServerUrl(await readServerUrl());
 
   const { token } = await readTokens();
   if (token && config.headers) {
@@ -119,7 +123,7 @@ axiosInstance.interceptors.response.use(
 
         return new Promise(async (resolve, reject) => {
           try {
-            const baseURL = axiosInstance.defaults.baseURL;
+            const baseURL = normalizarServerUrl(await readServerUrl());
             const { data } = await axios.post(`${baseURL}/api/auth/refresh-token`, { refresh_token });
 
             await writeTokens({ token: data.token, refresh_token: data.refresh_token });

@@ -1,4 +1,5 @@
 import { AppError } from "@utils/AppError";
+import { normalizarServerUrl } from "@utils/serverUrl";
 import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from "axios";
 import { getAuthToken, saveAuthToken } from "@storage/storageAuthToken";
 import { getStorageServerUrl } from "@/storage/storageServer";
@@ -29,10 +30,7 @@ api.registerInterceptTokenManager = (signOut) => {
 				const serverIP = await getStorageServerUrl();
 				//->se verifica que el ip se cargue y este en el formato adecuado
 				if (serverIP) {
-					config.baseURL = serverIP;
-					if (!serverIP.startsWith("http://")) {
-						config.baseURL = `http://${serverIP}`;
-					}
+					config.baseURL = normalizarServerUrl(serverIP);
 				}
 				//->traer el  token guardado y settearlo
 				const { token } = await getAuthToken();

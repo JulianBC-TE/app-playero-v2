@@ -14,6 +14,7 @@ import {
   saveServerUrl,
   removeServerUrl,
 } from "@storage/storageServer";
+import { SERVER_URL_FIJA } from "@utils/serverUrl";
 import { ClienteDTO } from "@dto/ClienteDTO";
 import { SucursalDTO } from "@/dto/sucursalDTO";
 import { getStorageSucursal, saveSucursal } from "@/storage/storageSucursal";
@@ -404,9 +405,19 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
   }
 
   async function loadServerIP() {
-    const ip = await getStorageServerUrl();
+    // La URL del servidor es fija (SERVER_URL_FIJA). Al arrancar se
+    // pisa lo que haya guardado (migra IPs viejas de installs existentes).
+    try {
+      const guardada = await getStorageServerUrl();
+      if (guardada !== SERVER_URL_FIJA) {
+        await saveServerUrl(SERVER_URL_FIJA);
+      }
+      setServerIPState(SERVER_URL_FIJA);
+    } catch (error) {
+      console.warn("No se pudo persistir la URL del servidor", error);
+      setServerIPState(SERVER_URL_FIJA);
+    }
     const sucursal = await getStorageSucursal();
-    setServerIPState(ip);
     await setSucursal(sucursal);
     setIsLoadingServerIP(false);
   }

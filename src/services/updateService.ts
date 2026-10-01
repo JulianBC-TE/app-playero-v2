@@ -11,6 +11,7 @@
  *  - permiso android.permission.REQUEST_INSTALL_PACKAGES
  */
 import * as FileSystem from "expo-file-system";
+import { normalizarServerUrl } from "@utils/serverUrl";
 
 const APK_DESTINO = `${FileSystem.cacheDirectory ?? ""}playero-update.apk`;
 
@@ -52,11 +53,7 @@ export type ProgresoDescarga = {
  */
 function resolverUrl(url: string, serverUrl: string | null): string {
   if (/^https?:\/\//i.test(url)) return url;
-  const base = serverUrl
-    ? serverUrl.startsWith("http://") || serverUrl.startsWith("https://")
-      ? serverUrl
-      : `http://${serverUrl}`
-    : "";
+  const base = serverUrl ? normalizarServerUrl(serverUrl) : "";
   return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
 }
 
