@@ -20,6 +20,7 @@ import { toastError, toastSuccess } from "@utils/toastMessage";
 import { StackRoutesProps } from "@/route/app.routes";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { useFocusEffect } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface Props {
   enabledEdit?: boolean;
@@ -41,6 +42,7 @@ export function BuscarPersona({
   const [isLoading, setIsLoading] = useState(false);
   const fromScreen = route.params?.fromScreen || "";
   const [editcreate, setEditCreate] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // Cria o debounce uma vez
   const debouncedSetQuery = useRef(
@@ -203,6 +205,7 @@ export function BuscarPersona({
           onRefresh={handleRefresh}
           refreshing={isRefreshing}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
           ListFooterComponent={
             isLoading && !isRefreshing ? (
               <ActivityIndicator size="small" color="#666" className="mt-4" />

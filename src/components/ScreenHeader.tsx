@@ -23,7 +23,7 @@ type Props = {
 export function ScreenHeader({ title, disableBackButton, actions }: Props) {
 	const navigation = useNavigation();
 	return (
-		<View className='flex-row items-center bg-teColorPrincipal pt-14 px-8 pb-2 gap-4'>
+		<View className='flex-row items-center bg-primary dark:bg-surfaceElevatedDark border-b border-primary dark:border-borderDark pt-14 px-8 pb-2 gap-4'>
 			{!disableBackButton && (
 				<TouchableOpacity onPress={() => navigation.goBack()}>
 					<ArrowLeftSquare

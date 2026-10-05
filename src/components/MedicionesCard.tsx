@@ -6,6 +6,7 @@ import {
 	Text,
 	TouchableOpacity,
 	TouchableOpacityProps,
+	useColorScheme,
 	View,
 } from "react-native";
 import { Trash } from "lucide-react-native";
@@ -22,12 +23,15 @@ type Props = TouchableOpacityProps & {
  * @param data - Objeto {@link MedicionDTO} con los datos de la medición a mostrar.
  */
 export function MedicionesCard({ data, ...rest }: Props) {
+	const colorScheme = useColorScheme();
+	const iconColor = colorScheme === "dark" ? "#F87171" : "#DC2626";
+
 	return (
-		<View className='flex-row items-center justify-between p-2 pr-2 rounded-md mb-3 bg-teColorPrincipalClaro'>
+		<View className='flex-row items-center justify-between p-2 pr-2 rounded-md mb-3 bg-surfaceElevated dark:bg-surfaceElevatedDark border border-border dark:border-borderDark'>
 			<View className='flex-1'>
 				<Text
 					numberOfLines={1}
-					className='text-lg font-bold text-black'
+					className='text-lg font-bold text-text dark:text-textDark'
 				>
 					{`Tanque ${data.id_tanque}`}
 				</Text>
@@ -35,7 +39,7 @@ export function MedicionesCard({ data, ...rest }: Props) {
 			<TouchableOpacity {...rest}>
 				<Trash
 					size={24}
-					color='#000'
+					color={iconColor}
 				/>
 			</TouchableOpacity>
 		</View>

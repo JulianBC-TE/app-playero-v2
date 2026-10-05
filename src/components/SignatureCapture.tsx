@@ -42,10 +42,10 @@ export function SignatureCapture({ onSave, onClear, title, persona }: Props) {
 	};
 
 	return (
-		<View className='flex-1 bg-teColorSecundarioMedio items-center justify-center p-4'>
+		<View className='flex-1 bg-background dark:bg-backgroundDark items-center justify-center p-4'>
 			<Text className='text-lg font-semibold mb-2'>{title}</Text>
 
-			<View className='h-[400px] w-full border border-gray-400 rounded-md overflow-hidden bg-white'>
+			<View className='h-[400px] w-full border border-border dark:border-borderDark rounded-md overflow-hidden bg-surface'>
 				<Signature
 					key={signatureKey}
 					ref={ref}
@@ -61,10 +61,10 @@ export function SignatureCapture({ onSave, onClear, title, persona }: Props) {
 				/>
 			</View>
 			<View className='flex items-center mt-2'>
-				<Text className='text-xl text-teColorPrincipal font-semibold'>
+				<Text className='text-xl text-primary dark:text-primaryDark font-semibold'>
 					{persona ? persona.nombre_apellido : "Sin nombre y apellido"}
 				</Text>
-				<Text className='text-xl text-teColorPrincipal font-semibold'>
+				<Text className='text-xl text-primary dark:text-primaryDark font-semibold'>
 					{persona ? persona.cedula : "No hay cédula"}
 				</Text>
 			</View>

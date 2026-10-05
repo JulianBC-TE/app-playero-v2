@@ -2,7 +2,7 @@
  * @module Playero/Components/textSearch
  * @category UI Components
  */
-import { TouchableOpacity, View } from "react-native";
+import { TouchableOpacity, useColorScheme, View } from "react-native";
 import { Text } from "@/components";
 import { Search } from "lucide-react-native";
 
@@ -28,9 +28,11 @@ export function TextSearch({
 	onPress,
 	enabled = true,
 }: TextSearchProps) {
+	const colorScheme = useColorScheme();
+
 	return (
 		<View className='flex-row w-full items-center'>
-			<View className='w-full h-10 bg-white rounded-md border border-gray-300'>
+			<View className='w-full h-10 bg-surface dark:bg-surfaceDark rounded-md border border-border dark:border-borderDark'>
 				<TouchableOpacity
 					disabled={!enabled}
 					className='flex-1 justify-center px-4'
@@ -43,7 +45,7 @@ export function TextSearch({
 					<View className='absolute left-3'>
 						<Search
 							size={18}
-							color='#666'
+							color={colorScheme === "dark" ? "#B6C2D5" : "#64748B"}
 						/>
 					</View>
 				</TouchableOpacity>

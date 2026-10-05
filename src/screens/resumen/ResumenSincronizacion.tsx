@@ -14,7 +14,7 @@ export function ResumenSincronizacion({ navigation }: StackRoutesProps<"resumenS
   const fechaISOString = fecha.toISOString().split("T")[0];
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-background dark:bg-backgroundDark">
       <HeaderResumen 
         title="Resumen" 
         fechaSeleccionada={fecha} 

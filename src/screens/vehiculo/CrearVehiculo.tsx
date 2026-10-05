@@ -136,7 +136,7 @@ export function CrearVehiculo({
 
         <InputCard title="Cliente:" required={true}>
           <View className="flex-row w-full items-center">
-            <View className="w-full h-10 bg-white rounded-md border border-gray-300">
+            <View className="w-full h-10 bg-surface dark:bg-surfaceDark rounded-md border border-border dark:border-borderDark">
               <TouchableOpacity
                 className="flex-1 justify-center px-4"
                 onPress={() =>

@@ -6,6 +6,7 @@ import { LucideIcon } from "lucide-react-native";
 import {
 	TouchableOpacity,
 	TouchableOpacityProps,
+	useColorScheme,
 	View,
 } from "react-native";
 import { Text } from "@/components";
@@ -47,37 +48,46 @@ export function MenuCard({
 	variant,
 	...rest
 }: Props) {
+	const colorScheme = useColorScheme();
+	const isDark = colorScheme === "dark";
+
 	// La card de actualización siempre se muestra activa y en verde.
 	const esActualizacion = variant === "update";
 
 	// Define color de fondo basado en el turno o en enabled
 	const getBackgroundClass = () => {
 		if (esActualizacion) {
-			return "bg-green-600";
+			return "bg-success dark:bg-successSoftDark";
 		}
 
 		if (turno) {
 			switch (turno) {
 				case "abierto":
-					return "bg-teColorTurnoAbierto";
+					return "bg-successSoft dark:bg-successSoftDark border border-success dark:border-successDark";
 				case "pendiente":
-					return "bg-teColorTurnoPendiente";
+					return "bg-warningSoft dark:bg-warningSoftDark border border-warning dark:border-warningDark";
 				case "cerrado":
-					return "bg-teColorTurnoCerrado";
+					return "bg-infoSoft dark:bg-infoSoftDark border border-info dark:border-infoDark";
 				case "iniciar":
-					return "bg-teColorTurnoAbrir";
+					return "bg-primarySoft dark:bg-primarySoftDark border border-primary dark:border-primaryDark";
 				case "falta_cerrar":
-					return "bg-teColorTurnoPendiente";
+					return "bg-warningSoft dark:bg-warningSoftDark border border-warning dark:border-warningDark";
 				default:
-					return "bg-gray-100";
+					return "bg-disabledBg dark:bg-disabledBgDark border border-border dark:border-borderDark";
 			}
 		} else {
-			return enabled ? "bg-teColorPrincipalClaro" : "bg-gray-100";
+			return enabled
+				? "bg-primarySoft dark:bg-primarySoftDark border border-primary dark:border-primaryDark"
+				: "bg-disabledBg dark:bg-disabledBgDark border border-border dark:border-borderDark";
 		}
 	};
 
 	const isActive = esActualizacion || turno !== undefined || enabled;
-	const colorContenido = esActualizacion ? "#ffffff" : isActive ? "#000" : "#c9c0c0";
+	const colorContenido = esActualizacion
+		? isDark ? "#4ADE80" : "#ffffff"
+		: isActive
+			? isDark ? "#DCE7FF" : "#243D79"
+			: isDark ? "#78869A" : "#9CA3AF";
 
 	// Badge circular: rojo para errores de subida, naranja para pendientes.
 	const renderBadge = (valor: number, color: string, right: number) =>
@@ -119,7 +129,7 @@ export function MenuCard({
 				style={{
 					shadowColor: "#000",
 					shadowOffset: { width: 4, height: 6 },
-					shadowOpacity: 0.25,
+					shadowOpacity: isDark ? 0.18 : 0.18,
 					shadowRadius: 4,
 					elevation: 5,
 				}}

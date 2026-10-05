@@ -32,13 +32,13 @@ export function EntryListItem({
 }: Props) {
   return (
     <TouchableOpacity
-      className="mx-4 mb-3 bg-white rounded-xl border border-gray-200 shadow-sm"
+      className="mx-4 mb-3 bg-surfaceElevated dark:bg-surfaceElevatedDark rounded-xl border border-border dark:border-borderDark shadow-sm"
       onPress={onEditar}
       onLongPress={onEliminar}
       activeOpacity={0.7}
     >
       <View className="p-4">
-        <Text className="text-lg font-bold text-gray-800">{label}</Text>
+        <Text className="text-lg font-bold text-text dark:text-textDark">{label}</Text>
       </View>
     </TouchableOpacity>
   );

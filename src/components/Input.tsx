@@ -3,7 +3,7 @@
  * @category UI Components
  */
 import { useState } from "react";
-import { TextInput, View, TextInputProps } from "react-native";
+import { TextInput, View, TextInputProps, useColorScheme } from "react-native";
 import { Text } from "@/components";
 
 type Props = TextInputProps & {
@@ -32,6 +32,7 @@ export function Input({
 	...rest
 }: Props) {
 	const [isFocused, setIsFocused] = useState(false);
+	const colorScheme = useColorScheme();
 	const isMultiline = rest.multiline === true;
 
 	const invalid = !!errorMessage || isInvalid;
@@ -48,9 +49,9 @@ export function Input({
 
 	// Determina a classe da borda baseada no estado
 	const getBorderClass = () => {
-		if (invalid) return "border border-red-500";
-		if (isFocused) return "border border-green-500";
-		return "border-0";
+		if (invalid) return "border border-danger dark:border-dangerDark";
+		if (isFocused) return "border border-primary dark:border-primaryDark";
+		return "border border-border dark:border-borderDark";
 	};
 
 	return (
@@ -59,7 +60,7 @@ export function Input({
 				className={`
           w-full
           rounded-md 
-          bg-white 
+          bg-surface dark:bg-surfaceDark
           justify-center
           ${getBorderClass()}
           ${isReadOnly ? "opacity-50" : "opacity-100"}
@@ -72,8 +73,8 @@ export function Input({
             w-full
             px-4 
 			 ${isMultiline ? "py-2" : ""}
-            bg-white 
-            text-black 
+            bg-surface dark:bg-surfaceDark
+            text-text dark:text-textDark
             rounded-md
 			text-xl
           `}
@@ -84,7 +85,7 @@ export function Input({
 						paddingBottom: 0,
 					}}
 					allowFontScaling={false}
-					placeholderTextColor='#6B7280'
+					placeholderTextColor={colorScheme === "dark" ? "#B6C2D5" : "#64748B"}
 					editable={!isReadOnly}
 					onFocus={handleFocus}
 					onBlur={handleBlur}
@@ -95,7 +96,7 @@ export function Input({
 
 			{/* Error Message */}
 			{errorMessage && (
-				<Text className='text-red-500 text-sm mt-1'>{errorMessage}</Text>
+				<Text className='text-danger dark:text-dangerDark text-sm mt-1'>{errorMessage}</Text>
 			)}
 		</View>
 	);

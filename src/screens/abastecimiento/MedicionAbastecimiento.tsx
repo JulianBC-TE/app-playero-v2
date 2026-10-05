@@ -33,6 +33,7 @@ import {
 } from "@/storage/storageMedicionAbastecimiento";
 import { getTanquesByBodega } from "@DBmodules/tanqueDB";
 import { cubicacionService } from "@DBmodules/cubicacionDB";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface ReglaOp {
   altura: string;
@@ -92,6 +93,7 @@ export function MedicionAbastecimiento({
   navigation,
   route,
 }: StackRoutesProps<"medicionAbastecimiento">) {
+  const insets = useSafeAreaInsets();
   const [base64ImageInicial, setBase64ImageInicial] = useState<string>("");
   const [base64ImageFinal, setBase64ImageFinal] = useState<string>("");
   const idBodega = route.params?.idBodega || "0";
@@ -403,7 +405,7 @@ export function MedicionAbastecimiento({
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 40 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -425,7 +427,7 @@ export function MedicionAbastecimiento({
             {/* SECCIÓN MEDICIÓN INICIAL */}
             <View className="flex-row items-center w-full my-2">
               <View className="flex-1 h-0.5 bg-gray-400" />
-              <Text className="mx-4 text-black text-xl font-bold">
+              <Text className="mx-4 text-text dark:text-textDark text-xl font-bold">
                 Medición Inicial
               </Text>
               <View className="flex-1 h-0.5 bg-gray-400" />
@@ -515,7 +517,7 @@ export function MedicionAbastecimiento({
               <>
                 <View className="flex-row items-center w-full my-2">
                   <View className="flex-1 h-0.5 bg-gray-400" />
-                  <Text className="mx-4 text-black text-xl font-bold">
+                  <Text className="mx-4 text-text dark:text-textDark text-xl font-bold">
                     Medición Final
                   </Text>
                   <View className="flex-1 h-0.5 bg-gray-400" />

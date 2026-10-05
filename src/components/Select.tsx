@@ -2,7 +2,7 @@
  * @module Playero/Components/Select
  * @category UI Components
  */
-import { View } from "react-native";
+import { View, useColorScheme } from "react-native";
 import { Loading } from "./Loading";
 import { Picker, PickerProps } from "@react-native-picker/picker";
 import { useEffect } from "react";
@@ -36,6 +36,8 @@ export function Select<T>({
 	valueField,
 	...rest
 }: SelectProps<T>) {
+	const colorScheme = useColorScheme();
+
 	useEffect(() => {
 		if (!isLoading && data.length > 0 && !selectedValue) {
 			const firstValue = data[0][valueField];
@@ -44,12 +46,12 @@ export function Select<T>({
 	}, [isLoading, data, selectedValue, setSelectedValue, valueField]);
 
 	return (
-		<View className='justify-center w-full h-12 rounded-md border border-gray-500 bg-white'>
+		<View className='justify-center w-full h-12 rounded-md border border-border dark:border-borderDark bg-surface dark:bg-surfaceDark'>
 			{isLoading ? (
 				<Loading />
 			) : (
 				<Picker
-					style={{ width: "100%", color: "#000" }}
+					style={{ width: "100%", color: colorScheme === "dark" ? "#EEF4FF" : "#1D293D" }}
 					selectedValue={selectedValue}
 					onValueChange={(itemValue) => setSelectedValue(itemValue)}
 					{...rest}

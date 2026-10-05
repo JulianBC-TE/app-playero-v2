@@ -21,7 +21,7 @@ import { getStorageSucursal, saveSucursal } from "@/storage/storageSucursal";
 
 import { httpClient } from "@/backend/api/httpClient";
 import { login } from "@/backend/api/authAPI";
-import { saveUserLocally, loginOffline, clearSession } from "@DBmodules/authDB";
+import { saveUserLocally, loginOffline, clearSession, inicializarTimestampsSyncLogin } from "@DBmodules/authDB";
 import { sincronizarModulos } from "@/backend/db/modules/moduleDB";
 import { getSucursalUsuarioActivoLocal } from "@/backend/db/modules/sucursalDB";
 import { reintentarSyncFallidas } from "@/backend/db/modules/reintentarSyncDB";
@@ -183,6 +183,9 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
         await sincronizarModulos(cedula);
         setSyncMessage("Preparando datos locales...");
         await saveUserLocally(loginData, password);
+
+        setSyncMessage("Preparando timestamps de sincronización...");
+        await inicializarTimestampsSyncLogin(loginData);
 
         // Resetea los fallidos (sync = -1 → 0) ANTES de subir, para que el
         // envío inicial de pendientes los incluya.

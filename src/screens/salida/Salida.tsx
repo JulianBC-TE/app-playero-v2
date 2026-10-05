@@ -733,7 +733,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
           message="Grabando salida..."
         />
         <ScreenHeader
-          title="Salida Combustible"
+          title="Salida"
           actions={
             <TouchableOpacity
               onPress={handleNewEntry}
@@ -852,7 +852,7 @@ export function Salida({ navigation, route }: StackRoutesProps<"salida">) {
         visible={savingModal.visible}
         message="Grabando salida..."
       />
-      <ScreenHeader title="Salida Combustible" />
+      <ScreenHeader title="Salida" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}

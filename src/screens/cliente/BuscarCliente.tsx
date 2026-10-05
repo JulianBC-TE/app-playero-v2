@@ -17,6 +17,7 @@ import { XCircle, Search, RefreshCcw } from "lucide-react-native";
 import { FlatList, TouchableOpacity, View } from "react-native";
 import { EmptyList } from "@/components/EmptyList";
 import { Button } from "@/components/Button";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export function BuscarCliente({
   navigation,
@@ -29,6 +30,7 @@ export function BuscarCliente({
   const [isLoading, setIsLoading] = useState(true);
   const [clientes, setClientes] = useState<ClienteDTO[]>([]);
   const enabledSelect = route.params?.enabledSelect ?? false;
+  const insets = useSafeAreaInsets();
 
   function handleSelectClientes(cliente: ClienteDTO) {
     setCliente(cliente); // Coloca o cliente selecionado no contexto
@@ -138,7 +140,7 @@ export function BuscarCliente({
             !isLoading && !filteredClientes.length ? <EmptyList /> : null
           }
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 20 }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
         />
       </View>
     </View>

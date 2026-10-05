@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, TouchableOpacity, Modal, TextInput, Alert } from "react-native";
+import { View, TouchableOpacity, Modal, TextInput, Alert, useColorScheme } from "react-native";
 import { Text } from "@/components";
 import { useNavigation } from "@react-navigation/native";
 import { ArrowLeftSquare, ChevronLeft, ChevronRight, Calendar, Lock, Unlock, X } from "lucide-react-native";
@@ -25,6 +25,7 @@ export function HeaderResumen({
   const [open, setOpen] = useState(false);
   const [modalClaveVisible, setModalClaveVisible] = useState(false);
   const [claveInput, setClaveInput] = useState("");
+  const colorScheme = useColorScheme();
 
   function cambiarDia(cantidad: number) {
     const nueva = new Date(fechaSeleccionada);
@@ -77,7 +78,7 @@ export function HeaderResumen({
   }
 
   return (
-    <View className="bg-teColorPrincipal pt-14 pb-3">
+    <View className="bg-primary dark:bg-surfaceElevatedDark border-b border-primary dark:border-borderDark pt-14 pb-3">
       <View className="flex-row items-center px-8 gap-4 mb-3">
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ArrowLeftSquare color="#fff" size={32} />
@@ -129,11 +130,11 @@ export function HeaderResumen({
       {/* Modal para ingresar clave de desbloqueo */}
       <Modal visible={modalClaveVisible} transparent animationType="fade">
         <View className="flex-1 bg-black/50 justify-center items-center px-6">
-          <View className="bg-white w-full rounded-2xl p-5 shadow-lg">
+          <View className="bg-surface dark:bg-surfaceElevatedDark w-full rounded-2xl p-5 shadow-lg">
             <View className="flex-row justify-between items-center mb-4">
-              <Text className="text-lg font-bold text-gray-800">Ingresar Clave Admin</Text>
+              <Text className="text-lg font-bold text-text dark:text-textDark">Ingresar Clave Admin</Text>
               <TouchableOpacity onPress={() => setModalClaveVisible(false)}>
-                <X color="#6b7280" size={22} />
+                <X color={colorScheme === "dark" ? "#A1A1AA" : "#6b7280"} size={22} />
               </TouchableOpacity>
             </View>
 
@@ -144,7 +145,8 @@ export function HeaderResumen({
               value={claveInput}
               onChangeText={setClaveInput}
               allowFontScaling={false}
-              className="border border-gray-300 rounded-xl px-4 py-3 text-base text-gray-800 mb-4"
+              placeholderTextColor={colorScheme === "dark" ? "#71717A" : "#9CA3AF"}
+              className="border border-border dark:border-borderDark rounded-xl px-4 py-3 text-base text-text dark:text-textDark mb-4"
             />
 
             <TouchableOpacity 

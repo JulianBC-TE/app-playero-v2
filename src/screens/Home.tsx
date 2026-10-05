@@ -14,7 +14,7 @@
 //   - Resto: solo controlado por permisos de módulo.
 
 import { HomeHeader } from "@/components/HomeHeader";
-import { ActivityIndicator, Alert, FlatList, Modal, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Modal, useColorScheme, View } from "react-native";
 import { Text } from "@/components";
 import { MenuCard } from "@/components/MenuCard";
 import { StackRoutesList, StackRoutesProps } from "@/route/app.routes";
@@ -33,6 +33,7 @@ import { hayListasPendientes } from "@/services/listasPendientesService";
 import { descargarEInstalar } from "@/services/updateService";
 import { registrarIntentoActualizacion } from "@/storage/storageUpdate";
 import { getStorageServerUrl } from "@/storage/storageServer";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Download } from "lucide-react-native";
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -92,12 +93,14 @@ function tienePermiso(
 // ─── Componente ──────────────────────────────────────────────────────────────
 
 export function Home({ navigation }: StackRoutesProps<"home">) {
+  const insets = useSafeAreaInsets();
   const [isLoading, setIsLoading] = useState(true);
   const [menuItems, setMenuItems] = useState<menuItemType[]>(baseMenuItems);
   
   const { user, signOut, sucursal, setSucursal, aplicarResultadoSync, syncStatus, syncMessage, setSyncStatus, setSyncMessage, isManualSync, setIsManualSync, syncCompleteCounter, incrementSyncComplete, syncErrorCount, setSyncErrorCount, syncPendingCount, setSyncPendingCount, updatePendiente } = useAuth();
   const cedula = user?.cedula; 
   const estaBloqueado = !!user?.bloqueado;
+  const colorScheme = useColorScheme();
 
   const haySucursal = !!sucursal?.id_sucursal;
 
@@ -346,15 +349,15 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
   // ── Render si el usuario está bloqueado ──────────────────────────────────────
   if (estaBloqueado) {
     return (
-      <View className="flex-1 bg-red-100 items-center justify-center px-6 gap-4">
-        <Text className="text-red-700 text-2xl font-bold text-center">
+      <View className="flex-1 bg-dangerSoft dark:bg-dangerSoftDark items-center justify-center px-6 gap-4">
+        <Text className="text-danger dark:text-dangerDark text-2xl font-bold text-center">
           Acceso Restringido
         </Text>
-        <Text className="text-black text-base text-center font-medium">
+        <Text className="text-text dark:text-textDark text-base text-center font-medium">
           El usuario asociado a esta cuenta ha sido bloqueado en el sistema.
         </Text>
         <Loading />
-        <Text className="text-gray-500 text-sm text-center mt-4 italic">
+        <Text className="text-textMuted dark:text-textMutedDark text-sm text-center mt-4 italic">
           Cerrando sesión de forma segura y eliminando registros locales...
         </Text>
       </View>
@@ -363,11 +366,13 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 
   // ── Render Normal ────────────────────────────────────────────────────────────
   return (
-    <View className="flex-1 justify-between">
+    <View className="flex-1 justify-between bg-background dark:bg-backgroundDark">
       {!isLoading ? (
         <View className="flex-1 justify-between">
           <View>
-            <HomeHeader />
+            <HomeHeader
+              title={`${sucursal?.descripcion_sucursal || "Ninguna Sucursal Seleccionada"}${haySucursal ? ` (${sucursal.id_sucursal})` : ""}`}
+            />
             <View className="px-12">
               <FlatList
                 data={menuConUpdate}
@@ -377,7 +382,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
                   justifyContent: "space-between",
                   marginBottom: 10,
                 }}
-                contentContainerStyle={{ paddingVertical: 24 }}
+                contentContainerStyle={{ paddingTop: 24, paddingBottom: insets.bottom + 24 }}
                 renderItem={({ item }) => (
 <MenuCard
                   name={item.name}
@@ -399,13 +404,6 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
               />
             </View>
           </View>
-
-          <View className="mb-20">
-            <Text className="text-center text-lg font-bold">
-              {sucursal?.descripcion_sucursal || "Ninguna Sucursal Seleccionada"}
-              {haySucursal ? ` (${sucursal.id_sucursal})` : ""}
-            </Text>
-          </View>
         </View>
       ) : (
         <View className="flex-1 items-center justify-center">
@@ -416,12 +414,12 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
       {/* Modal de sincronización */}
       <Modal visible={syncStatus === "syncing" && isManualSync} transparent animationType="fade">
         <View className="flex-1 bg-black/50 items-center justify-center">
-          <View className="bg-white rounded-2xl p-8 items-center mx-8">
-            <ActivityIndicator size="large" color="#000" />
-            <Text className="text-lg font-semibold mt-4 text-center">
+          <View className="bg-surface dark:bg-surfaceElevatedDark rounded-2xl p-8 items-center mx-8 border border-border dark:border-borderDark">
+            <ActivityIndicator size="large" color={colorScheme === "dark" ? "#86A2E8" : "#5B79C7"} />
+            <Text className="text-lg font-semibold mt-4 text-center text-text dark:text-textDark">
               {syncMessage}
             </Text>
-            <Text className="text-sm text-gray-500 mt-2 text-center">
+            <Text className="text-sm text-textMuted dark:text-textMutedDark mt-2 text-center">
               Por favor espere...
             </Text>
           </View>
@@ -430,21 +428,21 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
       {/* Modal de descarga de la actualización */}
       <Modal visible={updateProgress !== null} transparent animationType="fade">
         <View className="flex-1 bg-black/50 items-center justify-center">
-          <View className="bg-white rounded-2xl p-8 items-center mx-8 w-80">
+          <View className="bg-surface dark:bg-surfaceElevatedDark rounded-2xl p-8 items-center mx-8 w-80 border border-border dark:border-borderDark">
             <ActivityIndicator size="large" color="#16a34a" />
-            <Text className="text-lg font-semibold mt-4 text-center">
+            <Text className="text-lg font-semibold mt-4 text-center text-text dark:text-textDark">
               Descargando actualización...
             </Text>
-            <View className="h-2 w-full bg-gray-200 rounded-full mt-4 overflow-hidden">
+            <View className="h-2 w-full bg-secondarySoft dark:bg-secondarySoftDark rounded-full mt-4 overflow-hidden">
               <View
                 className="h-2 bg-green-600 rounded-full"
                 style={{ width: `${updateProgress ?? 0}%` }}
               />
             </View>
-            <Text className="text-sm text-gray-500 mt-2 text-center">
+            <Text className="text-sm text-textMuted dark:text-textMutedDark mt-2 text-center">
               {updateProgress ?? 0}%
             </Text>
-            <Text className="text-sm text-gray-500 mt-1 text-center">
+            <Text className="text-sm text-textMuted dark:text-textMutedDark mt-1 text-center">
               Al finalizar se abrirá el instalador
             </Text>
           </View>

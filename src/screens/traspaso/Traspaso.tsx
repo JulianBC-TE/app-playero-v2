@@ -72,9 +72,9 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   const [queue, setQueue] = useState<TraspasoQueueEntry[]>([]);
   const [currentEntryId, setCurrentEntryId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const [selectedBodegaOrigem, setSelectedBodegaOrigem] = useState<string>(" ");
+  const [selectedBodegaOrigem, setSelectedBodegaOrigem] = useState<string>("");
   const [selectedBodegaDestino, setSelectedBodegaDestino] =
-    useState<string>(" ");
+    useState<string>("");
   const [bodegaOrigem, setBodegaOrigem] = useState<BodegaDTO[]>([]);
   const [bodygaDestino, setBodegaDestino] = useState<BodegaDTO[]>([]);
   const { sucursal, user, syncCompleteCounter } = useAppContext();
@@ -91,7 +91,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
 
   const [motivoConfirmado, setMotivoConfirmado] = useState(false);
   const [cargaCombustible, setCargaCombustible] = useState<string>("");
-  const [selectedPico, setSelectedPico] = useState<string>(" ");
+  const [selectedPico, setSelectedPico] = useState<string>("");
 
   const [base64Obs, setBase64Obs] = useState<string>("");
   const [obs, setObs] = useState<string>("");
@@ -273,9 +273,9 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
   function clearForm() {
     setPersona(null);
     setFirma(null);
-    setSelectedBodegaOrigem(" ");
-    setSelectedBodegaDestino(" ");
-    setSelectedPico(" ");
+    setSelectedBodegaOrigem("");
+    setSelectedBodegaDestino("");
+    setSelectedPico("");
     setCargaCombustible("");
     setTaxilitroInicial("");
     setTaxilitroFinal("");
@@ -1039,18 +1039,18 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
             {/* Medición Inicial: Muestra botón y desglose de Altura/Litros */}
             <InputCard title="Medición Inicial del Tanque Receptor" required>
               {medicionInicial && medicionInicial.length > 0 && (
-                <View className="w-full items-center p-2 mt-2 bg-gray-100 rounded-md border border-gray-200">
-                  <Text className="text-md font-bold text-gray-800">
+                <View className="w-full items-center p-2 mt-2 bg-surfaceElevated dark:bg-surfaceElevatedDark rounded-md border border-border dark:border-borderDark">
+                  <Text className="text-md font-bold text-text dark:text-textDark">
                     Altura: {medicionInicial[0].regla} cm  —  {medicionInicial[0].litros.toLocaleString()} L
                   </Text>
                   {Boolean(medicionInicial[0].temperatura) && (
-                    <Text className="text-xs text-gray-500 mt-1">
+                    <Text className="text-xs text-textMuted dark:text-textMutedDark mt-1">
                       Temperatura: {medicionInicial[0].temperatura} °C
                     </Text>
                   )}
                 </View>
               )}
-              <View><Text className="text-xs text-gray-500">
+              <View><Text className="text-xs text-textMuted dark:text-textMutedDark">
               </Text></View>
               <Button
                 disabled={selectedBodegaDestino === ""}
@@ -1092,7 +1092,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                   }
                 }}
               />
-              <View><Text className="text-xs text-gray-500">
+              <View><Text className="text-xs text-textMuted dark:text-textMutedDark">
               </Text></View>
             </InputCard>
 
@@ -1112,18 +1112,18 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
             {/* Medición Final: Muestra botón y desglose de Altura/Litros */}
             <InputCard title="Medición Final del Tanque Receptor" required>
               {medicionFinal && medicionFinal.length > 0 && (
-                <View className="w-full items-center p-2 mt-2 bg-gray-100 rounded-md border border-gray-200">
-                  <Text className="text-md font-bold text-gray-800">
+                <View className="w-full items-center p-2 mt-2 bg-surfaceElevated dark:bg-surfaceElevatedDark rounded-md border border-border dark:border-borderDark">
+                  <Text className="text-md font-bold text-text dark:text-textDark">
                     Altura: {medicionFinal[0].regla} cm  —  {medicionFinal[0].litros.toLocaleString()} L
                   </Text>
                   {Boolean(medicionFinal[0].temperatura) && (
-                    <Text className="text-xs text-gray-500 mt-1">
+                    <Text className="text-xs text-textMuted dark:text-textMutedDark mt-1">
                       Temperatura: {medicionFinal[0].temperatura} °C
                     </Text>
                   )}
                 </View>
               )}
-              <View><Text className="text-xs text-gray-500">
+              <View><Text className="text-xs text-textMuted dark:text-textMutedDark">
               </Text></View>
               <Button
                 disabled={selectedBodegaDestino === ""}
@@ -1165,7 +1165,7 @@ export function Traspaso({ navigation, route }: StackRoutesProps<"traspaso">) {
                   }
                 }}
               />
-              <View><Text className="text-xs text-gray-500">
+              <View><Text className="text-xs text-textMuted dark:text-textMutedDark">
               </Text></View>
             </InputCard>
 

@@ -4,6 +4,7 @@ import { toastError } from "@/utils/toastMessage";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, ScrollView, View } from "react-native";
 import { Text } from "@/components";
+import { useTheme } from "@/contexts/ThemeContext";
 import { InputCard } from "@/components/InputCard";
 import { Button } from "@/components/Button";
 import { Select } from "@/components/Select";
@@ -61,6 +62,8 @@ export function Sequencias({
   const [valorMedicion, setValorMedicion] = useState("");
 
   const insets = useSafeAreaInsets();
+  const { currentTheme } = useTheme();
+  const isDark = currentTheme === "dark";
 
   // Fotos
   const [photoSequencia, setPhotoSequencia] = useState("");
@@ -232,7 +235,7 @@ export function Sequencias({
   const esPrimeraCarga = mediciones.totalMediciones === 0;
 
   return (
-    <View className="flex-1" style={{ backgroundColor: "#F9FAFB" }}>
+    <View className="flex-1 bg-background dark:bg-backgroundDark">
       <ScreenHeader title="Secuencia de Verificación" />
       <ScrollView
         contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 40 }}
@@ -242,9 +245,12 @@ export function Sequencias({
         <View className="flex-1 px-4 py-6 gap-5">
           {/* Info del Pico */}
           <View className="rounded-lg overflow-hidden" style={{ elevation: 4 }}>
-            <View style={{ backgroundColor: "#3B82F6" }}>
+            <View className="bg-primarySoft dark:bg-primarySoftDark border border-primary/20 dark:border-primaryDark/30">
               <InputCard title={descripcionPico ? " " : "Pico surtidor"} locked>
-                <Text className="text-3xl text-white text-center font-bold py-2 px-4">
+                <Text
+                  className="text-3xl text-center font-bold py-2 px-4"
+                  style={{ color: isDark ? "#EEF4FF" : "#1D293D" }}
+                >
                   {descripcionPico || `Pico N.º ${pico}`}
                 </Text>
               </InputCard>
@@ -259,16 +265,16 @@ export function Sequencias({
             >
               <View
                 style={{
-                  backgroundColor: "#F0FDF4",
+                  backgroundColor: isDark ? "#12351F" : "#F0FDF4",
                   borderWidth: 1,
-                  borderColor: "#BBF7D0",
+                  borderColor: isDark ? "#4ADE80" : "#BBF7D0",
                 }}
               >
                 <InputCard title="Secuencias acumuladas">
                   <View className="p-4 gap-2 w-full">
-                    <Text className="text-gray-700 text-center text-3xl">
+                    <Text className="text-text dark:text-textDark text-center text-3xl">
                       Secuencias:{" "}
-                      <Text className="text-red-700 font-bold">
+                      <Text className="text-danger dark:text-dangerDark font-bold">
                         {mediciones.totalMediciones}
                       </Text>
                     </Text>
@@ -280,19 +286,18 @@ export function Sequencias({
 
           {/* Formulario de Registro */}
           <View className="rounded-lg overflow-hidden " style={{ elevation: 3 }}>
-            <View style={{ backgroundColor: "#FFFFFF" }}>
+            <View className="bg-surface dark:bg-surfaceDark">
               <InputCard title="Formulario de secuencia" required>
                 <View className="p-4 gap-4 w-full">
-                  <Text className="text-gray-900 font-bold text-center tracking-wider text-xl">
+                  <Text className="text-text dark:text-textDark font-bold text-center tracking-wider text-xl">
                     LECTURAS DEL TAXILITRO
                   </Text>
 
                   {/* Taxilitro Inicial */}
                   <View
-                    className="gap-2 p-3 rounded-lg"
-                    style={{ backgroundColor: "#F3F4F6" }}
+                    className="gap-2 p-3 rounded-lg bg-surfaceElevated dark:bg-surfaceElevatedDark"
                   >
-                    <Text className="text-gray-700 font-semibold text-xl">
+                    <Text className="text-text dark:text-textDark font-semibold text-xl">
                       Taxilitro Inicial
                     </Text>
                     <View className="flex-row items-center gap-2">
@@ -324,11 +329,8 @@ export function Sequencias({
                   </View>
 
                   {/* Taxilitro Final */}
-                  <View
-                    className="gap-2 p-3 rounded-lg"
-                    style={{ backgroundColor: "#F3F4F6" }}
-                  >
-                    <Text className="text-gray-700 font-semibold text-xl">
+                  <View className="gap-2 p-3 rounded-lg bg-surfaceElevated dark:bg-surfaceElevatedDark">
+                    <Text className="text-text dark:text-textDark font-semibold text-xl">
                       Taxilitro Final
                     </Text>
                     <View className="flex-row items-center gap-2">
@@ -352,18 +354,17 @@ export function Sequencias({
                       />
                     </View>
                   </View>
-                  <View className="h-px bg-gray-200" />
+                  <View className="h-px bg-border dark:bg-borderDark" />
 
                   {/* SECCIÓN DETALLES FÍSICOS */}
-                  <Text className="text-gray-900 font-bold text-center tracking-wider text-xl">
+                  <Text className="text-text dark:text-textDark font-bold text-center tracking-wider text-xl">
                     MEDICIÓN FISICA (BALDE)
                   </Text>
                   <View
-                    className="gap-3 p-3 rounded-lg"
-                    style={{ backgroundColor: "#F9FAFB" }}
+                    className="gap-3 p-3 rounded-lg bg-surfaceElevated dark:bg-surfaceElevatedDark"
                   >
                     <View>
-                      <Text className="text-gray-700 font-semibold text-xl">
+                      <Text className="text-text dark:text-textDark font-semibold text-xl">
                         Litros cargados
                       </Text>
                       <Input
@@ -375,7 +376,7 @@ export function Sequencias({
                       />
                     </View>
                     <View>
-                      <Text className="text-gray-700 font-semibold text-xl">
+                      <Text className="text-text dark:text-textDark font-semibold text-xl">
                         Error de medición (ml)
                       </Text>
                       <Select
@@ -388,8 +389,8 @@ export function Sequencias({
                       />
                     </View>
 
-                    <View className="flex-row items-center justify-between mt-2 p-3 rounded-md bg-blue-50 border border-blue-200">
-                      <Text className="text-gray-900 font-medium text-xl flex-1">
+                    <View className="flex-row items-center justify-between mt-2 p-3 rounded-md bg-infoSoft dark:bg-infoSoftDark border border-info/20 dark:border-infoDark/30">
+                      <Text className="text-text dark:text-textDark font-medium text-xl flex-1">
                         Foto del balde graduado
                       </Text>
                       <Photo

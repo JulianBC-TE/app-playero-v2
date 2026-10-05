@@ -8,7 +8,8 @@ import {
   ScrollView, 
   Image, 
   TouchableWithoutFeedback,
-  ActivityIndicator
+  ActivityIndicator,
+  useColorScheme
 } from "react-native";
 import { Text } from "@/components";
 import { getRegistrosPorTipo, eliminarRegistroPorTipo, RegistroResumen, TipoRegistro, ImagenDetalle } from "@DBmodules/resumenBD";
@@ -32,18 +33,21 @@ interface GrupoBodega {
 // Subcomponente para renderizar la imagen con control de fallos
 function TarjetaImagen({ img, onPress }: { img: ImagenDetalle; onPress: () => void }) {
   const [hasError, setHasError] = useState(false);
+  const colorScheme = useColorScheme();
+  const iconColor = colorScheme === "dark" ? "#A1A1AA" : "#4b5563";
+  const errorColor = colorScheme === "dark" ? "#71717A" : "#9ca3af";
 
   return (
-    <View className="bg-gray-50 p-3 rounded-2xl border border-gray-200">
+    <View className="bg-surfaceElevated dark:bg-surfaceElevatedDark p-3 rounded-2xl border border-border dark:border-borderDark">
       <View className="flex-row items-center gap-2 mb-2">
-        <ImageIcon size={16} color="#4b5563" />
-        <Text className="text-xs font-bold text-gray-700">{img.titulo}</Text>
+        <ImageIcon size={16} color={iconColor} />
+        <Text className="text-xs font-bold text-text dark:text-textDark">{img.titulo}</Text>
       </View>
       
       {hasError ? (
-        <View className="w-full h-40 bg-gray-200 rounded-xl items-center justify-center p-3 border border-dashed border-gray-300">
-          <AlertTriangle color="#9ca3af" size={24} />
-          <Text className="text-xs text-gray-500 font-medium text-center mt-1">
+        <View className="w-full h-40 bg-secondarySoft dark:bg-secondarySoftDark rounded-xl items-center justify-center p-3 border border-dashed border-border dark:border-borderDark">
+          <AlertTriangle color={errorColor} size={24} />
+          <Text className="text-xs text-textMuted dark:text-textMutedDark font-medium text-center mt-1">
             No se pudo cargar el archivo de imagen
           </Text>
         </View>
@@ -67,6 +71,8 @@ function TarjetaImagen({ img, onPress }: { img: ImagenDetalle; onPress: () => vo
 // Componente de vista de logs con filtros y colores
 function ListaLogs({ registros }: { registros: RegistroResumen[] }) {
   const [filtroActivo, setFiltroActivo] = useState<"todos" | "creacion" | "sync_ok" | "sync_error">("todos");
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
 
   const registrosFiltrados = useMemo(() => {
     if (filtroActivo === "todos") return registros;
@@ -80,10 +86,10 @@ function ListaLogs({ registros }: { registros: RegistroResumen[] }) {
 
   const getBackgroundColor = (syncStatus: number) => {
     switch (syncStatus) {
-      case 0: return "#fef9c3"; // amarillo - creacion
-      case 1: return "#dcfce7"; // verde - sync_ok
-      case -1: return "#fee2e2"; // rojo - sync_error
-      default: return "#ffffff";
+      case 0: return isDark ? "#422006" : "#fef9c3"; // amarillo - creacion
+      case 1: return isDark ? "#052e16" : "#dcfce7"; // verde - sync_ok
+      case -1: return isDark ? "#450a0a" : "#fee2e2"; // rojo - sync_error
+      default: return isDark ? "#18181b" : "#ffffff";
     }
   };
 
@@ -102,19 +108,19 @@ function ListaLogs({ registros }: { registros: RegistroResumen[] }) {
         backgroundColor: getBackgroundColor(item.syncStatus),
         padding: 10,
         borderBottomWidth: 1,
-        borderBottomColor: '#e5e5e5',
+        borderBottomColor: isDark ? '#27272a' : '#e5e5e5',
       }}
     >
-      <Text style={{ fontSize: 13, color: '#000000' }}>
+      <Text style={{ fontSize: 13, color: isDark ? '#f4f4f5' : '#000000' }}>
         {item.hora}  {item.datoPrincipal}  {item.datoSecundario}  {getAccionLabel(item.syncStatus)}
       </Text>
     </View>
   );
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className="flex-1 bg-background dark:bg-backgroundDark">
       {/* Filtros */}
-      <View className="flex-row px-3 py-2 gap-2 bg-white border-b border-gray-200">
+      <View className="flex-row px-3 py-2 gap-2 bg-surface dark:bg-surfaceElevatedDark border-b border-border dark:border-borderDark">
         {[
           { key: "todos", label: "Todos" },
           { key: "creacion", label: "Creación" },
@@ -128,13 +134,13 @@ function ListaLogs({ registros }: { registros: RegistroResumen[] }) {
               paddingHorizontal: 12,
               paddingVertical: 6,
               borderRadius: 16,
-              backgroundColor: filtroActivo === f.key ? "#2563eb" : "#e5e7eb",
+              backgroundColor: filtroActivo === f.key ? "#2563eb" : isDark ? "#27272a" : "#e5e7eb",
             }}
           >
             <Text style={{ 
               fontSize: 12, 
               fontWeight: "bold",
-              color: filtroActivo === f.key ? "#ffffff" : "#374151" 
+              color: filtroActivo === f.key ? "#ffffff" : isDark ? "#d4d4d8" : "#374151" 
             }}>
               {f.label}
             </Text>
@@ -151,7 +157,7 @@ function ListaLogs({ registros }: { registros: RegistroResumen[] }) {
         contentContainerStyle={{ paddingBottom: 32 }}
         ListEmptyComponent={
           <View className="flex-1 items-center justify-center pt-16">
-            <Text className="text-gray-400 text-base text-center px-6">
+            <Text className="text-textMuted dark:text-textMutedDark text-base text-center px-6">
               No se encontraron logs para esta fecha.
             </Text>
           </View>
@@ -167,6 +173,8 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
   const [itemSeleccionado, setItemSeleccionado] = useState<RegistroResumen | null>(null);
   const [imagenModalUri, setImagenModalUri] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
 
   async function cargarRegistros() {
     try {
@@ -206,24 +214,24 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
     switch (status) {
       case 1:
         return {
-          backgroundColor: "#5ce98620",
-          borderColor: "#8ff8b4",
+          backgroundColor: isDark ? "#14532d33" : "#5ce98620",
+          borderColor: isDark ? "#166534" : "#8ff8b4",
           iconColor: "#16a34a",
           Icono: CheckCircle2,
           texto: "Sincronizado"
         };
       case -1:
         return {
-          backgroundColor: "#fef2f2",
-          borderColor: "#fecaca",
+          backgroundColor: isDark ? "#7f1d1d33" : "#fef2f2",
+          borderColor: isDark ? "#b91c1c" : "#fecaca",
           iconColor: "#dc2626",
           Icono: AlertTriangle,
           texto: "Error Sync"
         };
       default:
         return {
-          backgroundColor: "#fefce8",
-          borderColor: "#fef08a",
+          backgroundColor: isDark ? "#713f1233" : "#fefce8",
+          borderColor: isDark ? "#a16207" : "#fef08a",
           iconColor: "#ca8a04",
           Icono: Clock,
           texto: "Pendiente"
@@ -317,7 +325,7 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50">
+      <View className="flex-1 items-center justify-center bg-background dark:bg-backgroundDark">
         <Loading />
       </View>
     );
@@ -347,18 +355,18 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
             onPress={() => setItemSeleccionado(null)} 
           />
 
-          <View className="bg-white rounded-t-3xl p-6 shadow-2xl max-h-[88%]">
+          <View className="bg-surface dark:bg-surfaceElevatedDark rounded-t-3xl p-6 shadow-2xl max-h-[88%]">
             
             {/* Encabezado */}
-            <View className="flex-row justify-between items-center border-b border-gray-100 pb-3 mb-3">
+            <View className="flex-row justify-between items-center border-b border-border dark:border-borderDark pb-3 mb-3">
               <View className="flex-row items-center gap-2 flex-1 pr-2">
                 <ComponenteIcono color={config.iconColor} size={22} />
-                <Text className="text-xl font-bold text-gray-800" numberOfLines={1}>
+                <Text className="text-xl font-bold text-text dark:text-textDark" numberOfLines={1}>
                   {itemSeleccionado.datoPrincipal}
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setItemSeleccionado(null)} className="p-1">
-                <X color="#6b7280" size={24} />
+                <X color={isDark ? "#A1A1AA" : "#6b7280"} size={24} />
               </TouchableOpacity>
             </View>
 
@@ -366,8 +374,8 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
               
               {/* Badge Estado */}
-              <View className="flex-row items-center justify-between bg-gray-50 p-3 rounded-xl border border-gray-100 mb-4">
-                <Text className="text-xs font-bold text-gray-400 uppercase">Estado Sincronización</Text>
+              <View className="flex-row items-center justify-between bg-surfaceElevated dark:bg-surfaceDark p-3 rounded-xl border border-border dark:border-borderDark mb-4">
+                <Text className="text-xs font-bold text-textMuted dark:text-textMutedDark uppercase">Estado Sincronización</Text>
                 <View className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ backgroundColor: config.backgroundColor }}>
                   <ComponenteIcono color={config.iconColor} size={14} />
                   <Text className="text-xs font-bold" style={{ color: config.iconColor }}>{config.texto}</Text>
@@ -375,29 +383,29 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
               </View>
 
               {/* Campos */}
-              <Text className="text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
+              <Text className="text-sm font-bold text-text dark:text-textDark mb-2 uppercase tracking-wide">
                 Información Detallada
               </Text>
 
-              <View className="bg-gray-50 rounded-2xl p-4 border border-gray-100 gap-3 mb-5">
+              <View className="bg-surfaceElevated dark:bg-surfaceDark rounded-2xl p-4 border border-border dark:border-borderDark gap-3 mb-5">
                 {itemSeleccionado.camposDetalle && itemSeleccionado.camposDetalle.length > 0 ? (
                   itemSeleccionado.camposDetalle.map((campo, index) => (
-                    <View key={index} className="flex-row justify-between items-start border-b border-gray-100/80 pb-2">
-                      <Text className="text-xs font-semibold text-gray-500 flex-1 pr-2">
+                    <View key={index} className="flex-row justify-between items-start border-b border-border/80 dark:border-borderDark pb-2">
+                      <Text className="text-xs font-semibold text-textMuted dark:text-textMutedDark flex-1 pr-2">
                         {campo.label}
                       </Text>
-                      <Text className="text-xs font-bold text-gray-800 flex-1 text-right">
+                      <Text className="text-xs font-bold text-text dark:text-textDark flex-1 text-right">
                         {campo.value !== null && campo.value !== undefined ? String(campo.value) : "—"}
                       </Text>
                     </View>
                   ))
                 ) : (
-                  <Text className="text-xs text-gray-400 text-center">No hay campos adicionales disponibles.</Text>
+                  <Text className="text-xs text-textMuted dark:text-textMutedDark text-center">No hay campos adicionales disponibles.</Text>
                 )}
               </View>
 
               {/* Galería de Fotografías */}
-              <Text className="text-sm font-bold text-gray-800 mb-2 uppercase tracking-wide">
+              <Text className="text-sm font-bold text-text dark:text-textDark mb-2 uppercase tracking-wide">
                 Fotografías y Adjuntos
               </Text>
 
@@ -412,8 +420,8 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
                   ))}
                 </View>
               ) : (
-                <View className="p-4 bg-gray-50 rounded-xl border border-gray-100 mb-4 items-center">
-                  <Text className="text-xs text-gray-400">Sin imágenes adjuntas en este registro.</Text>
+                <View className="p-4 bg-surfaceElevated dark:bg-surfaceDark rounded-xl border border-border dark:border-borderDark mb-4 items-center">
+                  <Text className="text-xs text-textMuted dark:text-textMutedDark">Sin imágenes adjuntas en este registro.</Text>
                 </View>
               )}
 
@@ -496,7 +504,7 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
 
   if (tipo === "turno") {
     return (
-      <View className="flex-1 bg-gray-50 px-5 py-4">
+      <View className="flex-1 bg-background dark:bg-backgroundDark px-5 py-4">
         <FlatList
           data={registrosAgrupados}
           keyExtractor={(item) => `grupo-${item.bodega}`}
@@ -504,15 +512,15 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
           contentContainerStyle={{ paddingBottom: 32 }}
           ListEmptyComponent={
             <View className="flex-1 items-center justify-center pt-16">
-              <Text className="text-gray-400 text-base text-center px-6">
+              <Text className="text-textMuted dark:text-textMutedDark text-base text-center px-6">
                 No se encontraron turnos para la fecha seleccionada.
               </Text>
             </View>
           }
           renderItem={({ item }: { item: GrupoBodega }) => (
-            <View className="mb-5 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xs">
-              <View className="bg-gray-100 px-4 py-3 border-b border-gray-200">
-                <Text className="text-lg font-bold text-gray-800">{item.bodega}</Text>
+            <View className="mb-5 overflow-hidden rounded-2xl border border-border dark:border-borderDark bg-surface dark:bg-surfaceElevatedDark shadow-xs">
+              <View className="bg-surfaceElevated dark:bg-surfaceDark px-4 py-3 border-b border-border dark:border-borderDark">
+                <Text className="text-lg font-bold text-text dark:text-textDark">{item.bodega}</Text>
               </View>
 
               <View>
@@ -525,22 +533,22 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
                       key={turno.id}
                       onPress={() => setItemSeleccionado(turno)}
                       className={`flex-row justify-between items-center p-4 ${
-                        index !== item.items.length - 1 ? "border-b border-gray-100" : ""
+                        index !== item.items.length - 1 ? "border-b border-border dark:border-borderDark" : ""
                       }`}
                       style={{ backgroundColor: config.backgroundColor }}
                     >
                       <View className="flex-1 flex-row items-center pr-4 gap-3">
                         <ComponenteIcono color={config.iconColor} size={18} />
                         <View className="flex-1">
-                          <Text className="text-sm font-semibold text-gray-800">
+                          <Text className="text-sm font-semibold text-text dark:text-textDark">
                             {turno.datoSecundario}
                           </Text>
                         </View>
                       </View>
 
                       <View className="items-end min-w-[75px]">
-                        <Text className="text-sm font-medium text-gray-400">{turno.litros}</Text>
-                        <Text className="text-xs font-bold text-gray-600 mt-0.5">{turno.hora} hs</Text>
+                        <Text className="text-sm font-medium text-textMuted dark:text-textMutedDark">{turno.litros}</Text>
+                        <Text className="text-xs font-bold text-textMuted dark:text-textMutedDark mt-0.5">{turno.hora} hs</Text>
                       </View>
                     </TouchableOpacity>
                   );
@@ -555,7 +563,7 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
   }
 
   return (
-    <View className="flex-1 bg-gray-50 px-5 py-4">
+    <View className="flex-1 bg-background dark:bg-backgroundDark px-5 py-4">
       <FlatList
         data={registros}
         keyExtractor={(item) => `${tipo}-${item.id}`}
@@ -563,7 +571,7 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
         contentContainerStyle={{ paddingBottom: 32 }}
         ListEmptyComponent={
           <View className="flex-1 items-center justify-center pt-16">
-            <Text className="text-gray-400 text-base text-center px-6">
+            <Text className="text-textMuted dark:text-textMutedDark text-base text-center px-6">
               No se encontraron registros para esta categoría en la fecha seleccionada.
             </Text>
           </View>
@@ -584,21 +592,21 @@ export function ListaResumenSincronizacion({ tipo, fechaFiltro, isUnlocked }: Li
               <View className="flex-1 flex-row items-center pr-4 gap-3">
                 <ComponenteIcono color={config.iconColor} size={20} />
                 <View className="flex-1">
-                  <Text className="text-base font-bold text-gray-800" numberOfLines={1}>
+                  <Text className="text-base font-bold text-text dark:text-textDark" numberOfLines={1}>
                     {item.datoPrincipal}
                   </Text>
-                  <Text className="text-xs text-gray-500 mt-0.5" numberOfLines={1}>
+                  <Text className="text-xs text-textMuted dark:text-textMutedDark mt-0.5" numberOfLines={1}>
                     {item.datoSecundario}
                   </Text>
                 </View>
               </View>
 
               <View className="items-end min-w-[85px]">
-                <Text className="text-base font-black text-gray-900">
+                <Text className="text-base font-black text-text dark:text-textDark">
                   {typeof item.litros === "number" ? `${item.litros.toLocaleString()} L` : item.litros}
                 </Text>
-                <View className="mt-1 px-2 py-0.5 bg-white/70 rounded border border-gray-200">
-                  <Text className="text-[11px] font-medium text-gray-600">{item.hora} hs</Text>
+                <View className="mt-1 px-2 py-0.5 bg-surface/70 dark:bg-surfaceElevatedDark rounded border border-border dark:border-borderDark">
+                  <Text className="text-[11px] font-medium text-textMuted dark:text-textMutedDark">{item.hora} hs</Text>
                 </View>
               </View>
             </TouchableOpacity>

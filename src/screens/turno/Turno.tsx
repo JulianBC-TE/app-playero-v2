@@ -730,6 +730,7 @@ export function Turno({ navigation, route }: StackRoutesProps<"turno">) {
           <Select
             data={bodegas}
             isLoading={isLoading}
+            selectedValue={selectedBodega}
             setSelectedValue={handleBodegaChange}
             labelField="descripcion_bodega"
             valueField="id_bodega"

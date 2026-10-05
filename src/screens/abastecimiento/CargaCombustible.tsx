@@ -25,6 +25,7 @@ import {
   removeCargaCombustible,
 } from "@/storage/storageCargaCombustible";
 import { getPicosByBodega } from "@DBmodules/picoDB";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export function CargaCombustible({
   navigation,
@@ -32,6 +33,7 @@ export function CargaCombustible({
 }: StackRoutesProps<"cargaCombustible">) {
   const idBodega = route.params?.idBodega || "0";
   const entryId = route.params?.entryId || "0";
+  const insets = useSafeAreaInsets();
 
   const [salida, setSalida] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -199,7 +201,7 @@ export function CargaCombustible({
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 40 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -218,7 +220,7 @@ export function CargaCombustible({
                 <View></View>
               )}
               {salida !== 0 && (
-                <Text className="text-lg text-black font-bold">
+                <Text className="text-lg text-text dark:text-textDark font-bold">
                   {picos.find((pico) => String(pico.id_pico) === String(selectedPico))
                     ?.descripcion_pico || selectedPico}
                 </Text>

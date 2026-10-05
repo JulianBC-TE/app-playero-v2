@@ -2,7 +2,7 @@
  * @module Playero/Components/EmptyList
  * @category UI Components
  */
-import { View } from "react-native";
+import { useColorScheme, View } from "react-native";
 import { Text } from "@/components";
 import { Frown } from "lucide-react-native";
 
@@ -11,13 +11,15 @@ import { Frown } from "lucide-react-native";
  * Renderiza un ícono y el mensaje "No se encontraron resultados".
  */
 export function EmptyList() {
+	const colorScheme = useColorScheme();
+
 	return (
 		<View className='flex-1 items-center justify-center mt-36'>
 			<Frown
 				size={64}
-				color='#9CA3AF' // equivalent to $gray600
+				color={colorScheme === "dark" ? "#B6C2D5" : "#64748B"}
 			/>
-			<Text className='text-2xl text-gray-500 font-semibold'>
+			<Text className='text-2xl text-textMuted dark:text-textMutedDark font-semibold'>
 				No se encontraron resultados
 			</Text>
 		</View>

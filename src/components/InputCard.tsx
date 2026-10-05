@@ -3,7 +3,7 @@
  * @category UI Components
  */
 import clsx from "clsx";
-import { View } from "react-native";
+import { useColorScheme, View } from "react-native";
 import { Text } from "@/components";
 import { LockKeyhole, Check } from "lucide-react-native"; // Importa apenas para garantir que os ícones sejam incluídos no bundle
 
@@ -33,27 +33,31 @@ export function InputCard({
 	className?: string;
 	verified?: boolean; // Adiciona a propriedade verified
 }) {
+	const colorScheme = useColorScheme();
+	const iconColor = colorScheme === "dark" ? "#FBBF24" : "#D97706";
+	const verifiedColor = colorScheme === "dark" ? "#4ADE80" : "#16A34A";
+
 	return (
 		<View className='relative w-full'>
 			<View
 				className={clsx(
-					"bg-teColorPrincipalClaro items-center w-full px-4 rounded-md",
+					"bg-surfaceElevated dark:bg-surfaceElevatedDark border border-border dark:border-borderDark items-center w-full px-4 rounded-md",
 					!className?.includes("min-h-") && "min-h-24", // aplica min-h-24 se não houver override
 					className
 				)}
 			>
 				{title && (
-					<Text className='text-xl text-black font-bold mt-2'>{title}</Text>
+					<Text className='text-xl text-text dark:text-textDark font-bold mt-2'>{title}</Text>
 				)}
 				{children}
 			</View>
 
 			{required && !locked && (
-				<Text className='text-red-500 absolute top-0 right-1 text-3xl font-bold'>
+				<Text className='text-danger dark:text-dangerDark absolute top-0 right-1 text-3xl font-bold'>
 					{verified ? (
 						<Check
 							size={24}
-							color={"green"}
+							color={verifiedColor}
 						/>
 					) : (
 						<Text>*</Text>
@@ -61,8 +65,8 @@ export function InputCard({
 				</Text>
 			)}
 			{locked && (
-				<Text className='text-red-500 absolute top-0 right-1 text-3xl font-bold'>
-					<LockKeyhole size={16} />
+				<Text className='text-warning dark:text-warningDark absolute top-0 right-1 text-3xl font-bold'>
+					<LockKeyhole size={16} color={iconColor} />
 				</Text>
 			)}
 		</View>

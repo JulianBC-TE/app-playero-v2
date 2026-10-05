@@ -661,7 +661,7 @@ export function Calibracion({
                 />
               )}
               {salida !== 0 && (
-                <Text className="text-lg text-black font-bold">
+                <Text className="text-lg text-text dark:text-textDark font-bold">
                   Pico seleccionado: {selectedPico}
                 </Text>
               )}
@@ -733,7 +733,7 @@ export function Calibracion({
                 />
               ) : (
                 <View className="gap-3 w-full items-center">
-                  <Text className="text-lg text-black font-bold">
+                  <Text className="text-lg text-text dark:text-textDark font-bold">
                     Mediciones Realizadas: {mediciones.totalMediciones}
                   </Text>
                   {salida === 0 && (
@@ -748,7 +748,7 @@ export function Calibracion({
                 </View>
               )}
               <View className="gap-3 w-full items-center">
-                <Text className="text-lg text-black font-bold"></Text>
+                <Text className="text-lg text-text dark:text-textDark font-bold"></Text>
               </View>
             </InputCard>
 

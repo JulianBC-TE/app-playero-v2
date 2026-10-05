@@ -71,6 +71,18 @@ Mapa práctico de cambios:
 
 ---
 
+## Pendientes de tema oscuro
+
+- `src/components/Photo.tsx`: el estado "sin foto" se recibe desde pantallas como
+  `iconColor="#000"` en varios módulos. Resolver en la iteración de pantallas de
+  módulos para no tocar call sites operativos en un cambio solo de componentes.
+- `src/components/HeaderResumen.tsx`: `DatePickerModal` de
+  `react-native-paper-dates` sigue con tema claro porque la app todavía no monta
+  `PaperProvider`. Para completarlo, envolver la navegación con
+  `Provider`/`MD3DarkTheme` de `react-native-paper`.
+
+---
+
 ## Al terminar un cambio
 
 - [ ] ¿Hubo cambios de código? → bump en `app.json`.

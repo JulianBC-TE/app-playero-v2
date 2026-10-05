@@ -64,7 +64,7 @@ export function Setup() {
   }
 
   return (
-    <View className="flex-1 bg-teColorSecundarioMedio">
+		<View className="flex-1 bg-background dark:bg-backgroundDark">
       <View className="flex-1 p-4 gap-4 items-center">
         <View className="mt-32 mb-12">
           <Image
@@ -103,7 +103,7 @@ export function Setup() {
             onPress={handleSubmit(handleSetup)}
             isLoading={isLoading}
           />
-          <Text className="text-red-500 text-center mt-2">
+			<Text className="text-danger dark:text-dangerDark text-center mt-2">
             {errorText?.message || ""}
           </Text>
         </View>

@@ -651,7 +651,7 @@ export function Abastecimiento({
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 40 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -712,7 +712,7 @@ export function Abastecimiento({
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: insets.bottom + 40 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -878,23 +878,23 @@ export function Abastecimiento({
                           return (
                             <View
                               key={index}
-                              className="p-3 bg-gray-100 rounded-lg border border-gray-200 gap-1"
+                              className="p-3 bg-surfaceElevated dark:bg-surfaceElevatedDark rounded-lg border border-border dark:border-borderDark gap-1"
                             >
-                              <View className="flex-row justify-between border-b border-gray-200 pb-1">
-                                <Text className="font-bold text-gray-800 text-base text-lg">
+                              <View className="flex-row justify-between border-b border-border dark:border-borderDark pb-1">
+                                <Text className="font-bold text-text dark:text-textDark text-base text-lg">
                                   Inicial:
                                 </Text>
-                                <Text className="font-bold text-gray-800 text-base text-lg">
+                                <Text className="font-bold text-text dark:text-textDark text-base text-lg">
                                   {medIni.litros} L  -  {" "}
                                   {medIni.temperatura} °C
                                 </Text>
                               </View>
                               {medFin && (
                                 <View className="flex-row justify-between pt-1">
-                                  <Text className="font-bold text-gray-800 text-base text-lg">
+                                  <Text className="font-bold text-text dark:text-textDark text-base text-lg">
                                     Final:
                                   </Text>
-                                  <Text className="font-bold text-gray-800 text-base text-lg">
+                                  <Text className="font-bold text-text dark:text-textDark text-base text-lg">
                                     {medFin.litros} L  - {" "}
                                     {medFin.temperatura} °C
                                   </Text>

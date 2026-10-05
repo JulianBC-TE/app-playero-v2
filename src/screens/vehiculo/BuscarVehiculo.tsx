@@ -19,6 +19,7 @@ import { EmptyList } from "@/components/EmptyList";
 import { StackRoutesProps } from "@/route/app.routes";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { getVehiculosPaginado } from "@DBmodules/vehiculoDB";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const PAGE_SIZE = 15;
 
@@ -34,6 +35,7 @@ export function BuscarVehiculo({
   const [hasMore, setHasMore] = useState(true);
   const fromScreen = route.params?.fromScreen || "";
   const [isLoading, setIsLoading] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // Cria o debounce uma vez
   const debouncedSetQuery = useRef(
@@ -174,6 +176,7 @@ export function BuscarVehiculo({
           onRefresh={handleRefresh}
           refreshing={isRefreshing}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
           ListFooterComponent={
             isLoading && !isRefreshing ? (
               <ActivityIndicator size="small" color="#666" className="mt-4" />

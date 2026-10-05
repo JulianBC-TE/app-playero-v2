@@ -16,6 +16,7 @@ import { LoginResponse } from "@/backend/api/authAPI";
 import { savePersonas } from "./personaDB";
 import { saveSucursales } from "./sucursalDB";
 import { LAST_USER_KEY, getCedulaUsuarioActivo } from "./usuarioSesionDB";
+import { syncsController } from "./syncsDB";
 
 // ---------------------------------------------------------------------------
 // Tipos públicos
@@ -99,6 +100,7 @@ export async function saveUserLocally(loginData: LoginResponse, passwordClearTex
     {
       cedula: persona.cedula,
       nombre_apellido: persona.nombreApellido,
+      is_deleted: 0,
     },
   ]);
       
@@ -142,6 +144,34 @@ export async function saveUserLocally(loginData: LoginResponse, passwordClearTex
       target: syncs.tipo, 
       set: { fecha: usuarioApp.cedula } 
     });
+}
+
+function normalizarTimestampSync(timestamp: number | null | undefined): number {
+  if (!timestamp || !Number.isFinite(timestamp)) return Date.now();
+  return timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp;
+}
+
+/**
+ * Inicializa los timestamps incrementales tras login online para evitar que la
+ * primera bajada use `createdAt=0` cuando todavía no existe la clave local.
+ */
+export async function inicializarTimestampsSyncLogin(loginData: LoginResponse): Promise<void> {
+  const timestamp = normalizarTimestampSync(loginData.persona.timestamp);
+  const claves = [
+    "__last_sync_personas__",
+    "__last_sync_clientes__",
+    "__last_sync_vehiculos__",
+  ];
+  const iniciales = new Map<string, number>();
+
+  for (const clave of claves) {
+    const actual = await syncsController.getTimestamp(clave);
+    if (!actual || actual <= 0) iniciales.set(clave, timestamp);
+  }
+
+  if (iniciales.size > 0) {
+    await syncsController.saveOrUpdateFromMap(iniciales);
+  }
 }
 
 /**

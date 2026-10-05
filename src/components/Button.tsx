@@ -8,6 +8,7 @@ import {
 	ActivityIndicator,
 	View,
 	TouchableOpacityProps,
+	useColorScheme,
 } from "react-native";
 import { LucideIcon } from "lucide-react-native";
 
@@ -48,28 +49,32 @@ export function Button({
 	isLoading = false,
 	icon: IconComponent,
 	iconSize = "xl",
-	iconColor = "#fff",
+	iconColor,
 	...rest
 }: Props) {
+	const colorScheme = useColorScheme();
+	const isDark = colorScheme === "dark";
+	const contentColor = iconColor ?? (isDark ? "#0F172A" : "#FFFFFF");
+
 	return (
 		<TouchableOpacity
-			className='w-36 h-10 rounded-xl flex-row items-center justify-center bg-teColorPrincipal'
+			className='w-36 h-10 rounded-xl flex-row items-center justify-center bg-primary dark:bg-primaryDark active:bg-primaryPressed dark:active:bg-primaryPressedDark'
 			disabled={isLoading}
 			{...rest}
 		>
 			{isLoading ? (
 				<ActivityIndicator
-					color='white'
+					color={contentColor}
 					size='small'
 				/>
 			) : (
 				<View className='flex-row items-center'>
-					<Text className='text-xl font-bold'>{title}</Text>
+					<Text className='text-xl font-bold' style={{ color: contentColor }}>{title}</Text>
 					{IconComponent && (
 						<View className='ml-2'>
 							<IconComponent
 								size={getIconSize(iconSize)}
-								color={iconColor}
+								color={contentColor}
 							/>
 						</View>
 					)}
