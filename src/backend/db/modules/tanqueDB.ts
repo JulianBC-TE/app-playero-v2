@@ -15,7 +15,7 @@ import { db } from "@/backend/db/client";
 import { tanques, syncs } from "@/backend/db/schema";
 import { eq, and, inArray, not } from "drizzle-orm";
 import { TanqueDTO } from "@/dto/TanqueDTO";
-import { getIdsBodegasDelUsuario } from "./bodegaDB";
+import { getIdsBodegasLocales } from "./bodegaDB";
 import { getIdsBodegasConPendientes } from "./retencionPendientes";
 import { fetchTanquesPorBodegas } from "@/backend/api/tanqueAPI";
 
@@ -168,20 +168,16 @@ export async function getLastSyncDate(): Promise<number | null> {
 // ---------------------------------------------------------------------------
 
 /**
- * Descarga y sincroniza los tanques de las bodegas asignadas al operario,
- * más las retenidas por tener registros pendientes de subir.
+ * Descarga y sincroniza los tanques de todas las bodegas presentes en el dispositivo.
  *
- * @param cedula - Cédula del operario que dispara la acción.
+ * @param _cedula - Cédula del operario que dispara la acción. Se conserva por compatibilidad con el flujo actual de sync.
  * @returns Cantidad de tanques sincronizados.
  * @throws Si la llamada al servidor falla o hay error en persistencia.
  */
-export async function syncTanquesDelOperario(cedula: number): Promise<number> {
+export async function syncTanquesDelOperario(_cedula: number): Promise<number> {
   try {
-    const bodegasAsignadas = await getIdsBodegasDelUsuario(cedula);
+    const idsBodegas = await getIdsBodegasLocales();
     const bodegasPendientes = await getIdsBodegasConPendientes();
-    const idsBodegas = Array.from(
-      new Set([...bodegasAsignadas, ...bodegasPendientes]),
-    );
 
     if (idsBodegas.length === 0) {
       console.log("⚠️ TANQUES -> Omitido (no hay bodegas)");
@@ -214,7 +210,7 @@ export async function syncTanquesDelOperario(cedula: number): Promise<number> {
     console.log(`✅ TANQUES -> ok (+${tanquesRemotos.length})`);
     return tanquesRemotos.length;
   } catch (error) {
-    console.error("❌ TANQUES -> Error:", error.message || error);
+    console.error("❌ TANQUES -> Error:", error instanceof Error ? error.message : error);
     throw error;
   }
 }

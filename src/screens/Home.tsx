@@ -33,6 +33,7 @@ import { hayListasPendientes } from "@/services/listasPendientesService";
 import { descargarEInstalar } from "@/services/updateService";
 import { registrarIntentoActualizacion } from "@/storage/storageUpdate";
 import { getStorageServerUrl } from "@/storage/storageServer";
+import { createUpdateDownloadLink } from "@/backend/api/versionAPI";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Download } from "lucide-react-native";
 
@@ -187,7 +188,7 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
    *  - Si hay registros con sync == -1 avisa, pero permite actualizar.
    */
   async function handleActualizar() {
-    if (!updatePendiente?.url) return;
+    if (!updatePendiente?.latestVersion) return;
     if (updateProgress !== null) return;
 
     try {
@@ -237,12 +238,13 @@ export function Home({ navigation }: StackRoutesProps<"home">) {
 
   /** Descarga el APK con el enlace que dio el servidor y lanza el instalador. */
   async function descargarActualizacion() {
-    if (!updatePendiente?.url) return;
+    if (!updatePendiente?.latestVersion) return;
 
     setUpdateProgress(0);
     try {
       const serverUrl = await getStorageServerUrl();
-      await descargarEInstalar(updatePendiente.url, serverUrl, setUpdateProgress);
+      const url = await createUpdateDownloadLink();
+      await descargarEInstalar(url, serverUrl, setUpdateProgress);
       // El instalador terminó: si al reabrir la app la versión no cambió,
       // handleActualizar() mostrará el aviso de bucle.
       await registrarIntentoActualizacion();

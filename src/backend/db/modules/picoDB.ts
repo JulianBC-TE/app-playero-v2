@@ -17,7 +17,7 @@ import { db } from "@/backend/db/client";
 import { picos, syncs } from "@/backend/db/schema";
 import { eq, and, inArray, not } from "drizzle-orm";
 import { PicoDTO } from "@/dto/PicosDTO";
-import { getIdsBodegasDelUsuario } from "./bodegaDB";
+import { getIdsBodegasLocales } from "./bodegaDB";
 import { getIdsBodegasConPendientes } from "./retencionPendientes";
 import { fetchPicosPorBodegas } from "@/backend/api/picoAPI";
 
@@ -168,24 +168,17 @@ export async function getLastSyncDate(): Promise<number | null> {
 // ---------------------------------------------------------------------------
 
 /**
- * Descarga y sincroniza únicamente los picos de las bodegas
- * autorizadas para el operario.
- * Lee los IDs desde `usuarios_bodegas` (sin internet), obtiene los picos
- * del servidor y los guarda localmente.
+ * Descarga y sincroniza los picos de todas las bodegas presentes en el dispositivo.
+ * Lee los IDs desde el catálogo local, obtiene los picos del servidor y los guarda localmente.
  *
- * @param cedula - Cédula del operario autenticado.
+ * @param _cedula - Cédula del operario autenticado. Se conserva por compatibilidad con el flujo actual de sync.
  * @returns Cantidad de picos sincronizados.
  * @throws Si la llamada al servidor falla o hay error en persistencia.
  */
-export async function syncPicosDelOperario(cedula: number): Promise<number> {
+export async function syncPicosDelOperario(_cedula: number): Promise<number> {
   try {
-    // Solo las bodegas asignadas al operario, más las retenidas por tener
-    // registros pendientes de subir (para no perder sus nombres en el Resumen).
-    const bodegasAsignadas = await getIdsBodegasDelUsuario(cedula);
+    const idsBodegas = await getIdsBodegasLocales();
     const bodegasPendientes = await getIdsBodegasConPendientes();
-    const idsBodegas = Array.from(
-      new Set([...bodegasAsignadas, ...bodegasPendientes]),
-    );
 
     if (idsBodegas.length === 0) {
       console.log("⚠️ PICOS -> Omitido (no hay bodegas)");
@@ -218,7 +211,7 @@ export async function syncPicosDelOperario(cedula: number): Promise<number> {
     console.log(`✅ PICOS -> ok (+${picosRemotos.length})`);
     return picosRemotos.length;
   } catch (error) {
-    console.error("❌ PICOS -> Error:", error.message || error);
+    console.error("❌ PICOS -> Error:", error instanceof Error ? error.message : error);
     throw error;
   }
 }

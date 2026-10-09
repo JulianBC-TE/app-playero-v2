@@ -163,6 +163,23 @@ export async function getIdsBodegasDelUsuario(cedula: number): Promise<number[]>
 }
 
 /**
+ * Devuelve los IDs de todas las bodegas presentes en el dispositivo.
+ * Incluye bodegas propias, de traspaso y retenidas por pendientes.
+ */
+export async function getIdsBodegasLocales(): Promise<number[]> {
+  try {
+    const rows = await db
+      .select({ idBodega: bodegas.idBodega })
+      .from(bodegas);
+
+    return rows.map((r) => r.idBodega);
+  } catch (error) {
+    console.error("[DB] Error al obtener bodegas locales:", error);
+    return [];
+  }
+}
+
+/**
  * Devuelve todas las bodegas autorizadas y relacionadas con un usuario específico
  * basándose en la tabla intermedia `usuarios_bodegas`.
  *
@@ -327,7 +344,7 @@ export async function syncCatalogoYTraspasosBodega(): Promise<number> {
     
     return total;
   } catch (error) {
-    console.error("❌ BODEGAS -> Error:", error.message || error);
+    console.error("❌ BODEGAS -> Error:", error instanceof Error ? error.message : error);
     throw error;
   }
 }

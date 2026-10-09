@@ -123,7 +123,6 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
         if (
           update &&
           prev &&
-          prev.url === update.url &&
           prev.latestVersion === update.latestVersion &&
           prev.tamano === update.tamano
         ) {
@@ -317,11 +316,9 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
     if (resultado.update) {
       if (
         resultado.update.disponible &&
-        resultado.update.url &&
         resultado.update.latestVersion
       ) {
         await setUpdatePendiente({
-          url: resultado.update.url,
           latestVersion: resultado.update.latestVersion,
           tamano: resultado.update.tamano,
         });

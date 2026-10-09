@@ -12,8 +12,8 @@ import { compararVersiones, getVersionInstalada } from "@/backend/api/versionAPI
 const STORAGE_KEY = "@playero:update";
 
 export type UpdatePendiente = {
-  /** Enlace de descarga del APK. */
-  url: string;
+  /** Enlace temporal de descarga del APK. Solo se guarda para builds viejos. */
+  url?: string;
   /** Última versión publicada en el servidor. */
   latestVersion: string;
   /** Tamaño aprox. del APK en bytes. */
@@ -33,7 +33,7 @@ export type UpdatePendiente = {
  * Guarda (o limpia con `null`) el aviso de actualización pendiente.
  *
  * Conserva el contador de intentos si sigue siendo exactamente la misma
- * actualización (mismo enlace y misma versión publicada); si llega una
+   * actualización (misma versión publicada); si llega una
  * versión nueva, el contador vuelve a 1.
  */
 export async function saveUpdatePendiente(
@@ -54,7 +54,6 @@ export async function saveUpdatePendiente(
         const previa = JSON.parse(rawPrevia) as UpdatePendiente;
         if (
           previa &&
-          previa.url === update.url &&
           previa.latestVersion === update.latestVersion
         ) {
           intentos = previa.intentos ?? 1;
@@ -104,7 +103,7 @@ export async function getUpdatePendiente(): Promise<UpdatePendiente | null> {
     if (!raw) return null;
 
     const update = JSON.parse(raw) as UpdatePendiente;
-    if (!update?.url || !update?.latestVersion) {
+    if (!update?.latestVersion) {
       await AsyncStorage.removeItem(STORAGE_KEY);
       return null;
     }

@@ -4,8 +4,9 @@
  *
  * Chequeo de versión de la app contra el servidor.
  * Se invoca en cada ciclo de sincronización: envía la versión instalada
- * y, cuando el servidor detecta que no es la última, devuelve el enlace
- * de actualización para que el Home muestre el botón "Actualizar".
+ * y, cuando el servidor detecta que no es la última, devuelve la versión
+ * disponible para que el Home muestre el botón "Actualizar". El enlace
+ * temporal se pide recién cuando el usuario confirma la descarga.
  */
 import { httpClient } from "./httpClient";
 // Versión de respaldo (JS puro, se empaqueta en el bundle del build).
@@ -15,9 +16,17 @@ export type VersionCheckResponse = {
   updateAvailable: boolean;
   versionActual?: string;
   latestVersion?: string;
-  /** Enlace absoluto de descarga del APK (solo cuando hay actualización). */
-  url?: string;
   tamano?: number;
+};
+
+export type VersionDownloadLinkResponse = {
+  ok: boolean;
+  data?: {
+    url: string;
+    vence_en?: string;
+    latestVersion?: string;
+    tamano?: number;
+  };
 };
 
 /**
@@ -28,7 +37,6 @@ export type VersionCheckResponse = {
  */
 export type UpdateSyncInfo = {
   disponible: boolean;
-  url?: string;
   latestVersion?: string;
   tamano?: number;
 };
@@ -85,4 +93,17 @@ export async function checkAppVersion(): Promise<VersionCheckResponse> {
     console.warn("[versionAPI] No se pudo verificar la versión:", error);
     return { updateAvailable: false };
   }
+}
+
+export async function createUpdateDownloadLink(): Promise<string> {
+  const { data } = await httpClient.post<VersionDownloadLinkResponse>(
+    "/api/app/version/link-descarga",
+    { version: getVersionInstalada() },
+  );
+
+  if (!data?.data?.url) {
+    throw new Error("El servidor no devolvió el link de descarga.");
+  }
+
+  return data.data.url;
 }

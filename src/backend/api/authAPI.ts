@@ -6,6 +6,7 @@
 // Las pantallas y contextos importan de aquí — nunca usan axios directamente.
 
 import { httpClient } from "./httpClient";
+import { getStorageDeviceUuid, setStorageDeviceUuid } from "@/storage/storageDevice";
 
 // ---------------------------------------------------------------------------
 // Tipos de respuesta del servidor
@@ -89,6 +90,7 @@ export type UserStatusResponse = {
   bloqueado: boolean;
   idSucursal?: number;
   descripcionSucursal?: string;
+  deviceUuid?: string;
 };
 
 /**
@@ -98,10 +100,14 @@ export type UserStatusResponse = {
  */
 export async function checkUserStatusServer(id: number): Promise<UserStatusResponse> {
   try {
-    // Apunta al endpoint que creamos en el backend protegido por token
-    const { data } = await httpClient.get<UserStatusResponse>(
-      `/api/app/auth/status/${id}`
+    const deviceUuid = await getStorageDeviceUuid();
+    const { data } = await httpClient.post<UserStatusResponse>(
+      `/api/app/auth/status/${id}`,
+      deviceUuid ? { deviceUuid } : {}
     );
+    if (data.deviceUuid) {
+      await setStorageDeviceUuid(data.deviceUuid);
+    }
     return data;
   } catch (error) {
     if (error instanceof Error) {

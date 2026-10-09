@@ -53,7 +53,7 @@ export const baseMenuItems: menuItemType[] = [
     params: {},
   },
   {
-    name: "Equipo/Vehículo",
+    name: "Equipo",
     icon: Tractor,
     route: "vehiculo",
     enabled: true,

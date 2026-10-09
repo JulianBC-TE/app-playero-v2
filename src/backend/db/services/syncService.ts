@@ -325,10 +325,9 @@ export async function syncCatalogosFromCentral(
     try {
       const chequeo = await checkAppVersion();
       update =
-        chequeo.updateAvailable && chequeo.url && chequeo.latestVersion
+        chequeo.updateAvailable && chequeo.latestVersion
           ? {
               disponible: true,
-              url: chequeo.url,
               latestVersion: chequeo.latestVersion,
               tamano: chequeo.tamano,
             }
